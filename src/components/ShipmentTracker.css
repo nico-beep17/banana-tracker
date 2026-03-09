@@ -1,0 +1,173 @@
+.tracker-container {
+    padding: 0 1rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.map-wrapper {
+    height: 400px;
+    width: 100%;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    margin-bottom: 2rem;
+    border: 1px solid var(--border-color);
+}
+
+.leaflet-container {
+    height: 100%;
+    width: 100%;
+    background-color: #aadaff;
+    /* Light ocean blue */
+}
+
+/* Custom Marker Styling */
+.ship-marker-wrapper {
+    background: white;
+    border-radius: 50%;
+    padding: 5px;
+    box-shadow: var(--shadow-md);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border: 2px solid var(--color-accent);
+}
+
+.ship-icon-inner {
+    font-size: 1.2rem;
+    line-height: 1;
+}
+
+.eta-bubble {
+    font-weight: 700;
+    color: var(--color-primary-dark);
+    font-size: 0.9rem;
+    text-align: center;
+}
+
+.eta-bubble .bg {
+    display: block;
+    color: var(--text-tertiary);
+    font-size: 0.75rem;
+    font-weight: 500;
+    margin-bottom: 2px;
+}
+
+/* Shipment Cards Grid */
+.shipments-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 1.5rem;
+}
+
+.shipment-card {
+    background: white;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.shipment-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.shipment-title {
+    font-weight: 800;
+    color: var(--color-primary-dark);
+    font-size: 1.1rem;
+}
+
+.shipment-subtitle {
+    color: var(--text-tertiary);
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+/* Timeline */
+.transit-timeline {
+    display: flex;
+    justify-content: space-between;
+    position: relative;
+    margin-top: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.transit-timeline::before {
+    content: '';
+    position: absolute;
+    top: 14px;
+    left: 15px;
+    right: 15px;
+    height: 4px;
+    background: var(--border-color);
+    z-index: 1;
+    border-radius: 2px;
+}
+
+.timeline-progress {
+    position: absolute;
+    top: 14px;
+    left: 15px;
+    height: 4px;
+    background: linear-gradient(90deg, var(--color-primary) 0%, var(--color-accent) 100%);
+    z-index: 2;
+    border-radius: 2px;
+    transition: width 0.5s ease-in-out;
+}
+
+.timeline-node {
+    position: relative;
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    width: 60px;
+}
+
+.node-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: white;
+    border: 2px solid var(--border-color);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    color: var(--text-tertiary);
+}
+
+.timeline-node.active .node-icon {
+    border-color: var(--color-accent);
+    background: var(--color-primary-light);
+    color: white;
+    box-shadow: 0 0 0 4px rgba(42, 90, 53, 0.1);
+}
+
+.timeline-node.completed .node-icon {
+    border-color: var(--color-primary);
+    background: var(--color-primary);
+    color: white;
+}
+
+.node-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-align: center;
+    line-height: 1.2;
+}
+
+.timeline-node.active .node-label {
+    color: var(--color-primary-dark);
+}
+
+.shipment-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 0.5rem;
+}

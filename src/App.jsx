@@ -1,0 +1,775 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import Layout from './components/Layout';
+import Dashboard from './components/Dashboard';
+import ArrivalForm from './components/ArrivalForm';
+import ArrivalsTable from './components/ArrivalsTable';
+import FarmsAndGrowers from './components/FarmsAndGrowers';
+import Sampling from './components/Sampling';
+import NewContainerForm from './components/NewContainerForm';
+import ContainersList from './components/ContainersList';
+import ContainerStuffingGrid from './components/ContainerStuffingGrid';
+import Reports from './components/Reports';
+import Accounting from './components/Accounting';
+import Payroll from './components/Payroll';
+import Login from './components/Login';
+import ShipmentTracker from './components/ShipmentTracker';
+import MaterialsInventory from './components/MaterialsInventory';
+import AIAssistantWidget from './components/AIAssistantWidget';
+import { supabase } from './supabaseClient';
+import { BotMessageSquare } from 'lucide-react';
+
+const INITIAL_FARMS = [
+  { id: '1', farmCode: '1000', name: 'ASUCENA C. DUALLO', prodHas: 6.00, activeHas: 6.00, location: 'TALAINGOD, DAVAO DEL NORTE', elevation: 'LOW LAND', farmType: 'DIRECT', company: 'OWN FARM', otherGrouping: 'ASUCENA C. DUALLO', status: 'ACTIVE', pointOfDelivery: 'CARMEN CY', physicalPhName: 'DUALLO PH', physicalPhAddress: 'TALAINGOD, DAVAO DEL NORTE', brand: 'LFJ', bankName: '', accountName: '', accountNumber: '', lastModified: new Date().toISOString() },
+  { id: '2', farmCode: '1001', name: 'MARINA M. BACALLA', prodHas: 5.00, activeHas: 5.00, location: 'NEW CORELLA, DAVAO DEL NORTE', elevation: 'LOW LAND', farmType: 'DIRECT', company: 'OWN FARM', otherGrouping: 'MARINA BACALLA', status: 'ACTIVE', pointOfDelivery: 'CARMEN CY', physicalPhName: 'LAGUMBAY PH', physicalPhAddress: 'NEW CORELLA, DAVAO DEL NORTE', brand: 'LFJ', bankName: '', accountName: '', accountNumber: '', lastModified: new Date().toISOString() },
+  { id: '3', farmCode: '1002', name: 'NARCISO P. MANGQUIT', prodHas: 5.00, activeHas: 5.00, location: 'TULALIAN, STO. TOMAS DAVAO DEL NORTE', elevation: 'LOW LAND', farmType: 'DIRECT', company: 'OWN FARM', otherGrouping: 'NARCISO P. MANGQUIT', status: 'ACTIVE', pointOfDelivery: 'CARMEN CY', physicalPhName: 'MANQUIT PH', physicalPhAddress: 'TULALIAN, STO. TOMAS DAVAO DEL NORTE', brand: 'LFJ', bankName: '', accountName: '', accountNumber: '', lastModified: new Date().toISOString() },
+  { id: '4', farmCode: '1003', name: 'PERLA M. CABATO', prodHas: 4.00, activeHas: 4.00, location: 'BALAGUNAN, STO. TOMAS DAVAO DEL NORTE', elevation: 'LOW LAND', farmType: 'DIRECT', company: 'OWN FARM', otherGrouping: 'PERLA M. CABATO', status: 'ACTIVE', pointOfDelivery: 'CARMEN CY', physicalPhName: 'CABATO PH', physicalPhAddress: 'BALAGUNAN, STO. TOMAS DAVAO DEL NORTE', brand: 'LFJ', bankName: '', accountName: '', accountNumber: '', lastModified: new Date().toISOString() },
+  { id: '5', farmCode: '1004', name: 'ALMA QUISAY', prodHas: 15.00, activeHas: 15.00, location: 'TUBOD, CARMEN, DAVAO DEL NORTE', elevation: 'LOW LAND', farmType: 'DIRECT', company: 'OWN FARM', otherGrouping: 'ALMA QUISAY', status: 'ACTIVE', pointOfDelivery: 'CARMEN CY', physicalPhName: 'QUISAY PH', physicalPhAddress: 'TUBOD, CARMEN, DAVAO DEL NORTE', brand: 'LFJ', bankName: '', accountName: '', accountNumber: '', lastModified: new Date().toISOString() },
+  { id: '6', farmCode: '1005', name: 'DENNIS CERVANTES', prodHas: 5.00, activeHas: 5.00, location: 'PRK. 4B MAGSAYSAY, CARMEN , DAVAO DEL NORTE', elevation: 'LOW LAND', farmType: 'DIRECT', company: 'OWN FARM', otherGrouping: 'DENNIS CERVANTES', status: 'ACTIVE', pointOfDelivery: 'CARMEN CY', physicalPhName: 'CERVANTES PH', physicalPhAddress: 'PRK. 4B MAGSAYSAY, CARMEN , DAVAO DEL NORTE', brand: 'LFJ', bankName: '', accountName: '', accountNumber: '', lastModified: new Date().toISOString() }
+];
+
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  render() {
+    if (this.state.hasError) {
+      return <div style={{ padding: '2rem', color: 'red' }}><h1>CRASH</h1><pre>{this.state.error?.stack}</pre></div>;
+    }
+    return this.props.children;
+  }
+}
+
+function App() {
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [tabState, setTabState] = useState(null); // Used to pass context like pre-selected farmCode
+  const [arrivals, setArrivals] = useState([]);
+  const [farms, setFarms] = useState([]);
+  const [samplings, setSamplings] = useState([]);
+  const [containers, setContainers] = useState([]);
+  const [weeklyRates, setWeeklyRates] = useState([]);
+
+  // Phase 12 Accounting State
+  const [chartOfAccounts, setChartOfAccounts] = useState([]);
+  const [journalEntries, setJournalEntries] = useState([]);
+  const [journalLines, setJournalLines] = useState([]);
+
+  // Materials Inventory State
+  const [inventoryItems, setInventoryItems] = useState([]);
+
+  // Phase 12 Global Context
+  const [exchangeRate, setExchangeRate] = useState(56.50); // Default USD to PHP Rate
+  const [employees, setEmployees] = useState([]);
+  const [dtrRecords, setDtrRecords] = useState([]);
+  const [attendanceLocations, setAttendanceLocations] = useState([]);
+
+  // Auth State
+  const [user, setUser] = useState(null);
+  const [userProfile, setUserProfile] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  // AI Assistant State
+  const [isAIOpen, setIsAIOpen] = useState(false);
+
+  // Toast System
+  const [toasts, setToasts] = useState([]);
+  const showToast = (message, type = 'info') => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 5000);
+  };
+
+  // fetchData is defined outside useEffect so it can be passed to child components
+  const fetchData = useCallback(async () => {
+    try {
+      const { data: farmsData } = await supabase.from('farms').select('*').order('lastModified', { ascending: false });
+      if (farmsData && farmsData.length > 0) {
+        setFarms(farmsData);
+      } else {
+        setFarms(INITIAL_FARMS);
+        await supabase.from('farms').insert(INITIAL_FARMS);
+      }
+
+      const { data: arrivalsData } = await supabase.from('arrivals').select('*').order('dateTimeEncoded', { ascending: false });
+      if (arrivalsData) setArrivals(arrivalsData);
+
+      const { data: samplingsData } = await supabase.from('samplings').select('*').order('encodedAt', { ascending: false });
+      if (samplingsData) setSamplings(samplingsData);
+
+      const { data: containersData } = await supabase.from('containers').select('*').order('dateCreated', { ascending: false });
+      if (containersData) setContainers(containersData);
+
+      const { data: ratesData } = await supabase.from('weekly_rates').select('*').order('created_at', { ascending: false });
+      if (ratesData) setWeeklyRates(ratesData);
+
+      const { data: invData } = await supabase.from('materials_inventory').select('*').order('item_code', { ascending: true });
+      if (invData) setInventoryItems(invData);
+
+      const { data: coaData } = await supabase.from('chart_of_accounts').select('*').order('code', { ascending: true });
+      if (coaData) setChartOfAccounts(coaData);
+
+      const { data: jeData } = await supabase.from('journal_entries').select('*').order('date_posted', { ascending: false });
+      if (jeData) setJournalEntries(jeData);
+
+      const { data: jlData } = await supabase.from('journal_lines').select('*');
+      if (jlData) setJournalLines(jlData);
+
+      // HR/Payroll tables may not yet exist - catch individually
+      try {
+        const { data: empData, error: empErr } = await supabase.from('employees').select('*').order('last_name', { ascending: true });
+        if (!empErr && empData) setEmployees(empData);
+      } catch (_) { /* table may not exist yet */ }
+
+      try {
+        const { data: dtrData, error: dtrErr } = await supabase.from('dtr_records').select('*');
+        if (!dtrErr && dtrData) setDtrRecords(dtrData);
+      } catch (_) { /* table may not exist yet */ }
+
+      try {
+        const { data: locData, error: locErr } = await supabase.from('attendance_locations').select('*');
+        if (!locErr && locData) setAttendanceLocations(locData);
+      } catch (_) { /* table may not exist yet */ }
+
+      try {
+        await supabase.from('accounting_periods').select('*');
+      } catch (_) { /* table may not exist yet */ }
+
+    } catch (err) {
+      console.error('Error fetching data from Supabase:', err);
+    }
+  }, []);
+
+  // Fetch initial data & handle Auth
+  useEffect(() => {
+    // Check initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      if (session?.user) fetchUserProfile(session.user.id);
+      else setAuthLoading(false);
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUser(session?.user ?? null);
+      }
+    );
+
+    fetchData();
+
+    return () => subscription.unsubscribe();
+  }, [fetchData]);
+
+  // Sync profile when user changes (handles both real and dev bypass users)
+  useEffect(() => {
+    if (user) {
+      if (!userProfile || userProfile.id !== user.id) {
+        fetchUserProfile(user.id);
+      }
+    } else {
+      setUserProfile(null);
+    }
+  }, [user, userProfile]);
+
+  const fetchUserProfile = async (userId) => {
+    // 1. Check for Dev Bypass Mock ID (Zero UUID)
+    if (userId === '00000000-0000-0000-0000-000000000000' || userId === 'dev-bypass-id') {
+      setUserProfile({
+        id: userId,
+        full_name: 'Developer Admin',
+        role: 'Admin / Developer',
+        department: 'Engineering'
+      });
+      setAuthLoading(false);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (!error && data) {
+        setUserProfile(data);
+      } else {
+        // Fallback for newly registered users whose profile trigger hasn't finished
+        // or for edge cases where the profile record is missing.
+        setUserProfile({
+          id: userId,
+          full_name: 'New User',
+          role: 'Guest',
+          department: 'General'
+        });
+      }
+    } catch (e) {
+      console.error("Error fetching profile", e);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+  };
+
+  const handleNavigate = (tabInfo) => {
+    if (typeof tabInfo === 'string') {
+      setActiveTab(tabInfo);
+      setTabState(null);
+    } else {
+      setActiveTab(tabInfo.name);
+      setTabState(tabInfo.state || null);
+    }
+  };
+
+  const handleAddArrival = async (newArrivalsBatch) => {
+    const { data, error } = await supabase
+      .from('arrivals')
+      .insert(newArrivalsBatch)
+      .select();
+
+    if (error) {
+      console.error("Supabase error (Arrivals):", error);
+      alert(`⚠️ Database Insert Failed: ${error.message || error.details || 'Unknown constraint error.'}`);
+      return false;
+    }
+
+    if (data) {
+      setArrivals(prev => [...data, ...prev]);
+      return true;
+    }
+  };
+
+  const handleSaveContainer = async (containerData) => {
+    const isUpdate = containerData.id && containers.some(c => c.id === containerData.id);
+
+    // Omit columns that are purely front-end or not yet in schema cache to prevent db crashes
+    const {
+      timeOfDeparture,
+      bookingNo,
+      buyer_name,
+      vesselVoyage,
+      driverName,
+      plugInTime,
+      plugOutTime,
+      dateArrived,
+      plateNo,
+      temperature,
+      ventilation,
+      bpiSticker,
+      dateDeparted,
+      ...dbPayload
+    } = containerData;
+
+    if (isUpdate) {
+      const { data, error } = await supabase
+        .from('containers')
+        .update(dbPayload)
+        .eq('id', containerData.id)
+        .select();
+
+      if (error) {
+        console.error("Supabase error (Update Container):", error);
+        alert(`Failed to update container registry in database. Error: ${error.message}`);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        // Re-inject the front-end properties into local state so the UI functions seamlessly
+        setContainers(prev => prev.map(c => c.id === containerData.id ? { ...data[0], timeOfDeparture, bookingNo, buyer_name, vesselVoyage, driverName, dateArrived, plateNo, temperature, ventilation, bpiSticker, dateDeparted } : c));
+        handleNavigate('containers-list');
+      }
+    } else {
+      const { data, error } = await supabase
+        .from('containers')
+        .insert([dbPayload])
+        .select();
+
+      if (error) {
+        console.error("Supabase error (Create Container):", error);
+        alert(`Failed to create container registry in database. Error: ${error.message}`);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        // Re-inject the front-end properties into local state so the UI functions seamlessly
+        setContainers(prev => [{ ...data[0], timeOfDeparture, bookingNo, buyer_name, vesselVoyage, driverName, dateArrived, plateNo, temperature, ventilation, bpiSticker, dateDeparted }, ...prev]);
+        handleNavigate('containers-list');
+      }
+    }
+  };
+
+  const handleSaveContentPayload = async (containerId, payload) => {
+    const targetContainer = containers.find(c => c.id === containerId);
+    if (!targetContainer) return;
+
+    const newTotalBoxes = (targetContainer.totalBoxes || 0) + payload.total;
+    const newStuffedItems = [...(targetContainer.stuffedItems || []), payload];
+
+    // Automatically manage started and ended times as instructed
+    const updates = { totalBoxes: newTotalBoxes, stuffedItems: newStuffedItems };
+
+    if (newStuffedItems.length === 1 && !targetContainer.timeStarted) {
+      updates.timeStarted = new Date().toISOString();
+    }
+
+    if (newTotalBoxes >= 1540 && !targetContainer.timeEnded) {
+      updates.timeEnded = new Date().toISOString();
+    }
+
+    const { data, error } = await supabase
+      .from('containers')
+      .update(updates)
+      .eq('id', containerId)
+      .select();
+
+    if (error) {
+      console.error("Supabase error (Stuffed Items):", error);
+      alert("Failed to save stuffing payload data.");
+      return;
+    }
+
+    if (data && data[0]) {
+      setContainers(prev => prev.map(c => c.id === containerId ? data[0] : c));
+      handleNavigate('containers-list');
+    }
+  };
+
+  const handleSealContainer = async (containerId) => {
+    const timeSealed = new Date().toISOString();
+
+    // As the timeSealed native column might not be initialized on all remote databases 
+    // until next major migration, we explicitly update transit_status instead, 
+    // and hold timeSealed in memory/app state for seamless UI transitioning.
+    const { data, error } = await supabase
+      .from('containers')
+      .update({ transit_status: 'SEALED' })
+      .eq('id', containerId)
+      .select();
+
+    if (error) {
+      console.error("Supabase error (Seal Container):", error);
+      alert("Failed to seal container.");
+      return;
+    }
+
+    if (data && data[0]) {
+      // Patch the local state with timeSealed so the UI reacts correctly
+      setContainers(prev => prev.map(c => c.id === containerId ? { ...data[0], timeSealed } : c));
+    }
+  };
+
+  const handleDepartContainer = async (containerId) => {
+    const timeDeparted = new Date().toISOString();
+    const { data, error } = await supabase
+      .from('containers')
+      .update({ timeDeparted })
+      .eq('id', containerId)
+      .select();
+
+    if (error) {
+      console.error("Supabase error (Depart Container):", error);
+      alert("Failed to run departure dispatch command.");
+      return;
+    }
+
+    if (data && data[0]) {
+      setContainers(prev => prev.map(c => c.id === containerId ? data[0] : c));
+    }
+  };
+
+  const handleUpdateTransitStatus = async (containerId, newStatus) => {
+    const transit_updated_at = new Date().toISOString();
+    const { data, error } = await supabase
+      .from('containers')
+      .update({ transit_status: newStatus, transit_updated_at })
+      .eq('id', containerId)
+      .select();
+
+    if (error) {
+      console.error("Supabase error (Update Transit):", error);
+      alert("Failed to update transit status.");
+      return;
+    }
+
+    if (data && data[0]) {
+      setContainers(prev => prev.map(c => c.id === containerId ? data[0] : c));
+    }
+  };
+
+  // Calculate high level metrics
+  // ONLY count APPROVED arrivals
+  const approvedArrivals = arrivals.filter(arr => arr.approval_status === 'APPROVED');
+
+  const totalBoxesToday = approvedArrivals.reduce((sum, arr) => sum + (arr.quantity || 0), 0);
+  const classATotal = approvedArrivals.reduce((sum, arr) => {
+    const isA = arr.typeId ? arr.typeId.startsWith('classA') : (arr.ccClass === 'A' || arr.ccClass === 'Class A' || arr.ccClass === 'SH' || arr.ccClass === 'A (Cluster)');
+    return isA ? sum + (arr.quantity || 0) : sum;
+  }, 0);
+  const classBTotal = approvedArrivals.reduce((sum, arr) => {
+    const isB = arr.typeId ? arr.typeId.startsWith('classB') : (arr.ccClass === 'B' || arr.ccClass === 'Class B' || arr.ccClass === 'B (Cluster)' || arr.ccClass === 'B (Finger Pack)');
+    return isB ? sum + (arr.quantity || 0) : sum;
+  }, 0);
+
+  // Calculate unique farms based on the new 'farmName' property
+  const uniqueFarms = new Set(approvedArrivals.map(arr => arr.farmName));
+
+  const calculateRemainingInventory = () => {
+    const inventory = {};
+
+    // Initial arrival quantities (ONLY APPROVED)
+    approvedArrivals.forEach(arr => {
+      if (arr.typeId) {
+        inventory[arr.typeId] = (inventory[arr.typeId] || 0) + arr.quantity;
+      }
+    });
+
+    // Subtract stuffed quantities
+    containers.forEach(container => {
+      if (container.stuffedItems) {
+        container.stuffedItems.forEach(payload => {
+          if (payload.data) {
+            Object.keys(payload.data).forEach(classGroupName => {
+              const classObj = payload.data[classGroupName];
+              Object.keys(classObj).forEach(sizeKey => {
+                const val = Number(classObj[sizeKey]) || 0;
+                if (val > 0) {
+                  const typeId = `${classGroupName}.${sizeKey}`;
+                  if (inventory[typeId] !== undefined) {
+                    inventory[typeId] -= val;
+                  }
+                }
+              });
+            });
+          }
+        });
+      }
+    });
+    return inventory;
+  };
+
+  const handleApproveArrival = async (arrivalId, batchId) => {
+    let query = supabase.from('arrivals').update({ approval_status: 'APPROVED', approved_by: user?.id });
+
+    if (batchId) {
+      query = query.eq('batchId', batchId);
+    } else {
+      query = query.eq('id', arrivalId);
+    }
+
+    const { data, error } = await query.select();
+
+    if (error) {
+      console.error("Supabase error (Approve Arrival):", error);
+      alert(`Failed to approve arrival: ${error.message || 'Unknown error'}`);
+      return;
+    }
+
+    if (data && data.length > 0) {
+      // Create a map of updated items for faster lookup
+      const updatedMap = new Map(data.map(item => [item.id, item]));
+      setArrivals(prev => prev.map(a => updatedMap.has(a.id) ? updatedMap.get(a.id) : a));
+    }
+  };
+
+  const remainingInventoryDetailed = calculateRemainingInventory();
+
+  const remainingTotal = Object.values(remainingInventoryDetailed).reduce((sum, val) => sum + val, 0);
+  const remainingClassA = Object.keys(remainingInventoryDetailed).filter(k => k.startsWith('classA')).reduce((sum, k) => sum + remainingInventoryDetailed[k], 0);
+  const remainingClassB = Object.keys(remainingInventoryDetailed).filter(k => k.startsWith('classB')).reduce((sum, k) => sum + remainingInventoryDetailed[k], 0);
+
+  const inventoryMetrics = {
+    total: remainingTotal,
+    classA: remainingClassA,
+    classB: remainingClassB,
+    detailed: remainingInventoryDetailed
+  };
+
+  const [smartNotifications, setSmartNotifications] = useState([]);
+
+  useEffect(() => {
+    // Generate intelligent notifications summary based on recent global events
+    const notifs = [];
+
+    // Summary of operations
+    notifs.push({
+      id: 'daily-summary',
+      title: 'Daily Summary',
+      message: `Total boxes arrived today: ${totalBoxesToday}. Active farms: ${uniqueFarms.size}.`,
+      icon: '📊',
+      read: false
+    });
+
+    // Accounting & Payroll Alerts
+    const unpostedPayroll = arrivals.some(a => a.approval_status === 'APPROVED' && !a.is_posted); // Mock check
+    if (unpostedPayroll) {
+      notifs.push({
+        id: 'unposted-payroll',
+        title: 'Action Required: Payroll',
+        message: 'Approved arrivals ready for payroll processing.',
+        icon: '💰',
+        read: false
+      });
+    }
+
+    // HUB ALERT: Unsealed containers
+    const unsealed = containers.filter(c => !c.transit_status || c.transit_status === 'PENDING');
+    if (unsealed.length > 0) {
+      notifs.push({
+        id: 'unsealed-summary',
+        title: 'Hub Alert: Departure',
+        message: `⚠️ ${unsealed.length} containers standing by for seal and dispatch.`,
+        icon: '🚢',
+        read: false
+      });
+    }
+
+    // STRATEGIC ANALYSIS: Quality Trends
+    const sampledBoxes = samplings.flatMap(s => s.boxes || []);
+    if (sampledBoxes.length > 0) {
+      const downgradeRate = (sampledBoxes.filter(b => b.decision === 'DOWNGRADED').length / sampledBoxes.length) * 100;
+      if (downgradeRate > 15) {
+        notifs.push({
+          id: 'quality-analysis',
+          title: 'Intelligence: Quality Dip',
+          message: `Alert: Overall downgrade rate is at ${downgradeRate.toFixed(1)}%. Inspect Farm Group outputs.`,
+          icon: '📉',
+          read: false
+        });
+      } else {
+        notifs.push({
+          id: 'quality-analysis-good',
+          title: 'Intelligence: Quality Stable',
+          message: `Packing quality is optimal. Downgrade rate at ${downgradeRate.toFixed(1)}%.`,
+          icon: '✨',
+          read: false
+        });
+      }
+    }
+
+    // STRATEGIC ANALYSIS: Collection Efficiency
+    const totalRev = containers.reduce((s, c) => s + (Number(c.totalBoxes || 0) * (Number(c.agreed_rate) || 0)), 0);
+    const collected = containers.reduce((s, c) => s + (Number(c.amount_paid_partial) || 0), 0);
+    const collectionRate = totalRev > 0 ? (collected / totalRev) * 100 : 100;
+
+    if (collectionRate < 70) {
+      notifs.push({
+        id: 'finance-analysis',
+        title: 'Intelligence: Cash Flow',
+        message: `Collection efficiency is at ${collectionRate.toFixed(0)}%. Follow up on outstanding receivables.`,
+        icon: '💸',
+        read: false
+      });
+    }
+
+    // Geofence Violations (if any)
+    // Here we'd typically have a query for recent violations
+
+    setSmartNotifications(notifs);
+  }, [arrivals, containers, totalBoxesToday, uniqueFarms.size]);
+
+
+  if (authLoading) {
+    return <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center' }}>Loading Application...</div>;
+  }
+
+  if (!user) {
+    return <Login onLoginSuccess={setUser} />;
+  }
+
+  return (
+    <ErrorBoundary>
+      <Layout activeTab={activeTab} onTabChange={handleNavigate} userProfile={userProfile} onLogout={handleLogout} notifications={smartNotifications}>
+        {activeTab === 'dashboard' && (
+          <Dashboard
+            metrics={{
+              totalBoxes: totalBoxesToday,
+              totalTrips: arrivals.length,
+              classATotal: classATotal,
+              classBTotal: classBTotal,
+              activeFarms: uniqueFarms.size,
+              activeContainers: containers.filter(c => c.totalBoxes > 0 && !c.timeDeparted),
+              remainingInventory: inventoryMetrics,
+              pendingArrivalsCount: arrivals.filter(a => a.approval_status !== 'APPROVED').length,
+              unsealedContainersCount: containers.filter(c => !c.transit_status || c.transit_status === 'PENDING').length,
+              activeSamplingsCount: samplings.filter(s => s.status !== 'COMPLETED').length
+            }}
+            userProfile={userProfile}
+            onNavigate={handleNavigate}
+          >
+            <ArrivalsTable arrivals={arrivals} onApproveArrival={handleApproveArrival} userProfile={userProfile} />
+          </Dashboard>
+        )}
+
+        {activeTab === 'log-arrival' && (
+          <ArrivalForm
+            arrivals={arrivals}
+            onApproveArrival={handleApproveArrival}
+            userProfile={userProfile}
+            onAddArrival={handleAddArrival}
+            farms={farms}
+            weeklyRates={weeklyRates}
+            samplings={samplings}
+            setSamplings={setSamplings}
+            onNavigate={handleNavigate}
+          />
+        )}
+
+        {activeTab === 'sampling' && (
+          <Sampling
+            farms={farms}
+            samplings={samplings}
+            setSamplings={setSamplings}
+            onNavigate={handleNavigate}
+            initialFarmCode={tabState?.farmCode}
+          />
+        )}
+
+        {activeTab === 'farms' && (
+          <FarmsAndGrowers
+            farms={farms}
+            setFarms={setFarms}
+            weeklyRates={weeklyRates}
+            setWeeklyRates={setWeeklyRates}
+          />
+        )}
+
+        {activeTab === 'new-container' && (
+          <NewContainerForm
+            onSaveContainer={handleSaveContainer}
+            onCancel={() => handleNavigate('containers-list')}
+          />
+        )}
+
+        {activeTab === 'edit-container' && tabState?.containerId && (
+          <NewContainerForm
+            onSaveContainer={handleSaveContainer}
+            initialData={containers.find(c => c.id === tabState.containerId)}
+            onCancel={() => handleNavigate('containers-list')}
+          />
+        )}
+
+        {activeTab === 'container-stuffing-grid' && tabState?.containerId && (
+          <ContainerStuffingGrid
+            containerId={tabState.containerId}
+            containers={containers}
+            remainingInventory={inventoryMetrics}
+            onSavePayload={handleSaveContentPayload}
+            onCancel={() => handleNavigate('containers-list')}
+          />
+        )}
+
+        {activeTab === 'inventory' && (
+          <MaterialsInventory
+            inventoryItems={inventoryItems}
+            setInventoryItems={setInventoryItems}
+            userProfile={userProfile}
+            farms={farms}
+          />
+        )}
+
+        {activeTab === 'containers-list' && (
+          <ContainersList
+            containers={containers}
+            onNavigate={handleNavigate}
+            onDepartContainer={handleDepartContainer}
+            onSealContainer={handleSealContainer}
+          />
+        )}
+
+        {activeTab === 'reports' && (
+          <Reports
+            arrivals={arrivals}
+            containers={containers}
+            samplings={samplings}
+          />
+        )}
+
+        {activeTab === 'accounting' && (
+          <Accounting
+            arrivals={arrivals}
+            samplings={samplings}
+            containers={containers}
+            farms={farms}
+            userProfile={userProfile}
+            exchangeRate={exchangeRate}
+            setExchangeRate={setExchangeRate}
+            chartOfAccounts={chartOfAccounts}
+            journalEntries={journalEntries}
+            journalLines={journalLines}
+            showToast={showToast}
+          />
+        )}
+
+        {activeTab === 'payroll' && (
+          <Payroll
+            showToast={showToast}
+            employees={employees}
+            dtrRecords={dtrRecords}
+            attendanceLocations={attendanceLocations}
+            fetchData={fetchData}
+            initialTab={tabState?.tab}
+          />
+        )}
+
+        {activeTab === 'shipment-tracker' && (
+          <ShipmentTracker
+            containers={containers}
+            onUpdateTransitStatus={handleUpdateTransitStatus}
+          />
+        )}
+
+        {/* Premium AI Assistant FAB Trigger */}
+        <button
+          className="fixed bottom-6 right-6 w-16 h-16 rounded-full flex items-center justify-center text-white shadow-2xl transition-all duration-300 hover:scale-110 active:scale-95"
+          style={{
+            background: 'linear-gradient(135deg, #10b981, #059669)',
+            boxShadow: '0 10px 25px rgba(16, 185, 129, 0.4)',
+            zIndex: 9999, // High enough to overlay navigation and views, but below the widget (10000)
+            pointerEvents: 'auto',
+          }}
+          onClick={(e) => {
+            e.stopPropagation(); // Prevents clicks leaking into other overlays 
+            setIsAIOpen(!isAIOpen);
+          }}
+          title="Toggle LAVC AI Copilot"
+        >
+          <BotMessageSquare size={32} strokeWidth={1.5} />
+        </button>
+
+        {isAIOpen && (
+          <AIAssistantWidget
+            arrivals={arrivals}
+            containers={containers}
+            farms={farms}
+            onClose={() => setIsAIOpen(false)}
+          />
+        )}
+
+        {/* Toast Notification Overlay */}
+        <div className="toast-container" style={{ position: 'fixed', top: '1rem', right: '1rem', zIndex: 10001, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          {toasts.map(t => (
+            <div key={t.id} className={`toast toast-${t.type} animation-slide-in`} style={{
+              padding: '1rem 1.5rem',
+              borderRadius: '8px',
+              background: t.type === 'success' ? '#059669' : (t.type === 'error' ? '#dc2626' : '#1f2937'),
+              color: 'white',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+              minWidth: '250px',
+              fontSize: '0.9rem'
+            }}>
+              {t.message}
+            </div>
+          ))}
+        </div>
+      </Layout>
+    </ErrorBoundary>
+  );
+}
+
+export default App;

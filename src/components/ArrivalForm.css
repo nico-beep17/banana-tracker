@@ -1,0 +1,248 @@
+.form-container {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.form-header {
+    padding: var(--spacing-6);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.form-header h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.arrival-form {
+    padding: var(--spacing-6);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-8);
+}
+
+.form-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-4);
+}
+
+.form-section h3 {
+    font-size: 1.125rem;
+    color: var(--text-primary);
+    font-weight: 600;
+    margin-bottom: var(--spacing-2);
+}
+
+.grid-3 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--spacing-4);
+}
+
+.full-width {
+    grid-column: 1 / -1;
+}
+
+/* Breakdown Sections styling */
+.breakdown-section {
+    background-color: var(--bg-app);
+    padding: var(--spacing-5);
+    border-radius: var(--border-radius-md);
+    border: 1px solid var(--border-color);
+    border-left-width: 4px;
+}
+
+.highlight-green {
+    border-left-color: var(--color-success);
+}
+
+.highlight-yellow {
+    border-left-color: var(--color-warning);
+}
+
+.section-header-flex {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-3);
+}
+
+.section-header-flex h3 {
+    margin-bottom: 0;
+}
+
+.section-total {
+    font-weight: 600;
+    color: var(--text-secondary);
+    background: var(--bg-surface);
+    padding: var(--spacing-1) var(--spacing-3);
+    border-radius: 20px;
+    border: 1px solid var(--border-color);
+    font-size: 0.875rem;
+}
+
+.hands-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: var(--spacing-3);
+}
+
+.highlight-input {
+    font-size: 1.25rem;
+    font-weight: 700;
+    padding: var(--spacing-4);
+    background-color: rgba(16, 185, 129, 0.05);
+    border-color: var(--color-success);
+}
+
+.highlight-input:focus {
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+}
+
+.form-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: var(--spacing-6);
+    border-top: 1px solid var(--border-color);
+    margin-top: var(--spacing-4);
+    gap: var(--spacing-4);
+}
+
+.grand-total-display {
+    font-size: 1.25rem;
+    color: var(--text-primary);
+}
+
+.grand-total-display strong {
+    font-size: 1.5rem;
+    color: var(--color-primary-main);
+}
+
+.btn-group {
+    display: flex;
+    gap: var(--spacing-3);
+}
+
+.btn-secondary {
+    padding: var(--spacing-2) var(--spacing-4);
+    border: 1px solid var(--border-color);
+    background-color: var(--bg-surface);
+    color: var(--text-secondary);
+    border-radius: var(--border-radius-md);
+    font-weight: 500;
+    transition: all 0.2s eaes;
+}
+
+/* New styles for grid inputs and batch total */
+.boxes-grid {
+    background: white;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    overflow-x: auto;
+    border: 1px solid var(--border-color);
+    position: relative;
+    /* For the floating total */
+}
+
+.boxes-grid table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.boxes-grid th {
+    background: var(--bg-secondary);
+    padding: 0.8rem 0.5rem;
+    font-weight: 700;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-align: center;
+    border-bottom: 2px solid var(--border-color);
+    white-space: nowrap;
+}
+
+.boxes-grid td {
+    padding: 0.4rem 0.2rem;
+    /* Tighter padding for grid cells */
+    border-bottom: 1px solid var(--border-color);
+    vertical-align: middle;
+}
+
+.grid-input {
+    width: 100%;
+    min-width: 60px;
+    padding: 0.4rem;
+    text-align: center;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    font-size: 0.9rem;
+    transition: var(--transition-fast);
+    height: 34px;
+    /* Slightly smaller than global inputs */
+}
+
+.grid-input:focus {
+    border-color: var(--color-primary);
+    outline: none;
+    box-shadow: 0 0 0 2px var(--color-primary-light);
+}
+
+/* Floating Batch Total */
+.totals-summary {
+    position: sticky;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--bg-card);
+    border-top: 2px solid var(--color-accent);
+    padding: 1rem 1.5rem;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 2rem;
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05);
+    z-index: 10;
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+.totals-summary h3 {
+    margin: 0;
+    color: var(--color-primary-dark);
+    font-size: 1.2rem;
+}
+
+.totals-summary .total-value {
+    font-size: 1.5rem;
+    font-weight: 900;
+    color: var(--color-accent);
+}
+
+.btn-secondary:hover {
+    background-color: var(--bg-surface-hover);
+    color: var(--text-primary);
+    border-color: #d1d5db;
+}
+
+/* Additional classes for states */
+.disabled-section {
+    opacity: 0.5;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.slide-down {
+    animation: slideDown 0.3s ease-out forwards;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

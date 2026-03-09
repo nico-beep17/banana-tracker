@@ -1,0 +1,120 @@
+.container-stuffing-page {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    height: 100%;
+    width: 100%;
+}
+
+.stuffing-layout {
+    display: flex;
+    gap: 1.5rem;
+    min-height: calc(100vh - 120px);
+}
+
+.container-details-card {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.5rem;
+}
+
+.container-details-card h3 {
+    margin-bottom: 1.5rem;
+    color: var(--color-primary-dark);
+    border-bottom: 2px solid var(--color-background);
+    padding-bottom: 0.5rem;
+}
+
+.form-grid.dual-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.form-group.full-width {
+    grid-column: span 2;
+}
+
+.inventory-allocation-card {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 1.5rem;
+    overflow: hidden;
+}
+
+.allocation-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.capacity-tracker {
+    text-align: right;
+    min-width: 250px;
+}
+
+.capacity-tracker span {
+    font-size: 0.9rem;
+    color: var(--color-text-light);
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+.progress-bar-container {
+    height: 8px;
+    background-color: var(--color-background);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background-color: var(--color-primary-main);
+    transition: width 0.3s ease, background-color 0.3s ease;
+}
+
+.progress-fill.over-capacity {
+    background-color: var(--danger);
+}
+
+.progress-fill.perfect-capacity {
+    background-color: var(--color-accent);
+}
+
+.inventory-table-container {
+    flex: 1;
+    overflow-y: auto;
+    background: white;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+}
+
+.interactive-table tbody tr {
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.interactive-table tbody tr:hover {
+    background-color: var(--color-background);
+}
+
+.interactive-table tbody tr.selected-row {
+    background-color: rgba(20, 184, 166, 0.1);
+    border-left: 3px solid var(--color-primary-main);
+}
+
+.spec-badge {
+    background-color: var(--color-surface);
+    color: var(--color-primary-dark);
+    padding: 0.2rem 0.5rem;
+    border-radius: var(--radius-sm);
+    font-family: monospace;
+    font-size: 0.85rem;
+    border: 1px solid var(--color-background);
+}
+
+.stuffing-actions {
+    margin-top: 1.5rem;
+}
