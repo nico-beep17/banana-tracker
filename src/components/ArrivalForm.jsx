@@ -189,15 +189,10 @@ const ArrivalForm = ({ arrivals = [], onApproveArrival, userProfile, onAddArriva
         const packingYear = new Date(formData.dateOfPacking).getFullYear();
         const packingWeek = getWeekNumber(formData.dateOfPacking);
 
-        // Find the applicable weekly rate for this Farm + Week Combo
+        // Find the applicable weekly rate for this Farm + Week Combo (optional — not required for entry)
         const activeRateDoc = weeklyRates.find(r => r.farm_id === farmObj.id && r.year === packingYear && r.week_number === packingWeek);
 
-        if (!activeRateDoc) {
-            setFormError(`Missing Pricing Data: No Weekly Contract found for ${farmObj.name} in Year ${packingYear}, Week ${packingWeek}. Please define this farm's weekly rates in the Grower Registry before logging this delivery.`);
-            return;
-        }
-
-        let parsedRates = activeRateDoc.rates_matrix || {};
+        let parsedRates = activeRateDoc ? (activeRateDoc.rates_matrix || {}) : {};
 
         // Loop through the batch grid and construct individual Inventory Line Items
         // This satisfies the "On Ground Inventory" data model while keeping data entry fast
