@@ -166,16 +166,16 @@ const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, setAr
         );
     }
 
-    // Group arrivals by batchId
+    // Group arrivals by batchId — recompute totals from live rows every render
     const groupedArrivals = arrivals.reduce((acc, arrival) => {
         const key = arrival.batchId || `${arrival.deliveryReceipt}-${arrival.dateOfPacking}`;
         if (!acc[key]) {
             acc[key] = {
                 ...arrival,
-                totalQuantity: 0,
+                _liveTotal: 0,
             };
         }
-        acc[key].totalQuantity += (Number(arrival.quantity) || 0);
+        acc[key]._liveTotal += (Number(arrival.quantity) || 0);
         return acc;
     }, {});
 
@@ -193,7 +193,7 @@ const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, setAr
             'Driver': a.driverName || '-',
             'Plate Number': a.plateNumber || 'N/A',
             'DR Number': a.deliveryReceipt || '-',
-            'Total Boxes': a.totalQuantity || 0,
+            'Total Boxes': a._liveTotal || 0,
             'Status': a.approval_status || 'PENDING',
             'Encoded Timestamp (System)': a.dateTimeEncoded ? new Date(a.dateTimeEncoded).toLocaleString() : 'N/A'
         }));
@@ -249,7 +249,7 @@ const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, setAr
                                         <div className="cell-secondary">DR: {arrival.deliveryReceipt}</div>
                                     </td>
                                     <td className="text-right highlight-col">
-                                        <span style={{ fontSize: '1.2rem', fontWeight: '800' }}>{arrival.totalQuantity || 0}</span>
+                                        <span style={{ fontSize: '1.2rem', fontWeight: '800' }}>{arrival._liveTotal || 0}</span>
                                     </td>
                                     <td className="text-center">
                                         {isApproved ? (
@@ -278,29 +278,31 @@ const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, setAr
                                                 <span style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--text-tertiary)' }}>VERIFIED</span>
                                             )}
 
-                                            {/* Edit & Delete row */}
-                                            <div style={{ display: 'flex', gap: '0.35rem', width: '100%' }}>
-                                                <button
-                                                    onClick={() => handleEditClick(arrival)}
-                                                    style={{
-                                                        flex: 1, background: '#f8fafc', border: '1px solid #cbd5e1', color: '#475569',
-                                                        padding: '0.3rem 0.4rem', fontSize: '0.7rem', borderRadius: '4px', cursor: 'pointer', fontWeight: '600'
-                                                    }}
-                                                >
-                                                    ✏️ Edit
-                                                </button>
-                                                {onDeleteArrival && (
+                                            {/* Edit & Delete row — hidden when approved */}
+                                            {!isApproved && (
+                                                <div style={{ display: 'flex', gap: '0.35rem', width: '100%' }}>
                                                     <button
-                                                        onClick={() => onDeleteArrival(arrival.id, arrival.batchId)}
+                                                        onClick={() => handleEditClick(arrival)}
                                                         style={{
-                                                            flex: 1, background: '#fef2f2', border: '1px solid #fca5a5', color: '#dc2626',
+                                                            flex: 1, background: '#f8fafc', border: '1px solid #cbd5e1', color: '#475569',
                                                             padding: '0.3rem 0.4rem', fontSize: '0.7rem', borderRadius: '4px', cursor: 'pointer', fontWeight: '600'
                                                         }}
                                                     >
-                                                        🗑 Delete
+                                                        ✏️ Edit
                                                     </button>
-                                                )}
-                                            </div>
+                                                    {onDeleteArrival && (
+                                                        <button
+                                                            onClick={() => onDeleteArrival(arrival.id, arrival.batchId)}
+                                                            style={{
+                                                                flex: 1, background: '#fef2f2', border: '1px solid #fca5a5', color: '#dc2626',
+                                                                padding: '0.3rem 0.4rem', fontSize: '0.7rem', borderRadius: '4px', cursor: 'pointer', fontWeight: '600'
+                                                            }}
+                                                        >
+                                                            🗑 Delete
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            )}
 
                                             {/* Print */}
                                             <button
