@@ -31,7 +31,9 @@ const NewContainerForm = ({ onSaveContainer, initialData = null, onCancel }) => 
         plateNo: '',
         dateArrived: '',
         temperature: '14.0',
-        ventilation: 'CLOSED'
+        ventilation: 'CLOSED',
+        grossWeight: '',
+        netWeight: ''
     });
     useEffect(() => {
         if (initialData) {
@@ -45,7 +47,9 @@ const NewContainerForm = ({ onSaveContainer, initialData = null, onCancel }) => 
                 dateDeparted: initialData.dateDeparted || '',
                 timeOfDeparture: initialData.timeOfDeparture || '',
                 dateArrived: initialData.dateArrived || '',
-                ventilation: initialData.ventilation || 'CLOSED'
+                ventilation: initialData.ventilation || 'CLOSED',
+                grossWeight: initialData.grossWeight || '',
+                netWeight: initialData.netWeight || ''
             });
         }
     }, [initialData]);
@@ -80,7 +84,8 @@ const NewContainerForm = ({ onSaveContainer, initialData = null, onCancel }) => 
                 brand: 'LFJ', reeferName: '', reeferNo: '', sealNo: '', destination: '', vesselVoyage: '',
                 shipper: 'LFJ AGRI-VENTURES CORP.', bpiSticker: '', buyer_name: '',
                 bookingNo: '', dateDeparted: '', timeOfDeparture: '',
-                driverName: '', plateNo: '', dateArrived: '', temperature: '14.0', ventilation: 'CLOSED'
+                driverName: '', plateNo: '', dateArrived: '', temperature: '14.0', ventilation: 'CLOSED',
+                grossWeight: '', netWeight: ''
             });
         }
     };
@@ -197,6 +202,16 @@ const NewContainerForm = ({ onSaveContainer, initialData = null, onCancel }) => 
                             <div className="form-group">
                                 <label className="label">Date Arrived</label>
                                 <input type="date" name="dateArrived" className="input-field" value={formData.dateArrived} onChange={handleChange} required />
+                            </div>
+                        </div>
+                        <div className="form-row">
+                            <div className="form-group">
+                                <label className="label">Gross Weight (kg)</label>
+                                <input type="number" step="0.01" name="grossWeight" className="input-field" value={formData.grossWeight} onChange={handleChange} placeholder="e.g. 19500" />
+                            </div>
+                            <div className="form-group">
+                                <label className="label">Net Weight (kg)</label>
+                                <input type="number" step="0.01" name="netWeight" className="input-field" value={formData.netWeight} onChange={handleChange} placeholder="e.g. 18200" />
                             </div>
                         </div>
                     </div>

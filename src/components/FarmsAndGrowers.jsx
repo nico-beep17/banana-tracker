@@ -35,7 +35,7 @@ const FarmsAndGrowers = ({ farms = [], setFarms, weeklyRates = [], setWeeklyRate
     const [newGrower, setNewGrower] = useState({
         farmCode: '', name: '', prodHas: '', activeHas: '', location: '',
         elevation: 'LOW LAND', farmType: 'DIRECT', company: 'OWN FARM',
-        pointOfDelivery: 'CARMEN CY',
+        pointOfDelivery: 'CARMEN CY', status: 'ACTIVE',
         physicalPhName: '', physicalPhAddress: '',
         bankName: '', accountName: '', accountNumber: ''
     });
@@ -82,14 +82,13 @@ const FarmsAndGrowers = ({ farms = [], setFarms, weeklyRates = [], setWeeklyRate
             return;
         }
 
-        if (data && data.length > 0) {
-            // Remove old entry for this week if it existed, then push new
-            setWeeklyRates(prev => {
-                const filtered = prev.filter(r => !(r.farm_id === payload.farm_id && r.year === payload.year && r.week_number === payload.week_number));
-                return [data[0], ...filtered];
-            });
-            setShowRatesModal(false);
-        }
+        // Upsert may return empty data on conflict updates in some Supabase versions
+        const savedRate = (data && data.length > 0) ? data[0] : { ...payload, id: `local-${Date.now()}`, created_at: new Date().toISOString() };
+        setWeeklyRates(prev => {
+            const filtered = prev.filter(r => !(r.farm_id === payload.farm_id && r.year === payload.year && r.week_number === payload.week_number));
+            return [savedRate, ...filtered];
+        });
+        setShowRatesModal(false);
     };
 
     const handleAddGrower = async (e) => {
@@ -171,7 +170,7 @@ const FarmsAndGrowers = ({ farms = [], setFarms, weeklyRates = [], setWeeklyRate
         setNewGrower({
             farmCode: '', name: '', prodHas: '', activeHas: '', location: '',
             elevation: 'LOW LAND', farmType: 'DIRECT', company: 'OWN FARM',
-            pointOfDelivery: 'CARMEN CY',
+            pointOfDelivery: 'CARMEN CY', status: 'ACTIVE',
             physicalPhName: '', physicalPhAddress: '',
             bankName: '', accountName: '', accountNumber: ''
         });
@@ -352,14 +351,34 @@ const FarmsAndGrowers = ({ farms = [], setFarms, weeklyRates = [], setWeeklyRate
                                         </div>
                                     </td>
                                     <td className="text-center">
-                                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                                            <button
-                                                className="btn-primary"
-                                                onClick={() => handleManageRates(farm)}
-                                                style={{ padding: '0.4rem 0.6rem', fontSize: '0.75rem', backgroundColor: 'var(--color-primary-main)' }}
-                                            >
-                                                Weekly Rates
-                                            </button>
+                                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexDirection: 'column', alignItems: 'center' }}>
+                                            {(() => {
+                                                const currentYear = new Date().getFullYear();
+                                                const currentWk = getCurrentWeek();
+                                                const hasCurrentWeekRate = weeklyRates.some(
+                                                    r => r.farm_id === farm.id && r.year === currentYear && r.week_number === currentWk
+                                                );
+                                                return (
+                                                    <div style={{ position: 'relative', display: 'inline-block' }}>
+                                                        <button
+                                                            className="btn-primary"
+                                                            onClick={() => handleManageRates(farm)}
+                                                            style={{ padding: '0.4rem 0.6rem', fontSize: '0.75rem', backgroundColor: 'var(--color-primary-main)' }}
+                                                        >
+                                                            Weekly Rates
+                                                        </button>
+                                                        {hasCurrentWeekRate && (
+                                                            <span style={{
+                                                                position: 'absolute', top: '-6px', right: '-6px',
+                                                                background: '#10b981', color: 'white',
+                                                                borderRadius: '50%', width: '14px', height: '14px',
+                                                                fontSize: '9px', display: 'flex', alignItems: 'center',
+                                                                justifyContent: 'center', fontWeight: '700', lineHeight: 1
+                                                            }} title={`Week ${currentWk} rate already set`}>✓</span>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()}
                                             <button
                                                 className="btn-secondary"
                                                 onClick={() => handleEditClick(farm)}
@@ -390,6 +409,25 @@ const FarmsAndGrowers = ({ farms = [], setFarms, weeklyRates = [], setWeeklyRate
                             {/* Form to Add/Edit a Weekly Rate */}
                             <form onSubmit={handleAddWeeklyRate} className="grower-form" style={{ marginBottom: '2rem', padding: '1.5rem', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                                 <h4>Define New Weekly Rate</h4>
+                                {/* Current week indicator */}
+                                {(() => {
+                                    const currentYear = new Date().getFullYear();
+                                    const currentWk = getCurrentWeek();
+                                    const existingRate = weeklyRates.find(
+                                        r => r.farm_id === activeFarmForRates.id && r.year === currentYear && r.week_number === currentWk
+                                    );
+                                    return existingRate ? (
+                                        <div style={{ marginBottom: '1rem', padding: '0.65rem 1rem', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px', color: '#166534', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            <span style={{ fontSize: '1rem' }}>✅</span>
+                                            <span><strong>Week {currentWk}, {currentYear}</strong> rate is already set for this farm. You can overwrite it by submitting new values below.</span>
+                                        </div>
+                                    ) : (
+                                        <div style={{ marginBottom: '1rem', padding: '0.65rem 1rem', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: '8px', color: '#92400e', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            <span style={{ fontSize: '1rem' }}>⚠️</span>
+                                            <span><strong>Week {currentWk}, {currentYear}</strong> rate has <strong>not yet been defined</strong> for this farm.</span>
+                                        </div>
+                                    );
+                                })()}
                                 <div className="grid-3" style={{ marginBottom: '1rem' }}>
                                     <div className="form-group">
                                         <label className="label">Year</label>

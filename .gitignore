@@ -31,3 +31,10 @@ dist-ssr
 # Temporary / scratch files
 lint-results.txt
 tmp_*.js
+
+# Admin/utility scripts with embedded credentials (run locally only)
+clear_data.cjs
+finalize_clear.cjs
+
+
+.vercel
