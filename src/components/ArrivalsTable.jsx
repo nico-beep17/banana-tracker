@@ -166,7 +166,7 @@ const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, setAr
         );
     }
 
-    // Group arrivals by batchId — recompute totals from live rows every render
+    // Group arrivals by batchId — recompute totals and propagate approval from ANY row
     const groupedArrivals = arrivals.reduce((acc, arrival) => {
         const key = arrival.batchId || `${arrival.deliveryReceipt}-${arrival.dateOfPacking}`;
         if (!acc[key]) {
@@ -176,6 +176,10 @@ const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, setAr
             };
         }
         acc[key]._liveTotal += (Number(arrival.quantity) || 0);
+        // If ANY row in the batch is approved, the whole batch is approved
+        if (arrival.approval_status === 'APPROVED') {
+            acc[key].approval_status = 'APPROVED';
+        }
         return acc;
     }, {});
 
