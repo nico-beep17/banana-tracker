@@ -31,6 +31,20 @@ const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, setAr
     // --- Edit handlers ---
     const handleEditClick = (arrival) => {
         setEditingArrival(arrival);
+
+        // Build quantity grid from all individual arrival rows in this batch
+        const batchId = arrival.batchId;
+        const batchRows = batchId
+            ? arrivals.filter(a => a.batchId === batchId)
+            : arrivals.filter(a => a.id === arrival.id);
+
+        const quantities = {};
+        batchRows.forEach(row => {
+            if (row.typeId) {
+                quantities[row.typeId] = Number(row.quantity) || 0;
+            }
+        });
+
         setEditForm({
             farmName: arrival.farmName || '',
             driverName: arrival.driverName || '',
@@ -38,6 +52,8 @@ const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, setAr
             deliveryReceipt: arrival.deliveryReceipt || '',
             dateTimeArrive: arrival.dateTimeArrive || '',
             dateOfPacking: arrival.dateOfPacking || '',
+            // Per-hands quantities
+            quantities
         });
     };
 
@@ -45,15 +61,21 @@ const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, setAr
         setEditForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
     };
 
+    const handleQtyChange = (typeId, value) => {
+        setEditForm(prev => ({
+            ...prev,
+            quantities: { ...prev.quantities, [typeId]: value === '' ? '' : Number(value) }
+        }));
+    };
+
     const handleEditSave = async () => {
         if (!editingArrival || !setArrivals) return;
 
-        // We need supabase to update. Import dynamically since it may not be available as prop.
         const { supabase } = await import('../supabaseClient');
-
-        // Update all arrivals in this batch
         const batchId = editingArrival.batchId;
-        const updatePayload = {
+
+        // 1. Update header fields on all batch rows
+        const headerPayload = {
             farmName: editForm.farmName,
             driverName: editForm.driverName,
             plateNumber: editForm.plateNumber,
@@ -62,28 +84,58 @@ const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, setAr
             dateOfPacking: editForm.dateOfPacking,
         };
 
-        let query = supabase.from('arrivals').update(updatePayload);
+        let headerQuery = supabase.from('arrivals').update(headerPayload);
         if (batchId) {
-            query = query.eq('batchId', batchId);
+            headerQuery = headerQuery.eq('batchId', batchId);
         } else {
-            query = query.eq('id', editingArrival.id);
+            headerQuery = headerQuery.eq('id', editingArrival.id);
         }
-
-        const { data, error } = await query.select();
-
-        if (error) {
-            console.error('Supabase error (Edit Arrival):', error);
-            alert(`Failed to update arrival: ${error.message}`);
+        const { error: headerError } = await headerQuery.select();
+        if (headerError) {
+            alert(`Failed to update arrival headers: ${headerError.message}`);
             return;
         }
 
-        if (data && data.length > 0) {
-            const updatedMap = new Map(data.map(item => [item.id, item]));
-            setArrivals(prev => prev.map(a => updatedMap.has(a.id) ? updatedMap.get(a.id) : a));
+        // 2. Update individual row quantities
+        const batchRows = batchId
+            ? arrivals.filter(a => a.batchId === batchId)
+            : arrivals.filter(a => a.id === editingArrival.id);
+
+        for (const row of batchRows) {
+            if (row.typeId && editForm.quantities[row.typeId] !== undefined) {
+                const newQty = Number(editForm.quantities[row.typeId]) || 0;
+                if (newQty !== Number(row.quantity)) {
+                    await supabase.from('arrivals').update({ quantity: newQty }).eq('id', row.id);
+                }
+            }
+        }
+
+        // 3. Reload batch from DB to get fresh state
+        let reloadQuery = supabase.from('arrivals').select('*');
+        if (batchId) {
+            reloadQuery = reloadQuery.eq('batchId', batchId);
+        } else {
+            reloadQuery = reloadQuery.eq('id', editingArrival.id);
+        }
+        const { data: freshData } = await reloadQuery;
+        if (freshData && freshData.length > 0) {
+            const freshMap = new Map(freshData.map(item => [item.id, item]));
+            setArrivals(prev => prev.map(a => freshMap.has(a.id) ? freshMap.get(a.id) : a));
         }
 
         setEditingArrival(null);
     };
+
+    // Type labels for display
+    const typeLabels = {
+        'classA.rha4': '4H', 'classA.rha5': '5H', 'classA.rha6': '6H',
+        'classA.sha7': '7H', 'classA.sha8': '8H', 'classA.sha9': '9H', 'classA.cla': 'CLA',
+        'classB.rhb4': '4H', 'classB.rhb5': '5H', 'classB.rhb6': '6H',
+        'classB.shb7': '7H', 'classB.shb8': '8H', 'classB.shb9': '9H',
+        'classB.clb': 'CLB', 'classB.fp': 'FP'
+    };
+    const classATypes = ['classA.rha4', 'classA.rha5', 'classA.rha6', 'classA.sha7', 'classA.sha8', 'classA.sha9', 'classA.cla'];
+    const classBTypes = ['classB.rhb4', 'classB.rhb5', 'classB.rhb6', 'classB.shb7', 'classB.shb8', 'classB.shb9', 'classB.clb', 'classB.fp'];
 
     // --- Approve double-confirm ---
     const handleApproveClick = (arrivalId, batchId) => {
@@ -270,14 +322,15 @@ const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, setAr
             {/* Edit Modal */}
             {editingArrival && (
                 <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, backdropFilter: 'blur(4px)' }}>
-                    <div className="card animation-fade-in" style={{ padding: '2rem', maxWidth: '520px', width: '90%', position: 'relative', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.4)' }}>
+                    <div className="card animation-fade-in" style={{ padding: '2rem', maxWidth: '700px', width: '95%', maxHeight: '90vh', overflowY: 'auto', position: 'relative', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.4)' }}>
                         <button onClick={() => setEditingArrival(null)} style={{ position: 'absolute', top: '15px', right: '15px', cursor: 'pointer', fontSize: '1.2rem', color: 'var(--text-tertiary)', background: 'none', border: 'none' }}>×</button>
                         <h3 style={{ marginBottom: '0.5rem', color: 'var(--color-primary-dark)' }}>Edit Arrival</h3>
                         <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
                             Batch: <strong>{editingArrival.batchId || editingArrival.id}</strong>
                         </p>
 
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        {/* Delivery Header Fields */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1.5rem' }}>
                             <div className="form-group">
                                 <label className="label">Farm Name</label>
                                 <input type="text" name="farmName" className="input-field" value={editForm.farmName} onChange={handleEditChange} style={{ width: '100%', boxSizing: 'border-box' }} />
@@ -304,7 +357,61 @@ const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, setAr
                             </div>
                         </div>
 
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem' }}>
+                        {/* Per-Hands Quantity Grid */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                            {/* Class A */}
+                            <div style={{ border: '1px solid #bbf7d0', borderRadius: '8px', padding: '1rem', background: '#f0fdf4' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                                    <h4 style={{ margin: 0, color: '#166534', fontSize: '0.9rem' }}>Class A</h4>
+                                    <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#166534' }}>
+                                        {classATypes.reduce((s, t) => s + (Number(editForm.quantities?.[t]) || 0), 0)} bxs
+                                    </span>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
+                                    {classATypes.map(typeId => (
+                                        <div key={typeId} className="form-group" style={{ marginBottom: 0 }}>
+                                            <label className="label" style={{ fontSize: '0.7rem', marginBottom: '2px' }}>{typeLabels[typeId]}</label>
+                                            <input
+                                                type="number" min="0" className="input-field"
+                                                style={{ padding: '0.35rem', fontSize: '0.85rem', textAlign: 'center' }}
+                                                value={editForm.quantities?.[typeId] ?? ''}
+                                                onChange={(e) => handleQtyChange(typeId, e.target.value)}
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Class B */}
+                            <div style={{ border: '1px solid #fde68a', borderRadius: '8px', padding: '1rem', background: '#fffbeb' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                                    <h4 style={{ margin: 0, color: '#92400e', fontSize: '0.9rem' }}>Class B</h4>
+                                    <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#92400e' }}>
+                                        {classBTypes.reduce((s, t) => s + (Number(editForm.quantities?.[t]) || 0), 0)} bxs
+                                    </span>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
+                                    {classBTypes.map(typeId => (
+                                        <div key={typeId} className="form-group" style={{ marginBottom: 0 }}>
+                                            <label className="label" style={{ fontSize: '0.7rem', marginBottom: '2px' }}>{typeLabels[typeId]}</label>
+                                            <input
+                                                type="number" min="0" className="input-field"
+                                                style={{ padding: '0.35rem', fontSize: '0.85rem', textAlign: 'center' }}
+                                                value={editForm.quantities?.[typeId] ?? ''}
+                                                onChange={(e) => handleQtyChange(typeId, e.target.value)}
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Grand Total */}
+                        <div style={{ marginTop: '1rem', textAlign: 'right', fontSize: '0.95rem', fontWeight: '700', color: 'var(--color-primary-dark)' }}>
+                            Grand Total: {[...classATypes, ...classBTypes].reduce((s, t) => s + (Number(editForm.quantities?.[t]) || 0), 0)} boxes
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.25rem' }}>
                             <button className="btn-secondary" onClick={() => setEditingArrival(null)} style={{ padding: '0.5rem 1rem' }}>Cancel</button>
                             <button className="btn-primary" onClick={handleEditSave} style={{ padding: '0.5rem 1.5rem' }}>Save Changes</button>
                         </div>
