@@ -472,6 +472,30 @@ function App() {
     }
   };
 
+  const handleDeleteArrival = async (arrivalId, batchId) => {
+    if (!window.confirm('Are you sure you want to delete this arrival batch? This cannot be undone.')) return;
+
+    let query = supabase.from('arrivals').delete();
+    if (batchId) {
+      query = query.eq('batchId', batchId);
+    } else {
+      query = query.eq('id', arrivalId);
+    }
+
+    const { error } = await query;
+    if (error) {
+      console.error('Supabase error (Delete Arrival):', error);
+      alert(`Failed to delete arrival: ${error.message}`);
+      return;
+    }
+
+    if (batchId) {
+      setArrivals(prev => prev.filter(a => a.batchId !== batchId));
+    } else {
+      setArrivals(prev => prev.filter(a => a.id !== arrivalId));
+    }
+  };
+
   const remainingInventoryDetailed = calculateRemainingInventory();
 
   const remainingTotal = Object.values(remainingInventoryDetailed).reduce((sum, val) => sum + val, 0);
@@ -597,7 +621,7 @@ function App() {
             userProfile={userProfile}
             onNavigate={handleNavigate}
           >
-            <ArrivalsTable arrivals={arrivals} onApproveArrival={handleApproveArrival} userProfile={userProfile} />
+            <ArrivalsTable arrivals={arrivals} onApproveArrival={handleApproveArrival} onDeleteArrival={handleDeleteArrival} setArrivals={setArrivals} userProfile={userProfile} />
           </Dashboard>
         )}
 
@@ -605,6 +629,8 @@ function App() {
           <ArrivalForm
             arrivals={arrivals}
             onApproveArrival={handleApproveArrival}
+            onDeleteArrival={handleDeleteArrival}
+            setArrivals={setArrivals}
             userProfile={userProfile}
             onAddArrival={handleAddArrival}
             farms={farms}

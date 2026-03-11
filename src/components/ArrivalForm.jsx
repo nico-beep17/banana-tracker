@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import ArrivalsTable from './ArrivalsTable';
 import './ArrivalForm.css';
 
-const ArrivalForm = ({ arrivals = [], onApproveArrival, userProfile, onAddArrival, farms = [], weeklyRates = [], samplings = [], onNavigate }) => {
+const ArrivalForm = ({ arrivals = [], onApproveArrival, onDeleteArrival, setArrivals, userProfile, onAddArrival, farms = [], weeklyRates = [], samplings = [], onNavigate }) => {
     const [showForm, setShowForm] = useState(false);
     // Helper to get local ISO string compatible with datetime-local
     const getLocalISOString = () => {
@@ -357,7 +357,7 @@ const ArrivalForm = ({ arrivals = [], onApproveArrival, userProfile, onAddArriva
                 )}
 
                 <div style={{ marginTop: '1rem' }}>
-                    <ArrivalsTable arrivals={arrivals} onApproveArrival={onApproveArrival} userProfile={userProfile} samplings={samplings} />
+                    <ArrivalsTable arrivals={arrivals} onApproveArrival={onApproveArrival} onDeleteArrival={onDeleteArrival} setArrivals={setArrivals} userProfile={userProfile} samplings={samplings} />
                 </div>
             </div>
         );
