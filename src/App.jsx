@@ -248,7 +248,7 @@ function App() {
   const handleSaveContainer = async (containerData) => {
     const isUpdate = containerData.id && containers.some(c => c.id === containerData.id);
 
-    // Omit columns that are purely front-end or not yet in schema cache to prevent db crashes
+    // Omit columns that are purely front-end or not yet in schema to prevent db crashes
     const {
       timeOfDeparture,
       bookingNo,
@@ -258,6 +258,13 @@ function App() {
       plugInTime,
       plugOutTime,
       dateArrived,
+      // Columns from the patch that may not exist in DB yet
+      dateDeparted,
+      grossWeight,
+      netWeight,
+      ventilation,
+      transit_status,
+      transit_updated_at,
       ...dbPayload
     } = containerData;
 
