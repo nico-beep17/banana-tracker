@@ -36,5 +36,13 @@ tmp_*.js
 clear_data.cjs
 finalize_clear.cjs
 
-
 .vercel
+
+# Capacitor build artifacts
+android/app/build/
+android/.gradle/
+android/build/
+android/local.properties
+ios/App/Pods/
+ios/App/build/
+ios/App/DerivedData/

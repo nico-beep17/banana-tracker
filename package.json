@@ -7,9 +7,25 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "cap:sync": "vite build && npx cap sync",
+    "cap:android": "vite build && npx cap sync android && npx cap open android",
+    "cap:ios": "vite build && npx cap sync ios && npx cap open ios",
+    "cap:build:android": "vite build && npx cap sync android && cd android && ./gradlew assembleDebug",
+    "cap:icons": "npx @capacitor/assets generate --iconBackgroundColor \"#f5f0e0\" --splashBackgroundColor \"#166534\" --android --ios"
   },
   "dependencies": {
+    "@capacitor/android": "^6.2.1",
+    "@capacitor/app": "^6.0.3",
+    "@capacitor/camera": "^6.1.3",
+    "@capacitor/cli": "^6.2.1",
+    "@capacitor/core": "^6.2.1",
+    "@capacitor/haptics": "^6.0.3",
+    "@capacitor/ios": "^6.2.1",
+    "@capacitor/keyboard": "^6.0.4",
+    "@capacitor/push-notifications": "^6.0.5",
+    "@capacitor/splash-screen": "^6.0.4",
+    "@capacitor/status-bar": "^6.0.3",
     "@heroicons/react": "^2.2.0",
     "@langchain/openai": "^1.2.12",
     "@supabase/supabase-js": "^2.98.0",
@@ -46,6 +62,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
     "@eslint/js": "^9.39.1",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
