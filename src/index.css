@@ -76,12 +76,21 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  -webkit-tap-highlight-color: transparent;
 }
 
 html, body {
   /* Prevent horizontal scroll on the root level */
   overflow-x: hidden;
   max-width: 100%;
+  /* iOS overscroll behavior */
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+html {
+  /* iOS safe areas */
+  padding-top: env(safe-area-inset-top, 0px);
 }
 
 body {
@@ -91,6 +100,8 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Prevent pull-to-refresh in web browser */
+  overscroll-behavior-y: contain;
 }
 
 h1,
