@@ -21,14 +21,7 @@ import AIAssistantWidget from './components/AIAssistantWidget';
 import { supabase } from './supabaseClient';
 import { BotMessageSquare } from 'lucide-react';
 
-const INITIAL_FARMS = [
-  { id: '1', farmCode: '1000', name: 'ASUCENA C. DUALLO', prodHas: 6.00, activeHas: 6.00, location: 'TALAINGOD, DAVAO DEL NORTE', elevation: 'LOW LAND', farmType: 'DIRECT', company: 'OWN FARM', otherGrouping: 'ASUCENA C. DUALLO', status: 'ACTIVE', pointOfDelivery: 'CARMEN CY', physicalPhName: 'DUALLO PH', physicalPhAddress: 'TALAINGOD, DAVAO DEL NORTE', brand: 'LFJ', bankName: '', accountName: '', accountNumber: '', lastModified: new Date().toISOString() },
-  { id: '2', farmCode: '1001', name: 'MARINA M. BACALLA', prodHas: 5.00, activeHas: 5.00, location: 'NEW CORELLA, DAVAO DEL NORTE', elevation: 'LOW LAND', farmType: 'DIRECT', company: 'OWN FARM', otherGrouping: 'MARINA BACALLA', status: 'ACTIVE', pointOfDelivery: 'CARMEN CY', physicalPhName: 'LAGUMBAY PH', physicalPhAddress: 'NEW CORELLA, DAVAO DEL NORTE', brand: 'LFJ', bankName: '', accountName: '', accountNumber: '', lastModified: new Date().toISOString() },
-  { id: '3', farmCode: '1002', name: 'NARCISO P. MANGQUIT', prodHas: 5.00, activeHas: 5.00, location: 'TULALIAN, STO. TOMAS DAVAO DEL NORTE', elevation: 'LOW LAND', farmType: 'DIRECT', company: 'OWN FARM', otherGrouping: 'NARCISO P. MANGQUIT', status: 'ACTIVE', pointOfDelivery: 'CARMEN CY', physicalPhName: 'MANQUIT PH', physicalPhAddress: 'TULALIAN, STO. TOMAS DAVAO DEL NORTE', brand: 'LFJ', bankName: '', accountName: '', accountNumber: '', lastModified: new Date().toISOString() },
-  { id: '4', farmCode: '1003', name: 'PERLA M. CABATO', prodHas: 4.00, activeHas: 4.00, location: 'BALAGUNAN, STO. TOMAS DAVAO DEL NORTE', elevation: 'LOW LAND', farmType: 'DIRECT', company: 'OWN FARM', otherGrouping: 'PERLA M. CABATO', status: 'ACTIVE', pointOfDelivery: 'CARMEN CY', physicalPhName: 'CABATO PH', physicalPhAddress: 'BALAGUNAN, STO. TOMAS DAVAO DEL NORTE', brand: 'LFJ', bankName: '', accountName: '', accountNumber: '', lastModified: new Date().toISOString() },
-  { id: '5', farmCode: '1004', name: 'ALMA QUISAY', prodHas: 15.00, activeHas: 15.00, location: 'TUBOD, CARMEN, DAVAO DEL NORTE', elevation: 'LOW LAND', farmType: 'DIRECT', company: 'OWN FARM', otherGrouping: 'ALMA QUISAY', status: 'ACTIVE', pointOfDelivery: 'CARMEN CY', physicalPhName: 'QUISAY PH', physicalPhAddress: 'TUBOD, CARMEN, DAVAO DEL NORTE', brand: 'LFJ', bankName: '', accountName: '', accountNumber: '', lastModified: new Date().toISOString() },
-  { id: '6', farmCode: '1005', name: 'DENNIS CERVANTES', prodHas: 5.00, activeHas: 5.00, location: 'PRK. 4B MAGSAYSAY, CARMEN , DAVAO DEL NORTE', elevation: 'LOW LAND', farmType: 'DIRECT', company: 'OWN FARM', otherGrouping: 'DENNIS CERVANTES', status: 'ACTIVE', pointOfDelivery: 'CARMEN CY', physicalPhName: 'CERVANTES PH', physicalPhAddress: 'PRK. 4B MAGSAYSAY, CARMEN , DAVAO DEL NORTE', brand: 'LFJ', bankName: '', accountName: '', accountNumber: '', lastModified: new Date().toISOString() }
-];
+
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -89,12 +82,7 @@ function App() {
   const fetchData = useCallback(async () => {
     try {
       const { data: farmsData } = await supabase.from('farms').select('*').order('lastModified', { ascending: false });
-      if (farmsData && farmsData.length > 0) {
-        setFarms(farmsData);
-      } else {
-        setFarms(INITIAL_FARMS);
-        await supabase.from('farms').insert(INITIAL_FARMS);
-      }
+      if (farmsData) setFarms(farmsData);
 
       const { data: arrivalsData } = await supabase.from('arrivals').select('*').order('dateTimeEncoded', { ascending: false });
       if (arrivalsData) setArrivals(arrivalsData);
