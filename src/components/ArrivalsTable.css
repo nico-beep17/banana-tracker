@@ -171,3 +171,37 @@
     color: var(--text-tertiary);
     font-weight: 500;
 }
+
+/* ===== ARRIVALS TABLE MOBILE ===== */
+@media (max-width: 768px) {
+
+    .arrivals-table-container {
+        overflow-x: hidden;
+        max-width: 100%;
+    }
+
+    /* Table header row: stack title and button */
+    .table-header-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+        padding: 1rem;
+    }
+
+    .table-header-row h2 {
+        font-size: 1.1rem;
+    }
+
+    /* The inner scrollable wrapper */
+    .table-responsive {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+        scrollbar-color: #CBD5E1 transparent;
+    }
+
+    .btn-sm {
+        font-size: 0.8rem;
+        padding: 0.4rem 0.8rem;
+    }
+}

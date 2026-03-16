@@ -172,3 +172,69 @@
     font-weight: 500;
     font-size: 1.1rem;
 }
+
+/* ===== Dashboard Mobile Responsive ===== */
+@media (max-width: 768px) {
+    .dashboard-header h1 {
+        font-size: 1.8rem;
+    }
+
+    .subtitle {
+        font-size: 0.95rem;
+    }
+
+    .metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: var(--spacing-3);
+    }
+
+    .metric-card {
+        padding: var(--spacing-4);
+        gap: var(--spacing-3);
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .metric-icon {
+        width: 48px;
+        height: 48px;
+        font-size: 1.4rem;
+    }
+
+    .metric-value {
+        font-size: 1.6rem;
+    }
+
+    .metric-title {
+        font-size: 0.7rem;
+    }
+
+    .metric-trend {
+        font-size: 0.75rem;
+    }
+
+    .content-section h2 {
+        font-size: 1.2rem;
+        padding: var(--spacing-4);
+    }
+
+    .placeholder-state {
+        padding: var(--spacing-6);
+        font-size: 0.95rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .metrics-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .metric-card {
+        flex-direction: row;
+        align-items: center;
+    }
+
+    .dashboard-header h1 {
+        font-size: 1.5rem;
+    }
+}

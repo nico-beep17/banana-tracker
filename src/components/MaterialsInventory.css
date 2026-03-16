@@ -201,3 +201,55 @@
     background: #ffffff;
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
+
+/* ===== MATERIALS INVENTORY MOBILE ===== */
+@media (max-width: 768px) {
+
+    .materials-inventory-page {
+        overflow-x: hidden;
+        max-width: 100%;
+    }
+
+    .metrics-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+
+    /* Controls: stack search and actions vertically */
+    .inventory-controls {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+        padding: 1rem;
+    }
+
+    .search-box {
+        max-width: 100%;
+    }
+
+    /* Fix modal to be full-screen on mobile */
+    .inventory-form-overlay {
+        align-items: flex-end;
+    }
+
+    .inventory-form-modal {
+        border-radius: var(--border-radius-lg) var(--border-radius-lg) 0 0;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    .form-modal-body {
+        max-height: 60vh;
+        padding: 1.25rem;
+    }
+
+    .form-modal-header,
+    .form-modal-footer {
+        padding: 1rem 1.25rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .metrics-grid {
+        grid-template-columns: 1fr !important;
+    }
+}

@@ -1,14 +1,40 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './Layout.css';
 
 const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notifications = [] }) => {
     const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+    const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
     const unreadCount = notifications.filter(n => !n.read).length;
+
+    // Close mobile sidebar when tab changes
+    useEffect(() => {
+        setIsMobileSidebarOpen(false);
+    }, [activeTab]);
+
+    // Prevent body scroll when mobile sidebar is open
+    useEffect(() => {
+        if (isMobileSidebarOpen) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = '';
+        }
+        return () => { document.body.style.overflow = ''; };
+    }, [isMobileSidebarOpen]);
+
+    const handleMobileTabChange = (tab) => {
+        onTabChange(tab);
+        setIsMobileSidebarOpen(false);
+    };
 
     return (
         <div className="layout" onClick={() => isNotificationOpen && setIsNotificationOpen(false)}>
+            {/* Mobile Sidebar Overlay */}
+            {isMobileSidebarOpen && (
+                <div className="mobile-overlay" onClick={() => setIsMobileSidebarOpen(false)} />
+            )}
+
             {/* Sidebar */}
-            <aside className="sidebar">
+            <aside className={`sidebar ${isMobileSidebarOpen ? 'sidebar-mobile-open' : ''}`}>
                 <div className="sidebar-header">
                     <div className="logo">
                         <span className="logo-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🍌</span>
@@ -117,6 +143,15 @@ const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notif
             {/* Main Content Area */}
             <main className="main-content">
                 <header className="top-header">
+                    <button
+                        className="mobile-hamburger"
+                        onClick={(e) => { e.stopPropagation(); setIsMobileSidebarOpen(!isMobileSidebarOpen); }}
+                        aria-label="Toggle navigation"
+                    >
+                        <span className={`hamburger-line ${isMobileSidebarOpen ? 'open' : ''}`}></span>
+                        <span className={`hamburger-line ${isMobileSidebarOpen ? 'open' : ''}`}></span>
+                        <span className={`hamburger-line ${isMobileSidebarOpen ? 'open' : ''}`}></span>
+                    </button>
                     <div className="header-search">
                         <input type="text" className="input-field" placeholder="Search arrivals, growers..." />
                     </div>
@@ -160,6 +195,45 @@ const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notif
                     {children}
                 </div>
             </main>
+
+            {/* Mobile Bottom Navigation */}
+            <nav className="mobile-bottom-nav">
+                <button
+                    className={`mobile-nav-btn ${activeTab === 'dashboard' ? 'active' : ''}`}
+                    onClick={() => handleMobileTabChange('dashboard')}
+                >
+                    <span className="mobile-nav-icon">📊</span>
+                    <span className="mobile-nav-label">Home</span>
+                </button>
+                <button
+                    className={`mobile-nav-btn ${activeTab === 'log-arrival' ? 'active' : ''}`}
+                    onClick={() => handleMobileTabChange('log-arrival')}
+                >
+                    <span className="mobile-nav-icon">📝</span>
+                    <span className="mobile-nav-label">Log</span>
+                </button>
+                <button
+                    className={`mobile-nav-btn ${activeTab === 'containers-list' || activeTab === 'new-container' ? 'active' : ''}`}
+                    onClick={() => handleMobileTabChange('containers-list')}
+                >
+                    <span className="mobile-nav-icon">🚢</span>
+                    <span className="mobile-nav-label">Containers</span>
+                </button>
+                <button
+                    className={`mobile-nav-btn ${activeTab === 'reports' ? 'active' : ''}`}
+                    onClick={() => handleMobileTabChange('reports')}
+                >
+                    <span className="mobile-nav-icon">📈</span>
+                    <span className="mobile-nav-label">Reports</span>
+                </button>
+                <button
+                    className="mobile-nav-btn"
+                    onClick={() => setIsMobileSidebarOpen(true)}
+                >
+                    <span className="mobile-nav-icon">☰</span>
+                    <span className="mobile-nav-label">More</span>
+                </button>
+            </nav>
         </div>
     );
 };

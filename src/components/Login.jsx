@@ -2,82 +2,36 @@ import React, { useState } from 'react';
 import './Login.css';
 import { supabase } from '../supabaseClient';
 
-const ROLES = [
-    'Admin / Developer',
-    'Production Manager',
-    'Quality Manager',
-    'Production Supervisor',
-    'Quality Supervisor',
-    'Hub Receiver',
-    'Hub Operations In-Charge',
-    'Driver',
-    'Helper',
-    'Logistics Supervisor',
-    'Shipping Documentation Supervisor',
-    'HR Admin Supervisor',
-    'Accounting Staff'
-];
-
 const Login = ({ onLoginSuccess }) => {
-    const [isLogin, setIsLogin] = useState(true);
     const [loading, setLoading] = useState(false);
     const [errorMsg, setErrorMsg] = useState('');
 
-    const [formData, setFormData] = useState({
-        email: '',
-        password: '',
-        fullName: '',
-        role: ROLES[0],
-        department: ''
-    });
-
-    const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+    const handleGoogleSignIn = async () => {
         setLoading(true);
         setErrorMsg('');
 
         try {
-            if (isLogin) {
-                const { data, error } = await supabase.auth.signInWithPassword({
-                    email: formData.email,
-                    password: formData.password,
-                });
-                if (error) throw error;
-                if (data.user) {
-                    onLoginSuccess(data.user);
-                }
-            } else {
-                // Sign Up Flow
-                const { data, error } = await supabase.auth.signUp({
-                    email: formData.email,
-                    password: formData.password,
-                    options: {
-                        data: {
-                            full_name: formData.fullName,
-                            role: formData.role,
-                            department: formData.department
-                        }
-                    }
-                });
-                if (error) throw error;
-                if (data.user) {
-                    // Since we handle profile creation immediately in App.jsx or via Trigger
-                    onLoginSuccess(data.user);
-                }
-            }
+            const { error } = await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                    redirectTo: window.location.origin,
+                    queryParams: {
+                        access_type: 'offline',
+                        prompt: 'consent',
+                    },
+                },
+            });
+
+            if (error) throw error;
+            // OAuth will redirect — no need to call onLoginSuccess here.
+            // The auth state listener in App.jsx picks up the session after redirect.
         } catch (error) {
             setErrorMsg(error.message);
-        } finally {
             setLoading(false);
         }
     };
 
     const handleBypass = () => {
-        // Mock a superuser for development bypass
         const mockUser = {
             id: '00000000-0000-0000-0000-000000000000',
             email: 'dev@lavc.com',
@@ -94,60 +48,45 @@ const Login = ({ onLoginSuccess }) => {
         <div className="login-container">
             <div className="login-card glass-panel animation-fade-in">
                 <div className="login-header">
-                    <img src="https://raw.githubusercontent.com/antigravity/banana-tracker/main/public/logo.png" alt="LAVC Operations" onError={(e) => e.target.style.display = 'none'} className="login-logo" />
+                    <div className="login-emoji-logo">🍌</div>
                     <h2>LAVC Operations Hub</h2>
-                    <p>{isLogin ? 'Sign in to access your dashboard' : 'Register a new employee account'}</p>
+                    <p>Sign in with your company Google account to continue</p>
                 </div>
 
                 {errorMsg && <div className="login-error">{errorMsg}</div>}
 
-                <form onSubmit={handleSubmit} className="login-form">
-                    {!isLogin && (
-                        <>
-                            <div className="form-group">
-                                <label className="label">Full Name</label>
-                                <input type="text" name="fullName" className="input-field" required={!isLogin} value={formData.fullName} onChange={handleChange} placeholder="e.g. John Doe" />
-                            </div>
-                            <div className="form-group">
-                                <label className="label">Access Role</label>
-                                <select name="role" className="input-field" value={formData.role} onChange={handleChange} required={!isLogin}>
-                                    {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-                                </select>
-                            </div>
-                            <div className="form-group">
-                                <label className="label">Department (Optional)</label>
-                                <input type="text" name="department" className="input-field" value={formData.department} onChange={handleChange} placeholder="e.g. Quality Assurance" />
-                            </div>
-                        </>
-                    )}
-
-                    <div className="form-group">
-                        <label className="label">Email Address</label>
-                        <input type="email" name="email" className="input-field" required value={formData.email} onChange={handleChange} placeholder="employee@lavc.com" />
-                    </div>
-
-                    <div className="form-group">
-                        <label className="label">Password</label>
-                        <input type="password" name="password" className="input-field" required value={formData.password} onChange={handleChange} placeholder="••••••••" minLength={6} />
-                    </div>
-
-                    <button type="submit" className="btn-primary login-btn" disabled={loading}>
-                        {loading ? 'Processing...' : (isLogin ? 'Sign In' : 'Create Account')}
+                <div className="login-actions">
+                    <button
+                        type="button"
+                        className="btn-google"
+                        onClick={handleGoogleSignIn}
+                        disabled={loading}
+                    >
+                        <svg className="google-icon" viewBox="0 0 24 24" width="22" height="22">
+                            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
+                            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                        </svg>
+                        {loading ? 'Redirecting to Google...' : 'Sign in with Google'}
                     </button>
 
-                    <button type="button" className="btn-secondary" onClick={handleBypass} style={{ width: '100%', marginTop: '0.5rem', borderColor: '#f59e0b', color: '#d97706' }}>
-                        Skip Login (Dev Bypass)
+                    <div className="login-divider">
+                        <span>or</span>
+                    </div>
+
+                    <button
+                        type="button"
+                        className="btn-dev-bypass"
+                        onClick={handleBypass}
+                    >
+                        🛠️ Skip Login (Dev Bypass)
                     </button>
-                </form>
+                </div>
 
                 <div className="login-footer">
-                    <p>
-                        {isLogin ? "Don't have an account?" : "Already registered?"}
-                        {' '}
-                        <button type="button" className="text-link" onClick={() => setIsLogin(!isLogin)}>
-                            {isLogin ? 'Sign Up' : 'Log In'}
-                        </button>
-                    </p>
+                    <p>Access is restricted to authorized LAVC personnel.</p>
+                    <p className="login-hint">Use your <strong>@gmail.com</strong> account linked to your organization.</p>
                 </div>
             </div>
         </div>

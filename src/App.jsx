@@ -155,6 +155,9 @@ function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setUser(session?.user ?? null);
+        if (session?.user) {
+          fetchUserProfile(session.user.id);
+        }
       }
     );
 
@@ -197,14 +200,20 @@ function App() {
       if (!error && data) {
         setUserProfile(data);
       } else {
-        // Fallback for newly registered users whose profile trigger hasn't finished
-        // or for edge cases where the profile record is missing.
-        setUserProfile({
+        // Auto-create profile for Google OAuth users (first login)
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        const meta = currentUser?.user_metadata || {};
+        const newProfile = {
           id: userId,
-          full_name: 'New User',
-          role: 'Guest',
-          department: 'General'
-        });
+          full_name: meta.full_name || meta.name || meta.email?.split('@')[0] || 'New User',
+          role: meta.role || 'Hub Receiver',
+          department: meta.department || '',
+          avatar_url: meta.avatar_url || meta.picture || null,
+        };
+
+        // Attempt to insert — ignore conflict if trigger already created it
+        await supabase.from('profiles').upsert(newProfile, { onConflict: 'id' });
+        setUserProfile(newProfile);
       }
     } catch (e) {
       console.error("Error fetching profile", e);
@@ -747,12 +756,25 @@ function App() {
 
         {/* Premium AI Assistant FAB Trigger */}
         <button
-          className="fixed bottom-6 right-6 w-16 h-16 rounded-full flex items-center justify-center text-white shadow-2xl transition-all duration-300 hover:scale-110 active:scale-95"
+          className="ai-copilot-fab"
           style={{
+            position: 'fixed',
+            bottom: '96px',
+            right: '1.5rem',
+            width: '56px',
+            height: '56px',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#fff',
+            border: 'none',
+            cursor: 'pointer',
             background: 'linear-gradient(135deg, #10b981, #059669)',
             boxShadow: '0 10px 25px rgba(16, 185, 129, 0.4)',
-            zIndex: 9999, // High enough to overlay navigation and views, but below the widget (10000)
+            zIndex: 9999,
             pointerEvents: 'auto',
+            transition: 'transform 0.3s ease, box-shadow 0.3s ease',
           }}
           onClick={(e) => {
             e.stopPropagation(); // Prevents clicks leaking into other overlays 

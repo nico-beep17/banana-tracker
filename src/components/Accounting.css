@@ -76,3 +76,42 @@
     font-weight: 600;
     z-index: 10;
 }
+
+/* ===== ACCOUNTING MOBILE RESPONSIVE ===== */
+@media (max-width: 768px) {
+
+    .accounting-dashboard {
+        padding: 1rem !important;
+        max-width: 100%;
+        overflow-x: hidden;
+    }
+
+    /* ERP sub-section content */
+    .erp-content-section {
+        max-width: 100%;
+        overflow-x: hidden;
+    }
+
+    /* Voucher form: stack columns on mobile */
+    .erp-content-section > div > div[style*="grid"],
+    .erp-content-section > div[style*="grid"] {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* Force ALL tables inside erp-content-section to be wrapped horizontally */
+    .erp-content-section .card {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Payroll form date pickers: stack on mobile */
+    .erp-content-section .card[style*="flex"] {
+        flex-wrap: wrap;
+    }
+
+    /* Location form: stack the 5-col grid */
+    div[style*="minmax(200px, 1fr) 1fr 1fr"] {
+        grid-template-columns: 1fr 1fr !important;
+        gap: 0.75rem !important;
+    }
+}
