@@ -236,41 +236,40 @@ const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, setAr
 
                             return (
                                 <tr key={arrival.batchId || arrival.id || `fallback-row-${index}`}>
-                                    <td>
+                                    <td data-label="Date">
                                         <div className="cell-primary" style={{ fontWeight: '700' }}>
                                             {arrival.dateTimeArrive ? arrival.dateTimeArrive.split('T')[0] : 'N/A'}
                                         </div>
                                         <div className="cell-secondary">
-                                            {arrival.dateTimeArrive && arrival.dateTimeArrive.includes('T') ? arrival.dateTimeArrive.split('T')[1] : ''}
+                                            {arrival.dateTimeArrive && arrival.dateTimeArrive.includes('T') ? arrival.dateTimeArrive.split('T')[1]?.substring(0,5) : ''}
                                         </div>
                                     </td>
-                                    <td>
+                                    <td data-label="Farm">
                                         <div className="cell-primary" style={{ fontWeight: '700', color: 'var(--color-primary-dark)' }}>{arrival.farmName}</div>
                                         <div className="cell-secondary">{arrival.farmCode}</div>
                                     </td>
-                                    <td>
+                                    <td data-label="Driver / DR">
                                         <div className="cell-primary badge-neutral">{arrival.driverName}</div>
                                         <div className="cell-secondary">DR: {arrival.deliveryReceipt}</div>
                                     </td>
-                                    <td className="text-right highlight-col">
+                                    <td data-label="Boxes" className="text-right highlight-col">
                                         <span style={{ fontSize: '1.2rem', fontWeight: '800' }}>{arrival._liveTotal || 0}</span>
                                     </td>
-                                    <td className="text-center">
+                                    <td data-label="Status" className="text-center">
                                         {isApproved ? (
                                             <span className="status-badge" style={{ background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white' }}>✓ Approved</span>
                                         ) : (
                                             <span className="status-badge" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white' }}>⏳ Pending</span>
                                         )}
                                     </td>
-                                    <td className="text-center">
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', alignItems: 'center' }}>
-                                            {/* Approve with double-confirm */}
+                                    <td data-label="" className="text-center">
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', alignItems: 'stretch', width: '100%' }}>
                                             {!isApproved && canApprove && (
                                                 <button
                                                     className="btn-primary"
                                                     onClick={() => handleApproveClick(arrival.id, arrival.batchId)}
                                                     style={{
-                                                        padding: '0.4rem 1rem', fontSize: '0.8rem', borderRadius: 'var(--border-radius-sm)', width: '100%',
+                                                        padding: '0.4rem 1rem', fontSize: '0.8rem', borderRadius: 'var(--border-radius-sm)',
                                                         background: isConfirming ? 'linear-gradient(135deg, #dc2626, #b91c1c)' : undefined,
                                                         animation: isConfirming ? 'pulse 0.6s ease-in-out infinite' : undefined
                                                     }}
@@ -281,10 +280,8 @@ const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, setAr
                                             {isApproved && (
                                                 <span style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--text-tertiary)' }}>VERIFIED</span>
                                             )}
-
-                                            {/* Edit & Delete row — hidden when approved */}
                                             {!isApproved && (
-                                                <div style={{ display: 'flex', gap: '0.35rem', width: '100%' }}>
+                                                <div style={{ display: 'flex', gap: '0.35rem' }}>
                                                     <button
                                                         onClick={() => handleEditClick(arrival)}
                                                         style={{
@@ -307,12 +304,10 @@ const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, setAr
                                                     )}
                                                 </div>
                                             )}
-
-                                            {/* Print */}
                                             <button
                                                 className="btn-print"
                                                 onClick={() => handlePrintClick(arrival)}
-                                                style={{ background: '#f8fafc', border: '1px solid #cbd5e1', color: '#475569', padding: '0.3rem 0.6rem', fontSize: '0.75rem', borderRadius: '4px', cursor: 'pointer', width: '100%' }}
+                                                style={{ background: '#f8fafc', border: '1px solid #cbd5e1', color: '#475569', padding: '0.3rem 0.6rem', fontSize: '0.75rem', borderRadius: '4px', cursor: 'pointer' }}
                                             >
                                                 🖨️ Print
                                             </button>

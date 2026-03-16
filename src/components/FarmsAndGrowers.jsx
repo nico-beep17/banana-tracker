@@ -323,35 +323,35 @@ const FarmsAndGrowers = ({ farms = [], setFarms, weeklyRates = [], setWeeklyRate
                         <tbody>
                             {farms.map((farm) => (
                                 <tr key={farm.id}>
-                                    <td>
+                                    <td data-label="Farm Code">
                                         <div className="cell-primary" style={{ fontWeight: '700' }}>{farm.farmCode}</div>
                                     </td>
-                                    <td>
+                                    <td data-label="Grower">
                                         <div className="cell-primary" style={{ fontWeight: '700', color: 'var(--color-primary-dark)' }}>{farm.name}</div>
                                         <div className="cell-secondary">{farm.company}</div>
                                     </td>
-                                    <td>
+                                    <td data-label="Location">
                                         <div className="cell-primary truncate" style={{ fontSize: '0.85rem' }}>{farm.location}</div>
                                     </td>
-                                    <td>
+                                    <td data-label="PH Name">
                                         <div className="cell-primary" style={{ fontWeight: '600' }}>{farm.physicalPhName}</div>
                                         <div className="cell-secondary truncate">{farm.physicalPhAddress}</div>
                                     </td>
-                                    <td className="text-center">
+                                    <td data-label="Active Has." className="text-center">
                                         <div className="badge-neutral" style={{ fontWeight: '700' }}>{farm.activeHas} ha</div>
                                     </td>
-                                    <td className="text-center">
+                                    <td data-label="Status" className="text-center">
                                         <span className="status-badge" style={farm.status === 'ACTIVE' ? { background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white' } : { background: '#f1f5f9', color: '#64748b' }}>
                                             {farm.status}
                                         </span>
                                     </td>
-                                    <td>
+                                    <td data-label="Modified">
                                         <div className="cell-secondary" style={{ fontSize: '0.8rem', fontWeight: '500' }}>
                                             {farm.lastModified ? new Date(farm.lastModified).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}
                                         </div>
                                     </td>
-                                    <td className="text-center">
-                                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexDirection: 'column', alignItems: 'center' }}>
+                                    <td data-label="" className="text-center">
+                                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                                             {(() => {
                                                 const currentYear = new Date().getFullYear();
                                                 const currentWk = getCurrentWeek();

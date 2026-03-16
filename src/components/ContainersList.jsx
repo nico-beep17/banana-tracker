@@ -98,37 +98,32 @@ const ContainersList = ({ containers = [], onNavigate, onDepartContainer, onSeal
 
                                 return (
                                     <tr key={container.id}>
-                                        <td style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>
+                                        <td data-label="Date" style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>
                                             {new Date(container.dateCreated).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                                         </td>
-                                        <td>
+                                        <td data-label="Brand / Reefer">
                                             <div className="brand-label" style={{ fontWeight: '800', color: 'var(--color-primary-dark)' }}>{container.reeferName || 'N/A'}</div>
                                             <div className="reefer-label" style={{ fontWeight: '600', color: 'var(--text-tertiary)' }}>{container.brand}</div>
                                         </td>
-                                        <td><span className="spec-badge">{container.reeferNo || 'Pending'}</span></td>
-                                        <td style={{ fontWeight: '500' }}>{container.sealNo || 'Pending'}</td>
-                                        <td style={{ color: 'var(--text-secondary)' }}>
+                                        <td data-label="Container No."><span className="spec-badge">{container.reeferNo || 'Pending'}</span></td>
+                                        <td data-label="Seal No." style={{ fontWeight: '500' }}>{container.sealNo || 'Pending'}</td>
+                                        <td data-label="Destination" style={{ color: 'var(--text-secondary)' }}>
                                             <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{container.destination || 'Pending'}</div>
                                             {container.destination && <div style={{ fontSize: '0.8rem' }}>{getCountry(container.destination)}</div>}
                                         </td>
-                                        <td className="text-right">
+                                        <td data-label="Total Boxes" className="text-right">
                                             <span style={{ fontSize: '1.2rem', fontWeight: '800', color: 'var(--color-primary-dark)' }}>{container.totalBoxes}</span>
                                             <span style={{ color: 'var(--text-tertiary)', fontSize: '0.8rem', marginLeft: '0.25rem' }}>/ 1540</span>
                                         </td>
-                                        <td className="text-center">
+                                        <td data-label="Status" className="text-center">
                                             <span className={`status-badge ${statusClass}`}>{statusLabel}</span>
                                         </td>
-                                        <td className="text-center">
+                                        <td data-label="" className="text-center">
                                             <div className="action-cell">
                                                 {isDeparted ? (
                                                     <>
                                                         <span className="dispatched-label">✓ Dispatched</span>
-                                                        <button
-                                                            className="btn-print"
-                                                            onClick={() => handlePrintClick(container)}
-                                                        >
-                                                            Print Manifest
-                                                        </button>
+                                                        <button className="btn-print" onClick={() => handlePrintClick(container)}>Print Manifest</button>
                                                     </>
                                                 ) : !isFull ? (
                                                     <button
@@ -139,26 +134,11 @@ const ContainersList = ({ containers = [], onNavigate, onDepartContainer, onSeal
                                                         Stuff Container
                                                     </button>
                                                 ) : !isSealed ? (
-                                                    <button
-                                                        className="btn-seal"
-                                                        onClick={() => onSealContainer(container.id)}
-                                                    >
-                                                        Seal Container
-                                                    </button>
+                                                    <button className="btn-seal" onClick={() => onSealContainer(container.id)}>Seal Container</button>
                                                 ) : (
                                                     <>
-                                                        <button
-                                                            className="btn-depart"
-                                                            onClick={() => onDepartContainer(container.id)}
-                                                        >
-                                                            Depart Hub
-                                                        </button>
-                                                        <button
-                                                            className="btn-print"
-                                                            onClick={() => handlePrintClick(container)}
-                                                        >
-                                                            Print Manifest
-                                                        </button>
+                                                        <button className="btn-depart" onClick={() => onDepartContainer(container.id)}>Depart Hub</button>
+                                                        <button className="btn-print" onClick={() => handlePrintClick(container)}>Print Manifest</button>
                                                     </>
                                                 )}
                                                 <button

@@ -506,4 +506,99 @@ button {
   .desktop-only {
     display: none !important;
   }
+
+  /* =============================================
+     UNIVERSAL MOBILE CARD PATTERN
+     Transforms every banana-table row into a
+     self-contained labeled card on mobile.
+  ============================================= */
+
+  /* Hide the thead — labels come from data-label instead */
+  .banana-table thead {
+    display: none !important;
+  }
+
+  /* Each row = a card */
+  .banana-table tbody tr {
+    display: block;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    margin-bottom: 0.85rem;
+    padding: 0.85rem 1rem;
+    background: var(--bg-surface);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+  }
+
+  .banana-table tbody tr:hover {
+    background: #f8fafc;
+    border-color: var(--color-primary-light);
+  }
+
+  /* Each cell = a labeled row inside the card */
+  .banana-table td {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.45rem 0;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 0.85rem;
+    white-space: normal;
+    text-align: left !important;
+  }
+
+  .banana-table td:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  /* Label pulled from data-label attribute */
+  .banana-table td::before {
+    content: attr(data-label);
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-tertiary);
+    min-width: 90px;
+    flex-shrink: 0;
+    padding-top: 0.1rem;
+  }
+
+  /* Cell content takes remaining space */
+  .banana-table td > * {
+    flex: 1;
+  }
+
+  /* Cells with no label (action cells) */
+  .banana-table td[data-label=""] {
+    justify-content: flex-end;
+    border-bottom: none;
+  }
+
+  .banana-table td[data-label=""]::before {
+    display: none;
+  }
+
+  /* Action buttons in cards: wrap and fill */
+  .banana-table td .action-cell,
+  .banana-table td > div[style*="flex"] {
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    width: 100%;
+  }
+
+  /* The scroll wrapper should NOT clip the cards */
+  .table-responsive,
+  .banana-table-container {
+    overflow-x: visible !important;
+    overflow-y: visible !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+
+  /* The scroll hint ::after is hidden when cards are shown */
+  .banana-table-container::after {
+    display: none;
+  }
 }
