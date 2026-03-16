@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import './Layout.css';
 
-const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notifications = [] }) => {
+const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notifications = [], onRefresh }) => {
     const [isNotificationOpen, setIsNotificationOpen] = useState(false);
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+    const [isSyncing, setIsSyncing] = useState(false);
     const unreadCount = notifications.filter(n => !n.read).length;
 
     // Close mobile sidebar when tab changes
@@ -26,6 +27,18 @@ const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notif
         setIsMobileSidebarOpen(false);
     };
 
+    const handleRefresh = async () => {
+        if (isSyncing || !onRefresh) return;
+        setIsSyncing(true);
+        try {
+            await onRefresh();
+        } catch (e) {
+            console.error('Sync failed:', e);
+        } finally {
+            setTimeout(() => setIsSyncing(false), 600); // keep spinner visible briefly
+        }
+    };
+
     return (
         <div className="layout" onClick={() => isNotificationOpen && setIsNotificationOpen(false)}>
             {/* Mobile Sidebar Overlay */}
@@ -37,7 +50,7 @@ const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notif
             <aside className={`sidebar ${isMobileSidebarOpen ? 'sidebar-mobile-open' : ''}`}>
                 <div className="sidebar-header">
                     <div className="logo">
-                        <span className="logo-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🍌</span>
+                        <span className="logo-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>ðŸŒ</span>
                         <h2 className="logo-text" style={{ fontSize: '1.2rem' }}>LAVC Operations</h2>
                     </div>
                 </div>
@@ -45,69 +58,69 @@ const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notif
                 <nav className="sidebar-nav">
                     <ul className="nav-list">
                         <li className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => onTabChange('dashboard')}>
-                            <span className="nav-icon">📊</span>
+                            <span className="nav-icon">ðŸ“Š</span>
                             <span className="nav-text">Dashboard</span>
                         </li>
 
                         {(userProfile?.role === 'Admin / Developer' || userProfile?.role === 'Hub Receiver' || userProfile?.role === 'Production Manager' || userProfile?.role === 'Quality Manager') && (
                             <li className={`nav-item ${activeTab === 'log-arrival' ? 'active' : ''}`} onClick={() => onTabChange('log-arrival')}>
-                                <span className="nav-icon">📝</span>
+                                <span className="nav-icon">ðŸ“</span>
                                 <span className="nav-text">Log Arrival</span>
                             </li>
                         )}
 
                         {(userProfile?.role === 'Admin / Developer' || userProfile?.role === 'Quality Manager' || userProfile?.role === 'Quality Supervisor') && (
                             <li className={`nav-item ${activeTab === 'sampling' ? 'active' : ''}`} onClick={() => onTabChange('sampling')}>
-                                <span className="nav-icon">🔬</span>
+                                <span className="nav-icon">ðŸ”¬</span>
                                 <span className="nav-text">Daily Sampling</span>
                             </li>
                         )}
 
                         {(userProfile?.role === 'Admin / Developer' || userProfile?.role === 'Production Manager' || userProfile?.role === 'Production Supervisor') && (
                             <li className={`nav-item ${activeTab === 'farms' ? 'active' : ''}`} onClick={() => onTabChange('farms')}>
-                                <span className="nav-icon">🌿</span>
+                                <span className="nav-icon">ðŸŒ¿</span>
                                 <span className="nav-text">Farms & Growers</span>
                             </li>
                         )}
 
                         {(userProfile?.role === 'Admin / Developer' || userProfile?.role === 'Hub Operations In-Charge' || userProfile?.role === 'Shipping Documentation Supervisor' || userProfile?.role === 'Logistics Supervisor' || userProfile?.role === 'Hub Receiver') && (
                             <li className={`nav-item ${activeTab === 'new-container' || activeTab === 'containers-list' || activeTab === 'edit-container' ? 'active' : ''}`} onClick={() => onTabChange('containers-list')}>
-                                <span className="nav-icon">🚢</span>
+                                <span className="nav-icon">ðŸš¢</span>
                                 <span className="nav-text">Container Hub</span>
                             </li>
                         )}
 
                         {(userProfile?.role === 'Admin / Developer' || userProfile?.role === 'Hub Operations In-Charge' || userProfile?.role === 'Production Manager') && (
                             <li className={`nav-item ${activeTab === 'inventory' ? 'active' : ''}`} onClick={() => onTabChange('inventory')}>
-                                <span className="nav-icon">📦</span>
+                                <span className="nav-icon">ðŸ“¦</span>
                                 <span className="nav-text">Materials Inventory</span>
                             </li>
                         )}
 
                         {(userProfile?.role === 'Admin / Developer' || userProfile?.role === 'Hub Operations In-Charge' || userProfile?.role === 'Shipping Documentation Supervisor' || userProfile?.role === 'Logistics Supervisor') && (
                             <li className={`nav-item ${activeTab === 'shipment-tracker' ? 'active' : ''}`} onClick={() => onTabChange('shipment-tracker')}>
-                                <span className="nav-icon">🌍</span>
+                                <span className="nav-icon">ðŸŒ</span>
                                 <span className="nav-text">Shipment Tracker</span>
                             </li>
                         )}
 
                         {(userProfile?.role === 'Admin / Developer' || userProfile?.role === 'Production Manager' || userProfile?.role === 'Quality Manager' || userProfile?.role === 'Accounting Staff') && (
                             <li className={`nav-item ${activeTab === 'reports' ? 'active' : ''}`} onClick={() => onTabChange('reports')}>
-                                <span className="nav-icon">📈</span>
+                                <span className="nav-icon">ðŸ“ˆ</span>
                                 <span className="nav-text">Reports</span>
                             </li>
                         )}
 
                         {(userProfile?.role === 'Admin / Developer' || userProfile?.role === 'Accounting Staff' || userProfile?.role === 'Accounting Manager') && (
                             <li className={`nav-item ${activeTab === 'accounting' ? 'active' : ''}`} onClick={() => onTabChange('accounting')}>
-                                <span className="nav-icon">🧾</span>
+                                <span className="nav-icon">ðŸ§¾</span>
                                 <span className="nav-text">Accounting & Billing</span>
                             </li>
                         )}
 
                         {(userProfile?.role === 'Admin / Developer' || userProfile?.role === 'Accounting Manager' || userProfile?.role === 'HR Manager') && (
                             <li className={`nav-item ${activeTab === 'payroll' ? 'active' : ''}`} onClick={() => onTabChange('payroll')}>
-                                <span className="nav-icon">👥</span>
+                                <span className="nav-icon">ðŸ‘¥</span>
                                 <span className="nav-text">Payroll & HR</span>
                             </li>
                         )}
@@ -125,7 +138,7 @@ const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notif
                                 <span className="user-role">{userProfile.role || 'Guest'}</span>
                             </div>
                             <button onClick={onLogout} title="Sign Out" style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '1.2rem' }}>
-                                ⎋
+                                âŽ‹
                             </button>
                         </div>
                     ) : (
@@ -156,12 +169,26 @@ const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notif
                         <input type="text" className="input-field" placeholder="Search arrivals, growers..." />
                     </div>
                     <div className="header-actions">
+                        {/* Sync / Refresh Button */}
+                        <button
+                            className="icon-btn"
+                            onClick={handleRefresh}
+                            title="Sync latest data"
+                            style={{ position: 'relative' }}
+                        >
+                            <span style={{
+                                display: 'inline-block',
+                                animation: isSyncing ? 'spin 0.8s linear infinite' : 'none',
+                                fontSize: '1.2rem'
+                            }}>ðŸ”„</span>
+                        </button>
+
                         <div style={{ position: 'relative' }}>
                             <button
                                 className="icon-btn"
                                 onClick={(e) => { e.stopPropagation(); setIsNotificationOpen(!isNotificationOpen); }}
                             >
-                                🔔
+                                ðŸ””
                                 {unreadCount > 0 && <span className="notification-badge">{unreadCount}</span>}
                             </button>
                             {isNotificationOpen && (
@@ -172,7 +199,7 @@ const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notif
                                     <div className="notifications-list">
                                         {notifications.length > 0 ? notifications.map(n => (
                                             <div key={n.id} className={`notification-item ${n.read ? 'read' : 'unread'}`}>
-                                                <div className="notification-icon">{n.icon || 'ℹ️'}</div>
+                                                <div className="notification-icon">{n.icon || 'â„¹ï¸'}</div>
                                                 <div className="notification-content">
                                                     <strong>{n.title}</strong>
                                                     <p>{n.message}</p>
@@ -186,9 +213,25 @@ const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notif
                                 </div>
                             )}
                         </div>
-                        <button className="icon-btn">⚙️</button>
+                        <button className="icon-btn">âš™ï¸</button>
                     </div>
                 </header>
+
+                {/* Sync Banner */}
+                {isSyncing && (
+                    <div style={{
+                        background: 'linear-gradient(90deg, #10b981, #059669)',
+                        color: '#fff',
+                        textAlign: 'center',
+                        padding: '0.4rem',
+                        fontSize: '0.8rem',
+                        fontWeight: 600,
+                        letterSpacing: '0.05em',
+                        animation: 'fadeIn 0.2s ease'
+                    }}>
+                        âŸ³ Syncing latest data from all team members...
+                    </div>
+                )}
 
                 {/* Page Content */}
                 <div className="page-container">
@@ -202,40 +245,42 @@ const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notif
                     className={`mobile-nav-btn ${activeTab === 'dashboard' ? 'active' : ''}`}
                     onClick={() => handleMobileTabChange('dashboard')}
                 >
-                    <span className="mobile-nav-icon">📊</span>
+                    <span className="mobile-nav-icon">ðŸ“Š</span>
                     <span className="mobile-nav-label">Home</span>
                 </button>
                 <button
                     className={`mobile-nav-btn ${activeTab === 'log-arrival' ? 'active' : ''}`}
                     onClick={() => handleMobileTabChange('log-arrival')}
                 >
-                    <span className="mobile-nav-icon">📝</span>
+                    <span className="mobile-nav-icon">ðŸ“</span>
                     <span className="mobile-nav-label">Log</span>
                 </button>
                 <button
                     className={`mobile-nav-btn ${activeTab === 'containers-list' || activeTab === 'new-container' ? 'active' : ''}`}
                     onClick={() => handleMobileTabChange('containers-list')}
                 >
-                    <span className="mobile-nav-icon">🚢</span>
+                    <span className="mobile-nav-icon">ðŸš¢</span>
                     <span className="mobile-nav-label">Containers</span>
                 </button>
                 <button
                     className={`mobile-nav-btn ${activeTab === 'reports' ? 'active' : ''}`}
                     onClick={() => handleMobileTabChange('reports')}
                 >
-                    <span className="mobile-nav-icon">📈</span>
+                    <span className="mobile-nav-icon">ðŸ“ˆ</span>
                     <span className="mobile-nav-label">Reports</span>
                 </button>
                 <button
                     className="mobile-nav-btn"
                     onClick={() => setIsMobileSidebarOpen(true)}
                 >
-                    <span className="mobile-nav-icon">☰</span>
+                    <span className="mobile-nav-icon">â˜°</span>
                     <span className="mobile-nav-label">More</span>
                 </button>
             </nav>
         </div>
     );
 };
+
+
 
 export default Layout;

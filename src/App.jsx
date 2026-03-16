@@ -633,7 +633,7 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <Layout activeTab={activeTab} onTabChange={handleNavigate} userProfile={userProfile} onLogout={handleLogout} notifications={smartNotifications}>
+      <Layout activeTab={activeTab} onTabChange={handleNavigate} userProfile={userProfile} onLogout={handleLogout} notifications={smartNotifications} onRefresh={fetchData}>
         {activeTab === 'dashboard' && (
           <Dashboard
             metrics={{
