@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { Camera } from '@capacitor/camera';
+import { PushNotifications } from '@capacitor/push-notifications';
 import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
 import ArrivalForm from './components/ArrivalForm';
@@ -162,6 +165,49 @@ function App() {
     );
 
     fetchData();
+
+    // -- CAPACITOR PERMISSIONS --
+    if (Capacitor.isNativePlatform()) {
+      const requestPermissions = async () => {
+        try {
+          // 1. Camera Permissions
+          const cameraStatus = await Camera.checkPermissions();
+          if (cameraStatus.camera !== 'granted') {
+            await Camera.requestPermissions();
+          }
+
+          // 2. Push Notifications
+          let pushStatus = await PushNotifications.checkPermissions();
+          if (pushStatus.receive !== 'granted') {
+            pushStatus = await PushNotifications.requestPermissions();
+          }
+
+          if (pushStatus.receive === 'granted') {
+            // Register with FCM
+            await PushNotifications.register();
+            
+            // Add listeners
+            PushNotifications.addListener('registration', (token) => {
+              console.log('Push registration success, token: ' + token.value);
+              // You could sync this token to Supabase profiles here
+            });
+
+            PushNotifications.addListener('registrationError', (error) => {
+              console.error('Push registration error: ', JSON.stringify(error));
+            });
+
+            PushNotifications.addListener('pushNotificationReceived', (notification) => {
+              console.log('Push received: ' + JSON.stringify(notification));
+              showToast(notification.title + ': ' + notification.body, 'info');
+            });
+          }
+        } catch (err) {
+          console.error('Error requesting Capacitor permissions:', err);
+        }
+      };
+
+      requestPermissions();
+    }
 
     return () => subscription.unsubscribe();
   }, [fetchData]);
