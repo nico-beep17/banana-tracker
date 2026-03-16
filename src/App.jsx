@@ -170,39 +170,26 @@ function App() {
     if (Capacitor.isNativePlatform()) {
       const requestPermissions = async () => {
         try {
-          // 1. Camera Permissions
+          // Camera Permissions
           const cameraStatus = await Camera.checkPermissions();
           if (cameraStatus.camera !== 'granted') {
             await Camera.requestPermissions();
           }
+        } catch (err) {
+          console.warn('Camera permission request failed (non-fatal):', err);
+        }
 
-          // 2. Push Notifications
+        // Push Notifications — only request permission, do NOT register
+        // (FCM registration requires google-services.json to be configured first)
+        try {
           let pushStatus = await PushNotifications.checkPermissions();
           if (pushStatus.receive !== 'granted') {
-            pushStatus = await PushNotifications.requestPermissions();
+            await PushNotifications.requestPermissions();
           }
-
-          if (pushStatus.receive === 'granted') {
-            // Register with FCM
-            await PushNotifications.register();
-            
-            // Add listeners
-            PushNotifications.addListener('registration', (token) => {
-              console.log('Push registration success, token: ' + token.value);
-              // You could sync this token to Supabase profiles here
-            });
-
-            PushNotifications.addListener('registrationError', (error) => {
-              console.error('Push registration error: ', JSON.stringify(error));
-            });
-
-            PushNotifications.addListener('pushNotificationReceived', (notification) => {
-              console.log('Push received: ' + JSON.stringify(notification));
-              showToast(notification.title + ': ' + notification.body, 'info');
-            });
-          }
+          // NOTE: Do NOT call PushNotifications.register() here.
+          // It will crash without a valid google-services.json / FCM setup.
         } catch (err) {
-          console.error('Error requesting Capacitor permissions:', err);
+          console.warn('Push notification permission request failed (non-fatal):', err);
         }
       };
 

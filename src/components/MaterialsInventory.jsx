@@ -217,6 +217,11 @@ const MaterialsInventory = ({ inventoryItems = [], setInventoryItems, farms = []
         }
     };
 
+    const handleInputChange = (e) => {
+        const { name, value, type } = e.target;
+        setNewItem(prev => ({ ...prev, [name]: type === 'number' ? (value === '' ? '' : Number(value)) : value }));
+    };
+
     const handleAddItem = async (e) => {
         e.preventDefault();
         const payload = { ...newItem, last_updated: new Date().toISOString() };
