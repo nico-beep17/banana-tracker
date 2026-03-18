@@ -135,11 +135,26 @@ function App() {
 
   // Fetch initial data & handle Auth
   useEffect(() => {
-    // Check initial session
+    // Check for saved dev bypass session first
+    const savedDevUser = localStorage.getItem('lavc_dev_bypass_user');
+    if (savedDevUser) {
+      try {
+        const parsed = JSON.parse(savedDevUser);
+        setUser(parsed);
+        fetchUserProfile(parsed.id);
+      } catch (_) {
+        localStorage.removeItem('lavc_dev_bypass_user');
+      }
+    }
+
+    // Check initial Supabase session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) fetchUserProfile(session.user.id);
-      else setAuthLoading(false);
+      if (session?.user) {
+        setUser(session.user);
+        fetchUserProfile(session.user.id);
+      } else if (!savedDevUser) {
+        setAuthLoading(false);
+      }
     });
 
     // Listen for auth changes
@@ -244,7 +259,10 @@ function App() {
   };
 
   const handleLogout = async () => {
+    localStorage.removeItem('lavc_dev_bypass_user');
     await supabase.auth.signOut();
+    setUser(null);
+    setUserProfile(null);
   };
 
   const handleNavigate = (tabInfo) => {

@@ -41,6 +41,7 @@ const Login = ({ onLoginSuccess }) => {
                 department: 'Engineering'
             }
         };
+        localStorage.setItem('lavc_dev_bypass_user', JSON.stringify(mockUser));
         onLoginSuccess(mockUser);
     };
 

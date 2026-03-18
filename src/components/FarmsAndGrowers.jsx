@@ -398,7 +398,7 @@ const FarmsAndGrowers = ({ farms = [], setFarms, weeklyRates = [], setWeeklyRate
             {/* Weekly Rates Modal */}
             {showRatesModal && activeFarmForRates && (
                 <div className="modal-backdrop">
-                    <div className="modal-content" style={{ maxWidth: '900px', width: '90%', maxHeight: '90vh', overflowY: 'auto' }}>
+                    <div className="modal-content" style={{ maxWidth: '900px', width: '95%', maxHeight: '90vh', overflowY: 'auto' }}>
                         <div className="modal-header">
                             <h2>Weekly Pricing Contracts</h2>
                             <p className="subtitle">Manage rates for <strong>{activeFarmForRates.farmCode} - {activeFarmForRates.name}</strong></p>
@@ -439,7 +439,7 @@ const FarmsAndGrowers = ({ farms = [], setFarms, weeklyRates = [], setWeeklyRate
                                     </div>
                                 </div>
 
-                                <div className="pricing-matrix" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+                                <div className="pricing-matrix" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
                                     {/* Class A Rates */}
                                     <div className="matrix-column" style={{ background: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                                         <h5 style={{ borderBottom: '2px solid #e2e8f0', paddingBottom: '0.5rem', marginBottom: '1rem', color: '#16a34a' }}>Class A Rates (PHP)</h5>
@@ -469,8 +469,9 @@ const FarmsAndGrowers = ({ farms = [], setFarms, weeklyRates = [], setWeeklyRate
                                         </div>
                                     </div>
                                 </div>
-                                <div className="form-actions" style={{ justifyContent: 'flex-end', marginTop: '1rem' }}>
-                                    <button type="submit" className="btn-primary">Save Weekly Rate</button>
+                                <div className="form-actions" style={{ justifyContent: 'flex-end', marginTop: '1rem', gap: '0.75rem', display: 'flex', flexWrap: 'wrap' }}>
+                                    <button type="button" className="btn-secondary" onClick={() => setShowRatesModal(false)} style={{ padding: '0.5rem 1.5rem' }}>Cancel</button>
+                                    <button type="submit" className="btn-primary" style={{ padding: '0.5rem 1.5rem' }}>Save Weekly Rate</button>
                                 </div>
                             </form>
 
