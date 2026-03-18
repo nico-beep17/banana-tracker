@@ -427,6 +427,89 @@ function App() {
     }
   };
 
+  // --- Stuffed Payload Override Handlers ---
+  const handleEditStuffedPayload = async (containerId, payloadId, newPayloadData, operatorName) => {
+    const targetContainer = containers.find(c => c.id === containerId);
+    if (!targetContainer || !targetContainer.stuffedItems) return;
+
+    const oldPayload = targetContainer.stuffedItems.find(p => p.id === payloadId);
+    if (!oldPayload) { alert('Payload not found.'); return; }
+
+    // Write audit log
+    await supabase.from('override_audit_logs').insert({
+      action: 'EDIT',
+      entity_type: 'STUFFED_PAYLOAD',
+      entity_id: payloadId,
+      batch_id: null,
+      container_id: containerId,
+      old_data: oldPayload,
+      new_data: newPayloadData,
+      operator_name: operatorName
+    });
+
+    // Replace the payload in the array
+    const updatedItems = targetContainer.stuffedItems.map(p =>
+      p.id === payloadId ? { ...p, data: newPayloadData.data, total: newPayloadData.total } : p
+    );
+    const newTotalBoxes = updatedItems.reduce((sum, p) => sum + (p.total || 0), 0);
+
+    const { data, error } = await supabase
+      .from('containers')
+      .update({ stuffedItems: updatedItems, totalBoxes: newTotalBoxes })
+      .eq('id', containerId)
+      .select();
+
+    if (error) {
+      console.error('Supabase error (Edit Payload):', error);
+      alert(`Failed to update payload: ${error.message}`);
+      return;
+    }
+    if (data && data[0]) {
+      setContainers(prev => prev.map(c => c.id === containerId ? data[0] : c));
+    }
+  };
+
+  const handleDeleteStuffedPayload = async (containerId, payloadId, operatorName) => {
+    const targetContainer = containers.find(c => c.id === containerId);
+    if (!targetContainer || !targetContainer.stuffedItems) return;
+
+    const oldPayload = targetContainer.stuffedItems.find(p => p.id === payloadId);
+    if (!oldPayload) { alert('Payload not found.'); return; }
+
+    if (!window.confirm(`Delete payload ${payloadId} (${oldPayload.total} boxes)? This cannot be undone.`)) return;
+
+    // Write audit log
+    await supabase.from('override_audit_logs').insert({
+      action: 'DELETE',
+      entity_type: 'STUFFED_PAYLOAD',
+      entity_id: payloadId,
+      batch_id: null,
+      container_id: containerId,
+      old_data: oldPayload,
+      new_data: null,
+      operator_name: operatorName
+    });
+
+    // Remove the payload from the array
+    const updatedItems = targetContainer.stuffedItems.filter(p => p.id !== payloadId);
+    const newTotalBoxes = updatedItems.reduce((sum, p) => sum + (p.total || 0), 0);
+
+    const { data, error } = await supabase
+      .from('containers')
+      .update({ stuffedItems: updatedItems, totalBoxes: newTotalBoxes })
+      .eq('id', containerId)
+      .select();
+
+    if (error) {
+      console.error('Supabase error (Delete Payload):', error);
+      alert(`Failed to delete payload: ${error.message}`);
+      return;
+    }
+    if (data && data[0]) {
+      setContainers(prev => prev.map(c => c.id === containerId ? data[0] : c));
+    }
+  };
+
   // Calculate high level metrics
   // ONLY count APPROVED arrivals
   const approvedArrivals = arrivals.filter(arr => arr.approval_status === 'APPROVED');
@@ -730,6 +813,8 @@ function App() {
             onNavigate={handleNavigate}
             onDepartContainer={handleDepartContainer}
             onSealContainer={handleSealContainer}
+            onEditPayload={handleEditStuffedPayload}
+            onDeletePayload={handleDeleteStuffedPayload}
           />
         )}
 

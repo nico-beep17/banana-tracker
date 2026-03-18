@@ -2,6 +2,8 @@ import React, { useRef, useState } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import { downloadCSV } from '../utils/exportUtils';
 import ArrivalManifest from './ArrivalManifest';
+import PinVerifyModal from './PinVerifyModal';
+import { supabase } from '../supabaseClient';
 import './ArrivalsTable.css';
 
 const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, setArrivals, userProfile, samplings = [] }) => {
@@ -14,6 +16,10 @@ const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, setAr
 
     // Double-confirm approval state
     const [confirmApprovalId, setConfirmApprovalId] = useState(null);
+
+    // PIN verification state for override actions on APPROVED arrivals
+    const [pinModal, setPinModal] = useState({ open: false, action: null, arrival: null });
+    const [overrideOperator, setOverrideOperator] = useState(null); // tracks current override session
 
     const handlePrint = useReactToPrint({
         documentTitle: `Arrival_Manifest_${selectedArrival?.batchId || selectedArrival?.id || 'Unknown'}`,
@@ -29,7 +35,7 @@ const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, setAr
     };
 
     // --- Edit handlers ---
-    const handleEditClick = (arrival) => {
+    const openEditForm = (arrival) => {
         setEditingArrival(arrival);
 
         // Build quantity grid from all individual arrival rows in this batch
@@ -57,6 +63,53 @@ const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, setAr
         });
     };
 
+    const handleEditClick = (arrival) => {
+        const isApproved = arrival.approval_status === 'APPROVED';
+        if (isApproved) {
+            setPinModal({ open: true, action: 'edit', arrival });
+        } else {
+            openEditForm(arrival);
+        }
+    };
+
+    const handleDeleteClick = (arrival) => {
+        const isApproved = arrival.approval_status === 'APPROVED';
+        if (isApproved) {
+            setPinModal({ open: true, action: 'delete', arrival });
+        } else {
+            if (onDeleteArrival) onDeleteArrival(arrival.id, arrival.batchId);
+        }
+    };
+
+    const handlePinVerified = async ({ operatorName }) => {
+        const { action, arrival } = pinModal;
+        setPinModal({ open: false, action: null, arrival: null });
+
+        if (action === 'edit') {
+            setOverrideOperator(operatorName);
+            openEditForm(arrival);
+        } else if (action === 'delete') {
+            // Write audit log before deleting
+            const batchId = arrival.batchId;
+            const batchRows = batchId
+                ? arrivals.filter(a => a.batchId === batchId)
+                : arrivals.filter(a => a.id === arrival.id);
+
+            await supabase.from('override_audit_logs').insert({
+                action: 'DELETE',
+                entity_type: 'ARRIVAL',
+                entity_id: arrival.id,
+                batch_id: batchId || null,
+                container_id: null,
+                old_data: batchRows,
+                new_data: null,
+                operator_name: operatorName
+            });
+
+            if (onDeleteArrival) onDeleteArrival(arrival.id, arrival.batchId);
+        }
+    };
+
     const handleEditChange = (e) => {
         setEditForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
     };
@@ -71,8 +124,14 @@ const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, setAr
     const handleEditSave = async () => {
         if (!editingArrival || !setArrivals) return;
 
-        const { supabase } = await import('../supabaseClient');
         const batchId = editingArrival.batchId;
+
+        // Capture old data for audit log (only if this is an override)
+        const batchRows = batchId
+            ? arrivals.filter(a => a.batchId === batchId)
+            : arrivals.filter(a => a.id === editingArrival.id);
+
+        const oldDataSnapshot = batchRows.map(r => ({ id: r.id, typeId: r.typeId, quantity: r.quantity, farmName: r.farmName, driverName: r.driverName, deliveryReceipt: r.deliveryReceipt }));
 
         // 1. Update header fields on all batch rows
         const headerPayload = {
@@ -97,10 +156,6 @@ const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, setAr
         }
 
         // 2. Update individual row quantities
-        const batchRows = batchId
-            ? arrivals.filter(a => a.batchId === batchId)
-            : arrivals.filter(a => a.id === editingArrival.id);
-
         for (const row of batchRows) {
             if (row.typeId && editForm.quantities[row.typeId] !== undefined) {
                 const newQty = Number(editForm.quantities[row.typeId]) || 0;
@@ -110,7 +165,23 @@ const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, setAr
             }
         }
 
-        // 3. Reload batch from DB to get fresh state
+        // 3. Write audit log if this was an override on an approved arrival
+        if (overrideOperator) {
+            const newDataSnapshot = { ...headerPayload, quantities: editForm.quantities };
+            await supabase.from('override_audit_logs').insert({
+                action: 'EDIT',
+                entity_type: 'ARRIVAL',
+                entity_id: editingArrival.id,
+                batch_id: batchId || null,
+                container_id: null,
+                old_data: oldDataSnapshot,
+                new_data: newDataSnapshot,
+                operator_name: overrideOperator
+            });
+            setOverrideOperator(null);
+        }
+
+        // 4. Reload batch from DB to get fresh state
         let reloadQuery = supabase.from('arrivals').select('*');
         if (batchId) {
             reloadQuery = reloadQuery.eq('batchId', batchId);
@@ -188,19 +259,57 @@ const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, setAr
     });
 
     const handleExport = () => {
-        const exportData = displayArrivals.map(a => ({
-            'Batch ID': a.batchId || '-',
-            'Date Arrived': a.dateTimeArrive ? a.dateTimeArrive.split('T')[0] : '-',
-            'Time Arrived': a.dateTimeArrive ? a.dateTimeArrive.split('T')[1]?.substring(0, 5) : '-',
-            'Farm Code': a.farmCode || '-',
-            'Farm Name': a.farmName || '-',
-            'Driver': a.driverName || '-',
-            'Plate Number': a.plateNumber || 'N/A',
-            'DR Number': a.deliveryReceipt || '-',
-            'Total Boxes': a._liveTotal || 0,
-            'Status': a.approval_status || 'PENDING',
-            'Encoded Timestamp (System)': a.dateTimeEncoded ? new Date(a.dateTimeEncoded).toLocaleString() : 'N/A'
-        }));
+        const exportData = displayArrivals.map(a => {
+            // Aggregate per-hands breakdown from all rows in this batch
+            const batchId = a.batchId;
+            const batchRows = batchId
+                ? arrivals.filter(r => r.batchId === batchId)
+                : arrivals.filter(r => r.id === a.id);
+
+            const handsBreakdown = {};
+            batchRows.forEach(row => {
+                if (row.typeId) {
+                    handsBreakdown[row.typeId] = (handsBreakdown[row.typeId] || 0) + (Number(row.quantity) || 0);
+                }
+            });
+
+            // Calculate class subtotals
+            const classASubtotal = classATypes.reduce((s, t) => s + (handsBreakdown[t] || 0), 0);
+            const classBSubtotal = classBTypes.reduce((s, t) => s + (handsBreakdown[t] || 0), 0);
+
+            return {
+                'Batch ID': a.batchId || '-',
+                'Date Arrived': a.dateTimeArrive ? a.dateTimeArrive.split('T')[0] : '-',
+                'Time Arrived': a.dateTimeArrive ? a.dateTimeArrive.split('T')[1]?.substring(0, 5) : '-',
+                'Farm Code': a.farmCode || '-',
+                'Farm Name': a.farmName || '-',
+                'Driver': a.driverName || '-',
+                'Plate Number': a.plateNumber || 'N/A',
+                'DR Number': a.deliveryReceipt || '-',
+                'Total Boxes': a._liveTotal || 0,
+                // Class A Per-Hands Breakdown
+                'A-RHA 4H': handsBreakdown['classA.rha4'] || 0,
+                'A-RHA 5H': handsBreakdown['classA.rha5'] || 0,
+                'A-RHA 6H': handsBreakdown['classA.rha6'] || 0,
+                'A-SHA 7H': handsBreakdown['classA.sha7'] || 0,
+                'A-SHA 8H': handsBreakdown['classA.sha8'] || 0,
+                'A-SHA 9H': handsBreakdown['classA.sha9'] || 0,
+                'A-CLA': handsBreakdown['classA.cla'] || 0,
+                'Class A Total': classASubtotal,
+                // Class B Per-Hands Breakdown
+                'B-RHB 4H': handsBreakdown['classB.rhb4'] || 0,
+                'B-RHB 5H': handsBreakdown['classB.rhb5'] || 0,
+                'B-RHB 6H': handsBreakdown['classB.rhb6'] || 0,
+                'B-SHB 7H': handsBreakdown['classB.shb7'] || 0,
+                'B-SHB 8H': handsBreakdown['classB.shb8'] || 0,
+                'B-SHB 9H': handsBreakdown['classB.shb9'] || 0,
+                'B-CLB': handsBreakdown['classB.clb'] || 0,
+                'B-FP': handsBreakdown['classB.fp'] || 0,
+                'Class B Total': classBSubtotal,
+                'Status': a.approval_status || 'PENDING',
+                'Encoded Timestamp (System)': a.dateTimeEncoded ? new Date(a.dateTimeEncoded).toLocaleString() : 'N/A'
+            };
+        });
 
         const timestampStr = new Date().toISOString().replace(/[:.]/g, '-');
         downloadCSV(exportData, `Arrivals_Log_Report_${timestampStr}.xlsx`);
@@ -280,30 +389,31 @@ const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, setAr
                                             {isApproved && (
                                                 <span style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--text-tertiary)' }}>VERIFIED</span>
                                             )}
-                                            {!isApproved && (
-                                                <div style={{ display: 'flex', gap: '0.35rem' }}>
+                                            {/* Edit & Delete — always visible, PIN-gated for approved */}
+                                            <div style={{ display: 'flex', gap: '0.35rem' }}>
+                                                <button
+                                                    onClick={() => handleEditClick(arrival)}
+                                                    style={{
+                                                        flex: 1, background: isApproved ? '#fef3c7' : '#f8fafc',
+                                                        border: `1px solid ${isApproved ? '#f59e0b' : '#cbd5e1'}`,
+                                                        color: isApproved ? '#92400e' : '#475569',
+                                                        padding: '0.3rem 0.4rem', fontSize: '0.7rem', borderRadius: '4px', cursor: 'pointer', fontWeight: '600'
+                                                    }}
+                                                >
+                                                    {isApproved ? '🔒 Edit' : '✏️ Edit'}
+                                                </button>
+                                                {onDeleteArrival && (
                                                     <button
-                                                        onClick={() => handleEditClick(arrival)}
+                                                        onClick={() => handleDeleteClick(arrival)}
                                                         style={{
-                                                            flex: 1, background: '#f8fafc', border: '1px solid #cbd5e1', color: '#475569',
+                                                            flex: 1, background: '#fef2f2', border: '1px solid #fca5a5', color: '#dc2626',
                                                             padding: '0.3rem 0.4rem', fontSize: '0.7rem', borderRadius: '4px', cursor: 'pointer', fontWeight: '600'
                                                         }}
                                                     >
-                                                        ✏️ Edit
+                                                        {isApproved ? '🔒 Delete' : '🗑 Delete'}
                                                     </button>
-                                                    {onDeleteArrival && (
-                                                        <button
-                                                            onClick={() => onDeleteArrival(arrival.id, arrival.batchId)}
-                                                            style={{
-                                                                flex: 1, background: '#fef2f2', border: '1px solid #fca5a5', color: '#dc2626',
-                                                                padding: '0.3rem 0.4rem', fontSize: '0.7rem', borderRadius: '4px', cursor: 'pointer', fontWeight: '600'
-                                                            }}
-                                                        >
-                                                            🗑 Delete
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            )}
+                                                )}
+                                            </div>
                                             <button
                                                 className="btn-print"
                                                 onClick={() => handlePrintClick(arrival)}
@@ -419,6 +529,14 @@ const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, setAr
                     </div>
                 </div>
             )}
+
+            {/* PIN Verification Modal */}
+            <PinVerifyModal
+                isOpen={pinModal.open}
+                onClose={() => setPinModal({ open: false, action: null, arrival: null })}
+                onVerified={handlePinVerified}
+                actionLabel={pinModal.action === 'delete' ? 'Delete Override' : 'Edit Override'}
+            />
 
             {/* Hidden component solely for printing */}
             <div style={{ display: 'none' }}>
