@@ -11,6 +11,7 @@ const getCountry = (dest) => getPortCountry(dest);
 const ContainersList = ({ containers = [], onNavigate, onDepartContainer, onSealContainer, onEditPayload, onDeletePayload }) => {
     const componentRef = useRef();
     const [selectedContainer, setSelectedContainer] = useState(null);
+    const [breakdownContainer, setBreakdownContainer] = useState(null);
 
     // Payload manager state
     const [managingContainerId, setManagingContainerId] = useState(null);
@@ -227,7 +228,12 @@ const ContainersList = ({ containers = [], onNavigate, onDepartContainer, onSeal
                                 let statusClass = isDeparted ? 'departed' : (isSealed ? 'sealed' : (isFull ? 'full' : (isEmpty ? 'empty' : 'packing')));
 
                                 return (
-                                    <tr key={container.id}>
+                                    <tr
+                                        key={container.id}
+                                        onClick={() => setBreakdownContainer(container)}
+                                        className="container-row-clickable"
+                                        title="Click to view class breakdown"
+                                    >
                                         <td data-label="Date" style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>
                                             {new Date(container.dateCreated).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                                         </td>
@@ -248,7 +254,7 @@ const ContainersList = ({ containers = [], onNavigate, onDepartContainer, onSeal
                                         <td data-label="Status" className="text-center">
                                             <span className={`status-badge ${statusClass}`}>{statusLabel}</span>
                                         </td>
-                                        <td data-label="" className="text-center">
+                                        <td data-label="" className="text-center" onClick={e => e.stopPropagation()}>
                                             <div className="action-cell">
                                                 {isDeparted ? (
                                                     <>
@@ -305,6 +311,195 @@ const ContainersList = ({ containers = [], onNavigate, onDepartContainer, onSeal
                     container={selectedContainer}
                 />
             </div>
+
+            {/* ====== CLASS BREAKDOWN MODAL ====== */}
+            {breakdownContainer && (() => {
+                const c = breakdownContainer;
+                // Aggregate all stuffed items into a flat breakdown object
+                const bd = {};
+                (c.stuffedItems || []).forEach(item => {
+                    if (item.data) {
+                        Object.keys(item.data).forEach(cg => {
+                            const classObj = item.data[cg];
+                            Object.keys(classObj).forEach(sk => {
+                                const key = `${cg}.${sk}`;
+                                bd[key] = (bd[key] || 0) + (Number(classObj[sk]) || 0);
+                            });
+                        });
+                    }
+                });
+
+                const classATotal = classATypes.reduce((s, t) => s + (bd[t] || 0), 0);
+                const classBTotal = classBTypes.reduce((s, t) => s + (bd[t] || 0), 0);
+                const grandTotal = classATotal + classBTotal;
+                const capacity = 1540;
+                const fillPct = Math.min((c.totalBoxes / capacity) * 100, 100);
+                const circumference = 2 * Math.PI * 42; // r=42
+                const dashOffset = circumference * (1 - fillPct / 100);
+
+                const isDeparted = !!c.timeDeparted;
+                const isSealed = !!c.timeSealed;
+                const isFull = c.totalBoxes >= capacity;
+                const isEmpty = c.totalBoxes === 0;
+                const statusLabel = isDeparted ? 'DEPARTED' : (isSealed ? 'SEALED' : (isFull ? 'FULL' : (isEmpty ? 'EMPTY' : 'PACKING')));
+                const statusClass = isDeparted ? 'departed' : (isSealed ? 'sealed' : (isFull ? 'full' : (isEmpty ? 'empty' : 'packing')));
+
+                const BarRow = ({ label, value, maxVal, colorFrom, colorTo }) => {
+                    const pct = maxVal > 0 ? Math.round((value / maxVal) * 100) : 0;
+                    return (
+                        <div className="bd-bar-row">
+                            <div className="bd-bar-label">{label}</div>
+                            <div className="bd-bar-track">
+                                <div
+                                    className="bd-bar-fill"
+                                    style={{
+                                        width: `${pct}%`,
+                                        background: `linear-gradient(90deg, ${colorFrom}, ${colorTo})`
+                                    }}
+                                />
+                            </div>
+                            <div className="bd-bar-count">{value > 0 ? value.toLocaleString() : '—'}</div>
+                            <div className="bd-bar-pct">{pct > 0 ? `${pct}%` : ''}</div>
+                        </div>
+                    );
+                };
+
+                const ringColor = isDeparted ? '#1d4ed8' : isSealed ? '#059669' : isFull ? '#3b82f6' : '#f59e0b';
+
+                return (
+                    <div className="bd-overlay" onClick={() => setBreakdownContainer(null)}>
+                        <div className="bd-modal animation-fade-in" onClick={e => e.stopPropagation()}>
+                            <button className="bd-close" onClick={() => setBreakdownContainer(null)}>×</button>
+
+                            {/* Header */}
+                            <div className="bd-header">
+                                <div className="bd-header-info">
+                                    <span className="bd-container-name">{c.reeferName || 'Container'}</span>
+                                    <span className="bd-container-sub">
+                                        {c.reeferNo || 'No. Pending'}
+                                        {c.destination && <> &nbsp;→&nbsp; <strong>{c.destination}</strong></>}
+                                    </span>
+                                    <span className={`status-badge ${statusClass}`} style={{ marginTop: '0.25rem', alignSelf: 'flex-start' }}>{statusLabel}</span>
+                                </div>
+
+                                {/* Capacity Ring */}
+                                <div className="bd-ring-wrap">
+                                    <svg viewBox="0 0 100 100" className="bd-ring-svg">
+                                        <circle cx="50" cy="50" r="42" fill="none" stroke="#e2e8f0" strokeWidth="8" />
+                                        <circle
+                                            cx="50" cy="50" r="42" fill="none"
+                                            stroke={ringColor} strokeWidth="8"
+                                            strokeLinecap="round"
+                                            strokeDasharray={circumference}
+                                            strokeDashoffset={dashOffset}
+                                            transform="rotate(-90 50 50)"
+                                            style={{ transition: 'stroke-dashoffset 0.8s ease' }}
+                                        />
+                                    </svg>
+                                    <div className="bd-ring-text">
+                                        <span className="bd-ring-boxes">{(c.totalBoxes || 0).toLocaleString()}</span>
+                                        <span className="bd-ring-cap">/ {capacity.toLocaleString()}</span>
+                                        <span className="bd-ring-label">boxes</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Summary pills */}
+                            <div className="bd-summary-pills">
+                                <div className="bd-pill bd-pill-a">
+                                    <span className="bd-pill-val">{classATotal.toLocaleString()}</span>
+                                    <span className="bd-pill-lbl">Class A</span>
+                                </div>
+                                <div className="bd-pill bd-pill-b">
+                                    <span className="bd-pill-val">{classBTotal.toLocaleString()}</span>
+                                    <span className="bd-pill-lbl">Class B</span>
+                                </div>
+                                <div className="bd-pill bd-pill-total">
+                                    <span className="bd-pill-val">{grandTotal.toLocaleString()}</span>
+                                    <span className="bd-pill-lbl">Total Hands</span>
+                                </div>
+                            </div>
+
+                            {/* Charts */}
+                            {(() => {
+                                // Class A sub-groups
+                                const classARegularTypes = ['classA.rha4', 'classA.rha5', 'classA.rha6'];
+                                const classASmallTypes   = ['classA.sha7', 'classA.sha8', 'classA.sha9', 'classA.cla'];
+                                const classARegularTotal = classARegularTypes.reduce((s, t) => s + (bd[t] || 0), 0);
+                                const classASmallTotal   = classASmallTypes.reduce((s, t) => s + (bd[t] || 0), 0);
+
+                                // Class B sub-groups
+                                const classBRegularTypes = ['classB.rhb4', 'classB.rhb5', 'classB.rhb6'];
+                                const classBSmallTypes   = ['classB.shb7', 'classB.shb8', 'classB.shb9', 'classB.clb', 'classB.fp'];
+                                const classBRegularTotal = classBRegularTypes.reduce((s, t) => s + (bd[t] || 0), 0);
+                                const classBSmallTotal   = classBSmallTypes.reduce((s, t) => s + (bd[t] || 0), 0);
+
+                                const SubHeader = ({ label, total, accent }) => (
+                                    <div style={{
+                                        fontSize: '0.68rem', fontWeight: '700', textTransform: 'uppercase',
+                                        letterSpacing: '0.07em', color: accent, margin: '0.6rem 0 0.35rem',
+                                        display: 'flex', alignItems: 'center', gap: '0.4rem'
+                                    }}>
+                                        <span style={{ opacity: 0.5, fontSize: '0.6rem' }}>▸</span>
+                                        {label}
+                                        <span style={{ fontWeight: 500, opacity: 0.6 }}>({total.toLocaleString()})</span>
+                                    </div>
+                                );
+
+                                return (
+                                    <div className="bd-charts">
+                                        {/* Class A */}
+                                        <div className="bd-section">
+                                            <div className="bd-section-header bd-section-header-a">
+                                                <span className="bd-section-dot bd-dot-a"/>
+                                                Class A &nbsp;<span className="bd-section-total">({classATotal.toLocaleString()} boxes)</span>
+                                            </div>
+
+                                            <SubHeader label="Regular Hands" total={classARegularTotal} accent="#15803d" />
+                                            {classARegularTypes.map(t => (
+                                                <BarRow key={t} label={typeLabels[t]} value={bd[t] || 0}
+                                                    maxVal={classATotal || 1} colorFrom="#4ade80" colorTo="#16a34a" />
+                                            ))}
+
+                                            <SubHeader label="Small Hands" total={classASmallTotal} accent="#0369a1" />
+                                            {classASmallTypes.map(t => (
+                                                <BarRow key={t} label={typeLabels[t]} value={bd[t] || 0}
+                                                    maxVal={classATotal || 1} colorFrom="#38bdf8" colorTo="#0284c7" />
+                                            ))}
+                                        </div>
+
+                                        {/* Class B */}
+                                        <div className="bd-section">
+                                            <div className="bd-section-header bd-section-header-b">
+                                                <span className="bd-section-dot bd-dot-b"/>
+                                                Class B &nbsp;<span className="bd-section-total">({classBTotal.toLocaleString()} boxes)</span>
+                                            </div>
+
+                                            <SubHeader label="Regular Hands" total={classBRegularTotal} accent="#b45309" />
+                                            {classBRegularTypes.map(t => (
+                                                <BarRow key={t} label={typeLabels[t]} value={bd[t] || 0}
+                                                    maxVal={classBTotal || 1} colorFrom="#fbbf24" colorTo="#d97706" />
+                                            ))}
+
+                                            <SubHeader label="Small Hands" total={classBSmallTotal} accent="#9333ea" />
+                                            {classBSmallTypes.map(t => (
+                                                <BarRow key={t} label={typeLabels[t]} value={bd[t] || 0}
+                                                    maxVal={classBTotal || 1} colorFrom="#c084fc" colorTo="#9333ea" />
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+
+                            {grandTotal === 0 && (
+                                <p style={{ textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '0.9rem', marginTop: '1rem' }}>
+                                    No stuffed payload data recorded yet.
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                );
+            })()}
 
             {/* Payload Manager Modal */}
             {managingContainer && (

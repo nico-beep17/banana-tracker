@@ -160,9 +160,17 @@ function App() {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
-        setUser(session?.user ?? null);
         if (session?.user) {
+          setUser(session.user);
           fetchUserProfile(session.user.id);
+        } else {
+          // IMPORTANT: Only clear the user if we are NOT using a dev bypass
+          // This prevents initial null session events from clearing restored dev user
+          if (!localStorage.getItem('lavc_dev_bypass_user')) {
+            setUser(null);
+            setUserProfile(null);
+            setAuthLoading(false);
+          }
         }
       }
     );

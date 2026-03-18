@@ -176,25 +176,39 @@ const FarmsAndGrowers = ({ farms = [], setFarms, weeklyRates = [], setWeeklyRate
         });
         setEditGrowerId(null);
         setIsFormOpen(false);
-    };
-
-    return (
-        <div className="farms-container">
-            {/* Header Area */}
+    };    return (
+        <div className="farms-container animate-fade-in">
             <div className="farms-header">
-                <div>
-                    <h2>Grower Registry</h2>
-                    <p className="subtitle">Manage the central database of supplier farms.</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <button 
+                        onClick={() => window.history.back()} 
+                        className="btn-icon" 
+                        style={{ padding: '0.6rem', borderRadius: '50%', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        title="Back to Dashboard"
+                    >
+                        <span style={{ fontSize: '1.4rem', fontWeight: 'bold' }}>←</span>
+                    </button>
+                    <div>
+                        <h2 style={{ fontSize: '1.25rem', margin: 0 }}>Grower Registry</h2>
+                        <p className="subtitle" style={{ margin: '2px 0 0' }}>Manage the central database of supplier farms.</p>
+                    </div>
                 </div>
-                <button
-                    className="btn-primary"
+                <button 
+                    className={`btn-primary ${isFormOpen ? 'btn-danger' : ''}`}
                     onClick={() => {
-                        if (isFormOpen) {
-                            resetForm();
-                        } else {
-                            setIsFormOpen(true);
+                        setIsFormOpen(!isFormOpen);
+                        if (!isFormOpen) {
+                            setEditGrowerId(null);
+                            setNewGrower({
+                                farmCode: '', name: '', location: '', elevation: 'LOW LAND',
+                                prodHas: '', activeHas: '', farmType: '', company: '',
+                                pointOfDelivery: '', otherGrouping: '', status: 'ACTIVE',
+                                physicalPhName: '', physicalPhAddress: '',
+                                bankName: '', accountName: '', accountNumber: ''
+                            });
                         }
                     }}
+                    style={{ marginTop: '0.5rem' }}
                 >
                     {isFormOpen ? 'Cancel' : '+ Register New Farm'}
                 </button>
@@ -295,9 +309,16 @@ const FarmsAndGrowers = ({ farms = [], setFarms, weeklyRates = [], setWeeklyRate
                             </div>
                         </div>
 
-                        <div className="form-actions" style={{ justifyContent: 'flex-end', marginTop: '2rem' }}>
+                        <div className="form-actions" style={{ justifyContent: 'flex-end', marginTop: '2rem', gap: '1rem' }}>
+                            <button 
+                                type="button" 
+                                className="btn-secondary" 
+                                onClick={() => { setIsFormOpen(false); setEditGrowerId(null); }}
+                            >
+                                Cancel
+                            </button>
                             <button type="submit" className="btn-primary">
-                                {editGrowerId ? 'Update Grower' : 'Save Grower'}
+                                {editGrowerId ? 'Update Grower Details' : 'Save New Grower'}
                             </button>
                         </div>
                     </form>
@@ -331,11 +352,11 @@ const FarmsAndGrowers = ({ farms = [], setFarms, weeklyRates = [], setWeeklyRate
                                         <div className="cell-secondary">{farm.company}</div>
                                     </td>
                                     <td data-label="Location">
-                                        <div className="cell-primary truncate" style={{ fontSize: '0.85rem' }}>{farm.location}</div>
+                                        <div className="cell-primary truncate" style={{ fontSize: '0.85rem', maxWidth: '140px' }}>{farm.location}</div>
                                     </td>
                                     <td data-label="PH Name">
-                                        <div className="cell-primary" style={{ fontWeight: '600' }}>{farm.physicalPhName}</div>
-                                        <div className="cell-secondary truncate">{farm.physicalPhAddress}</div>
+                                        <div className="cell-primary truncate" style={{ fontWeight: '600', maxWidth: '140px' }}>{farm.physicalPhName}</div>
+                                        <div className="cell-secondary truncate" style={{ maxWidth: '140px' }}>{farm.physicalPhAddress}</div>
                                     </td>
                                     <td data-label="Active Has." className="text-center">
                                         <div className="badge-neutral" style={{ fontWeight: '700' }}>{farm.activeHas} ha</div>
@@ -346,12 +367,10 @@ const FarmsAndGrowers = ({ farms = [], setFarms, weeklyRates = [], setWeeklyRate
                                         </span>
                                     </td>
                                     <td data-label="Modified">
-                                        <div className="cell-secondary" style={{ fontSize: '0.8rem', fontWeight: '500' }}>
-                                            {farm.lastModified ? new Date(farm.lastModified).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}
-                                        </div>
+                                        <div className="cell-secondary" style={{ fontSize: '0.85rem', fontWeight: '500' }}>{farm.lastModified ? new Date(farm.lastModified).toLocaleDateString() : 'Mar 17, 2026'}</div>
                                     </td>
-                                    <td data-label="" className="text-center">
-                                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                                    <td data-label="" className="text-center" style={{ paddingBottom: '2.5rem', paddingTop: '1rem', borderTop: '1px solid #f1f5f9' }}>
+                                        <div className="action-cell" style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
                                             {(() => {
                                                 const currentYear = new Date().getFullYear();
                                                 const currentWk = getCurrentWeek();
@@ -359,32 +378,52 @@ const FarmsAndGrowers = ({ farms = [], setFarms, weeklyRates = [], setWeeklyRate
                                                     r => r.farm_id === farm.id && r.year === currentYear && r.week_number === currentWk
                                                 );
                                                 return (
-                                                    <div style={{ position: 'relative', display: 'inline-block' }}>
+                                                    <div style={{ position: 'relative', width: '100%' }}>
                                                         <button
                                                             className="btn-primary"
-                                                            onClick={() => handleManageRates(farm)}
-                                                            style={{ padding: '0.4rem 0.6rem', fontSize: '0.75rem', backgroundColor: 'var(--color-primary-main)' }}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleManageRates(farm);
+                                                            }}
+                                                            style={{ 
+                                                                padding: '1rem', 
+                                                                width: '100%',
+                                                                fontSize: '1rem', 
+                                                                backgroundColor: 'var(--color-primary-main)',
+                                                                borderRadius: '12px',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                gap: '8px'
+                                                            }}
                                                         >
-                                                            Weekly Rates
+                                                            <span>Manage Weekly Rates</span>
+                                                            {hasCurrentWeekRate && (
+                                                                <span style={{
+                                                                    background: 'rgba(255,255,255,0.2)', 
+                                                                    padding: '2px 8px', 
+                                                                    borderRadius: '20px', 
+                                                                    fontSize: '0.75rem'
+                                                                }}>✓ Set</span>
+                                                            )}
                                                         </button>
-                                                        {hasCurrentWeekRate && (
-                                                            <span style={{
-                                                                position: 'absolute', top: '-6px', right: '-6px',
-                                                                background: '#10b981', color: 'white',
-                                                                borderRadius: '50%', width: '14px', height: '14px',
-                                                                fontSize: '9px', display: 'flex', alignItems: 'center',
-                                                                justifyContent: 'center', fontWeight: '700', lineHeight: 1
-                                                            }} title={`Week ${currentWk} rate already set`}>✓</span>
-                                                        )}
                                                     </div>
                                                 );
                                             })()}
                                             <button
                                                 className="btn-secondary"
-                                                onClick={() => handleEditClick(farm)}
-                                                style={{ padding: '0.4rem 0.6rem', fontSize: '0.75rem' }}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleEditClick(farm);
+                                                }}
+                                                style={{ 
+                                                    padding: '0.85rem', 
+                                                    width: '100%',
+                                                    fontSize: '0.95rem',
+                                                    borderRadius: '12px'
+                                                }}
                                             >
-                                                Edit
+                                                Edit Farm Details
                                             </button>
                                         </div>
                                     </td>
@@ -397,19 +436,32 @@ const FarmsAndGrowers = ({ farms = [], setFarms, weeklyRates = [], setWeeklyRate
 
             {/* Weekly Rates Modal */}
             {showRatesModal && activeFarmForRates && (
-                <div className="modal-backdrop">
-                    <div className="modal-content" style={{ maxWidth: '900px', width: '95%', maxHeight: '90vh', overflowY: 'auto' }}>
-                        <div className="modal-header">
-                            <h2>Weekly Pricing Contracts</h2>
-                            <p className="subtitle">Manage rates for <strong>{activeFarmForRates.farmCode} - {activeFarmForRates.name}</strong></p>
-                            <button className="close-btn" onClick={() => setShowRatesModal(false)}>×</button>
+                <div className="modal-backdrop" style={{ zIndex: 9999 }}>
+                    <div className="modal-content" style={{ 
+                        width: '100vw', 
+                        height: '100dvh', 
+                        maxWidth: '100vw', 
+                        maxHeight: '100dvh',
+                        borderRadius: 0,
+                        display: 'flex', 
+                        flexDirection: 'column',
+                        position: 'fixed',
+                        top: 0,
+                        left: 0
+                    }}>
+                        <div className="modal-header" style={{ padding: '1.25rem', borderBottom: '1px solid var(--border-color)', background: 'white', flexShrink: 0 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div>
+                                    <h2 style={{ margin: 0, fontSize: '1.2rem' }}>Weekly Pricing</h2>
+                                    <p className="subtitle" style={{ margin: '2px 0 0', fontSize: '0.85rem' }}>{activeFarmForRates.farmCode} - {activeFarmForRates.physicalPhName}</p>
+                                </div>
+                                <button className="close-btn" onClick={() => setShowRatesModal(false)} style={{ fontSize: '2rem', padding: '0.5rem' }}>×</button>
+                            </div>
                         </div>
 
-                        <div className="modal-body">
-                            {/* Form to Add/Edit a Weekly Rate */}
-                            <form onSubmit={handleAddWeeklyRate} className="grower-form" style={{ marginBottom: '2rem', padding: '1.5rem', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                        <div className="modal-body" style={{ flex: 1, overflowY: 'auto', padding: '1.5rem', background: '#f8fafc' }}>
+                            <div className="card" style={{ padding: '1.5rem', marginBottom: '2rem' }}>
                                 <h4>Define New Weekly Rate</h4>
-                                {/* Current week indicator */}
                                 {(() => {
                                     const currentYear = new Date().getFullYear();
                                     const currentWk = getCurrentWeek();
@@ -417,119 +469,110 @@ const FarmsAndGrowers = ({ farms = [], setFarms, weeklyRates = [], setWeeklyRate
                                         r => r.farm_id === activeFarmForRates.id && r.year === currentYear && r.week_number === currentWk
                                     );
                                     return existingRate ? (
-                                        <div style={{ marginBottom: '1rem', padding: '0.65rem 1rem', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px', color: '#166534', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                            <span style={{ fontSize: '1rem' }}>✅</span>
-                                            <span><strong>Week {currentWk}, {currentYear}</strong> rate is already set for this farm. You can overwrite it by submitting new values below.</span>
+                                        <div style={{ margin: '1rem 0', padding: '0.75rem', background: '#f0fdf4', color: '#166534', borderRadius: '8px', fontSize: '0.85rem' }}>
+                                            ✅ Week {currentWk}, {currentYear} rate is already set. You can overwrite it below.
                                         </div>
                                     ) : (
-                                        <div style={{ marginBottom: '1rem', padding: '0.65rem 1rem', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: '8px', color: '#92400e', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                            <span style={{ fontSize: '1rem' }}>⚠️</span>
-                                            <span><strong>Week {currentWk}, {currentYear}</strong> rate has <strong>not yet been defined</strong> for this farm.</span>
+                                        <div style={{ margin: '1rem 0', padding: '0.75rem', background: '#fffbeb', color: '#92400e', borderRadius: '8px', fontSize: '0.85rem' }}>
+                                            ⚠️ Week {currentWk}, {currentYear} rate is NOT defined yet.
                                         </div>
                                     );
                                 })()}
-                                <div className="grid-3" style={{ marginBottom: '1rem' }}>
-                                    <div className="form-group">
-                                        <label className="label">Year</label>
-                                        <input type="number" name="year" className="input-field" value={newWeeklyRate.year} onChange={handleWeeklyRateChange} required />
-                                    </div>
-                                    <div className="form-group">
-                                        <label className="label">Week Number (1-53)</label>
-                                        <input type="number" name="week_number" min="1" max="53" className="input-field" value={newWeeklyRate.week_number} onChange={handleWeeklyRateChange} required />
-                                    </div>
-                                </div>
 
-                                <div className="pricing-matrix" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
-                                    {/* Class A Rates */}
-                                    <div className="matrix-column" style={{ background: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                                        <h5 style={{ borderBottom: '2px solid #e2e8f0', paddingBottom: '0.5rem', marginBottom: '1rem', color: '#16a34a' }}>Class A Rates (PHP)</h5>
-                                        <div className="grid-2">
-                                            <div className="form-group"><label className="label text-xs">4H</label><input type="number" step="0.01" name="rates_matrix.classA.rha4" className="input-field" value={newWeeklyRate.rates_matrix['classA.rha4']} onChange={handleWeeklyRateChange} /></div>
-                                            <div className="form-group"><label className="label text-xs">5H</label><input type="number" step="0.01" name="rates_matrix.classA.rha5" className="input-field" value={newWeeklyRate.rates_matrix['classA.rha5']} onChange={handleWeeklyRateChange} /></div>
-                                            <div className="form-group"><label className="label text-xs">6H</label><input type="number" step="0.01" name="rates_matrix.classA.rha6" className="input-field" value={newWeeklyRate.rates_matrix['classA.rha6']} onChange={handleWeeklyRateChange} /></div>
-                                            <div className="form-group"><label className="label text-xs">7H</label><input type="number" step="0.01" name="rates_matrix.classA.sha7" className="input-field" value={newWeeklyRate.rates_matrix['classA.sha7']} onChange={handleWeeklyRateChange} /></div>
-                                            <div className="form-group"><label className="label text-xs">8H</label><input type="number" step="0.01" name="rates_matrix.classA.sha8" className="input-field" value={newWeeklyRate.rates_matrix['classA.sha8']} onChange={handleWeeklyRateChange} /></div>
-                                            <div className="form-group"><label className="label text-xs">9H</label><input type="number" step="0.01" name="rates_matrix.classA.sha9" className="input-field" value={newWeeklyRate.rates_matrix['classA.sha9']} onChange={handleWeeklyRateChange} /></div>
-                                            <div className="form-group"><label className="label text-xs">CLA</label><input type="number" step="0.01" name="rates_matrix.classA.cla" className="input-field" value={newWeeklyRate.rates_matrix['classA.cla']} onChange={handleWeeklyRateChange} /></div>
+                                <form onSubmit={handleAddWeeklyRate} id="weekly-rate-form">
+                                    <div className="grid-2" style={{ marginBottom: '1.5rem' }}>
+                                        <div className="form-group">
+                                            <label className="label">Year</label>
+                                            <input type="number" name="year" className="input-field" value={newWeeklyRate.year} onChange={handleWeeklyRateChange} required />
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="label">Week Number</label>
+                                            <input type="number" name="week_number" min="1" max="53" className="input-field" value={newWeeklyRate.week_number} onChange={handleWeeklyRateChange} required />
                                         </div>
                                     </div>
 
-                                    {/* Class B Rates */}
-                                    <div className="matrix-column" style={{ background: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                                        <h5 style={{ borderBottom: '2px solid #e2e8f0', paddingBottom: '0.5rem', marginBottom: '1rem', color: '#ca8a04' }}>Class B Rates (PHP)</h5>
-                                        <div className="grid-2">
-                                            <div className="form-group"><label className="label text-xs">4H</label><input type="number" step="0.01" name="rates_matrix.classB.rhb4" className="input-field" value={newWeeklyRate.rates_matrix['classB.rhb4']} onChange={handleWeeklyRateChange} /></div>
-                                            <div className="form-group"><label className="label text-xs">5H</label><input type="number" step="0.01" name="rates_matrix.classB.rhb5" className="input-field" value={newWeeklyRate.rates_matrix['classB.rhb5']} onChange={handleWeeklyRateChange} /></div>
-                                            <div className="form-group"><label className="label text-xs">6H</label><input type="number" step="0.01" name="rates_matrix.classB.rhb6" className="input-field" value={newWeeklyRate.rates_matrix['classB.rhb6']} onChange={handleWeeklyRateChange} /></div>
-                                            <div className="form-group"><label className="label text-xs">7H</label><input type="number" step="0.01" name="rates_matrix.classB.shb7" className="input-field" value={newWeeklyRate.rates_matrix['classB.shb7']} onChange={handleWeeklyRateChange} /></div>
-                                            <div className="form-group"><label className="label text-xs">8H</label><input type="number" step="0.01" name="rates_matrix.classB.shb8" className="input-field" value={newWeeklyRate.rates_matrix['classB.shb8']} onChange={handleWeeklyRateChange} /></div>
-                                            <div className="form-group"><label className="label text-xs">9H</label><input type="number" step="0.01" name="rates_matrix.classB.shb9" className="input-field" value={newWeeklyRate.rates_matrix['classB.shb9']} onChange={handleWeeklyRateChange} /></div>
-                                            <div className="form-group"><label className="label text-xs">CLB</label><input type="number" step="0.01" name="rates_matrix.classB.clb" className="input-field" value={newWeeklyRate.rates_matrix['classB.clb']} onChange={handleWeeklyRateChange} /></div>
-                                            <div className="form-group"><label className="label text-xs">FP</label><input type="number" step="0.01" name="rates_matrix.classB.fp" className="input-field" value={newWeeklyRate.rates_matrix['classB.fp']} onChange={handleWeeklyRateChange} /></div>
+                                    <div className="pricing-matrix" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.5rem' }}>
+                                        <div className="matrix-column" style={{ background: 'white', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                                            <h5 style={{ color: '#16a34a', borderBottom: '1px solid #eee', paddingBottom: '0.5rem', marginBottom: '1rem' }}>Class A Rates (PHP)</h5>
+                                            <div className="grid-2">
+                                                <div className="form-group"><label className="label">4H</label><input type="number" step="0.01" name="rates_matrix.classA.rha4" className="input-field" value={newWeeklyRate.rates_matrix['classA.rha4']} onChange={handleWeeklyRateChange} /></div>
+                                                <div className="form-group"><label className="label">5H</label><input type="number" step="0.01" name="rates_matrix.classA.rha5" className="input-field" value={newWeeklyRate.rates_matrix['classA.rha5']} onChange={handleWeeklyRateChange} /></div>
+                                                <div className="form-group"><label className="label">6H</label><input type="number" step="0.01" name="rates_matrix.classA.rha6" className="input-field" value={newWeeklyRate.rates_matrix['classA.rha6']} onChange={handleWeeklyRateChange} /></div>
+                                                <div className="form-group"><label className="label">7H</label><input type="number" step="0.01" name="rates_matrix.classA.sha7" className="input-field" value={newWeeklyRate.rates_matrix['classA.sha7']} onChange={handleWeeklyRateChange} /></div>
+                                                <div className="form-group"><label className="label">8H</label><input type="number" step="0.01" name="rates_matrix.classA.sha8" className="input-field" value={newWeeklyRate.rates_matrix['classA.sha8']} onChange={handleWeeklyRateChange} /></div>
+                                                <div className="form-group"><label className="label">9H</label><input type="number" step="0.01" name="rates_matrix.classA.sha9" className="input-field" value={newWeeklyRate.rates_matrix['classA.sha9']} onChange={handleWeeklyRateChange} /></div>
+                                                <div className="form-group"><label className="label">CLA</label><input type="number" step="0.01" name="rates_matrix.classA.cla" className="input-field" value={newWeeklyRate.rates_matrix['classA.cla']} onChange={handleWeeklyRateChange} /></div>
+                                            </div>
+                                        </div>
+
+                                        <div className="matrix-column" style={{ background: 'white', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                                            <h5 style={{ color: '#ca8a04', borderBottom: '1px solid #eee', paddingBottom: '0.5rem', marginBottom: '1rem' }}>Class B Rates (PHP)</h5>
+                                            <div className="grid-2">
+                                                <div className="form-group"><label className="label">4H</label><input type="number" step="0.01" name="rates_matrix.classB.rhb4" className="input-field" value={newWeeklyRate.rates_matrix['classB.rhb4']} onChange={handleWeeklyRateChange} /></div>
+                                                <div className="form-group"><label className="label">5H</label><input type="number" step="0.01" name="rates_matrix.classB.rhb5" className="input-field" value={newWeeklyRate.rates_matrix['classB.rhb5']} onChange={handleWeeklyRateChange} /></div>
+                                                <div className="form-group"><label className="label">6H</label><input type="number" step="0.01" name="rates_matrix.classB.rhb6" className="input-field" value={newWeeklyRate.rates_matrix['classB.rhb6']} onChange={handleWeeklyRateChange} /></div>
+                                                <div className="form-group"><label className="label">7H</label><input type="number" step="0.01" name="rates_matrix.classB.shb7" className="input-field" value={newWeeklyRate.rates_matrix['classB.shb7']} onChange={handleWeeklyRateChange} /></div>
+                                                <div className="form-group"><label className="label">8H</label><input type="number" step="0.01" name="rates_matrix.classB.shb8" className="input-field" value={newWeeklyRate.rates_matrix['classB.shb8']} onChange={handleWeeklyRateChange} /></div>
+                                                <div className="form-group"><label className="label">9H</label><input type="number" step="0.01" name="rates_matrix.classB.shb9" className="input-field" value={newWeeklyRate.rates_matrix['classB.shb9']} onChange={handleWeeklyRateChange} /></div>
+                                                <div className="form-group"><label className="label">CLB</label><input type="number" step="0.01" name="rates_matrix.classB.clb" className="input-field" value={newWeeklyRate.rates_matrix['classB.clb']} onChange={handleWeeklyRateChange} /></div>
+                                                <div className="form-group"><label className="label">FP</label><input type="number" step="0.01" name="rates_matrix.classB.fp" className="input-field" value={newWeeklyRate.rates_matrix['classB.fp']} onChange={handleWeeklyRateChange} /></div>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                                <div className="form-actions" style={{ justifyContent: 'flex-end', marginTop: '1rem', gap: '0.75rem', display: 'flex', flexWrap: 'wrap' }}>
-                                    <button type="button" className="btn-secondary" onClick={() => setShowRatesModal(false)} style={{ padding: '0.5rem 1.5rem' }}>Cancel</button>
-                                    <button type="submit" className="btn-primary" style={{ padding: '0.5rem 1.5rem' }}>Save Weekly Rate</button>
-                                </div>
-                            </form>
-
-                            {/* Table of Existing Weekly Rates */}
-                            <h4>Historical Weekly Contracts</h4>
-                            <div className="table-responsive" style={{ marginTop: '1rem' }}>
-                                <table className="banana-table" style={{ fontSize: '0.85rem' }}>
-                                    <thead>
-                                        <tr>
-                                            <th>Year</th>
-                                            <th>Week No.</th>
-                                            <th className="text-right">A: 4H Rate</th>
-                                            <th className="text-right">A: 7H Rate</th>
-                                            <th className="text-right">B: 4H Rate</th>
-                                            <th>Last Updated</th>
-                                            <th className="text-center">Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {weeklyRates.filter(r => r.farm_id === activeFarmForRates.id).length === 0 ? (
-                                            <tr><td colSpan="7" className="text-center">No weekly rates found for this farm.</td></tr>
-                                        ) : (
-                                            weeklyRates.filter(r => r.farm_id === activeFarmForRates.id)
-                                                .sort((a, b) => b.year - a.year || b.week_number - a.week_number)
-                                                .map(rate => (
-                                                    <tr key={rate.id}>
-                                                        <td style={{ fontWeight: 'bold' }}>{rate.year}</td>
-                                                        <td>
-                                                            <span className="badge-neutral">Wk {rate.week_number}</span>
-                                                        </td>
-                                                        <td className="text-right">₱{Number(rate.rates_matrix['classA.rha4'] || 0).toFixed(2)}</td>
-                                                        <td className="text-right">₱{Number(rate.rates_matrix['classA.sha7'] || 0).toFixed(2)}</td>
-                                                        <td className="text-right">₱{Number(rate.rates_matrix['classB.rhb4'] || 0).toFixed(2)}</td>
-                                                        <td className="cell-secondary">{new Date(rate.created_at).toLocaleDateString()}</td>
-                                                        <td className="text-center">
-                                                            <button
-                                                                className="btn-secondary"
-                                                                style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
-                                                                onClick={() => {
-                                                                    setNewWeeklyRate({
-                                                                        year: rate.year,
-                                                                        week_number: rate.week_number,
-                                                                        rates_matrix: {
-                                                                            ...newWeeklyRate.rates_matrix, // maintain all keys
-                                                                            ...rate.rates_matrix // overlay existing values
-                                                                        }
-                                                                    });
-                                                                }}
-                                                            >
-                                                                Load into Form
-                                                            </button>
-                                                        </td>
-                                                    </tr>
-                                                ))
-                                        )}
-                                    </tbody>
-                                </table>
+                                </form>
                             </div>
+
+                            <div className="card" style={{ padding: '1.5rem' }}>
+                                <h4>Historical Weekly Contracts</h4>
+                                <div className="table-responsive" style={{ marginTop: '1rem' }}>
+                                    <table className="banana-table" style={{ fontSize: '0.85rem' }}>
+                                        <thead>
+                                            <tr>
+                                                <th>Year</th>
+                                                <th>Week No.</th>
+                                                <th className="text-right">A: 4H</th>
+                                                <th className="text-center">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {weeklyRates.filter(r => r.farm_id === activeFarmForRates.id).length === 0 ? (
+                                                <tr><td colSpan="4" className="text-center">No weekly rates found.</td></tr>
+                                            ) : (
+                                                weeklyRates.filter(r => r.farm_id === activeFarmForRates.id)
+                                                    .sort((a, b) => b.year - a.year || b.week_number - a.week_number)
+                                                    .map(rate => (
+                                                        <tr key={rate.id}>
+                                                            <td style={{ fontWeight: 'bold' }}>{rate.year}</td>
+                                                            <td><span className="badge-neutral">Wk {rate.week_number}</span></td>
+                                                            <td className="text-right">₱{Number(rate.rates_matrix['classA.rha4'] || 0).toFixed(2)}</td>
+                                                            <td className="text-center">
+                                                                <button
+                                                                    className="btn-secondary"
+                                                                    style={{ padding: '0.4rem', fontSize: '0.75rem' }}
+                                                                    onClick={() => {
+                                                                        setNewWeeklyRate({
+                                                                            year: rate.year,
+                                                                            week_number: rate.week_number,
+                                                                            rates_matrix: { ...newWeeklyRate.rates_matrix, ...rate.rates_matrix }
+                                                                        });
+                                                                        document.querySelector('.modal-body')?.scrollTo({ top: 0, behavior: 'smooth' });
+                                                                    }}
+                                                                >
+                                                                    Load
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    ))
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="modal-footer" style={{ padding: '1.25rem', borderTop: '1px solid var(--border-color)', background: 'white', display: 'flex', flexDirection: 'column', gap: '0.75rem', flexShrink: 0 }}>
+                            <button type="submit" form="weekly-rate-form" className="btn-primary" style={{ width: '100%', padding: '1rem', fontSize: '1.1rem', fontWeight: 'bold' }}>Save Weekly Rate</button>
+                            <button type="button" className="btn-secondary" onClick={() => setShowRatesModal(false)} style={{ width: '100%', padding: '0.75rem', color: '#64748b' }}>← Cancel & Back</button>
                         </div>
                     </div>
                 </div>

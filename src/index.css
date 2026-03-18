@@ -127,6 +127,14 @@ button {
 }
 
 /* Base Utility Classes */
+.truncate {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+  max-width: 100%;
+}
+
 .card {
   background: var(--bg-surface);
   border-radius: var(--border-radius-lg);
@@ -538,6 +546,8 @@ button {
     padding: 0.85rem 1rem;
     background: var(--bg-surface);
     box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+    max-width: calc(100vw - 2rem); /* Enforce mobile width */
+    overflow-x: hidden;
   }
 
   .banana-table tbody tr:hover {
@@ -580,10 +590,13 @@ button {
     flex: 1;
   }
 
-  /* Cells with no label (action cells) */
+  /* Actions cell in mobile card view */
   .banana-table td[data-label=""] {
     justify-content: flex-end;
     border-bottom: none;
+    padding-top: 1rem;
+    margin-top: 0.5rem;
+    border-top: 1px solid #f1f5f9;
   }
 
   .banana-table td[data-label=""]::before {
@@ -593,9 +606,16 @@ button {
   /* Action buttons in cards: wrap and fill */
   .banana-table td .action-cell,
   .banana-table td > div[style*="flex"] {
-    flex-wrap: wrap;
-    gap: 0.4rem;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 0.5rem;
     width: 100%;
+  }
+
+  .banana-table td .action-cell > *,
+  .banana-table td > div[style*="flex"] > * {
+    width: 100%;
+    justify-content: center;
   }
 
   /* The scroll wrapper should NOT clip the cards */
