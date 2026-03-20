@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { RefreshCw, Bell, Settings } from 'lucide-react';
 import './Layout.css';
 
 const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notifications = [], onRefresh }) => {
@@ -184,10 +185,13 @@ const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notif
                             style={{ position: 'relative' }}
                         >
                             <span style={{
-                                display: 'inline-block',
-                                animation: isSyncing ? 'spin 0.8s linear infinite' : 'none',
-                                fontSize: '1.2rem'
-                            }}>&#x1F504;</span>
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                animation: isSyncing ? 'spin 1.2s linear infinite' : 'none',
+                            }}>
+                                <RefreshCw size={20} className={isSyncing ? "text-primary" : ""} />
+                            </span>
                         </button>
 
                         <div style={{ position: 'relative' }}>
@@ -195,7 +199,7 @@ const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notif
                                 className="icon-btn"
                                 onClick={(e) => { e.stopPropagation(); setIsNotificationOpen(!isNotificationOpen); }}
                             >
-                                &#x1F514;
+                                <Bell size={20} />
                                 {unreadCount > 0 && <span className="notification-badge">{unreadCount}</span>}
                             </button>
                             {isNotificationOpen && (
@@ -220,7 +224,9 @@ const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notif
                                 </div>
                             )}
                         </div>
-                        <button className="icon-btn">&#x2699;&#xFE0F;</button>
+                        <button className="icon-btn">
+                            <Settings size={20} />
+                        </button>
                     </div>
                 </header>
 
