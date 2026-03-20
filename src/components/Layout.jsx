@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, Bell, Settings, LayoutDashboard, ClipboardEdit, TestTubes, Leaf, Handshake, Ship, Package, Globe, LineChart, Calculator, Users, LogOut } from 'lucide-react';
+import { RefreshCw, Bell, Settings, LayoutDashboard, ClipboardEdit, TestTubes, Leaf, Handshake, Ship, Package, Globe, LineChart, Calculator, Users, LogOut, UserCog } from 'lucide-react';
 import './Layout.css';
 
 const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notifications = [], onRefresh }) => {
@@ -134,6 +134,12 @@ const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notif
                             <li className={`nav-item ${activeTab === 'payroll' ? 'active' : ''}`} onClick={() => onTabChange('payroll')}>
                                 <span className="nav-icon"><Users size={20} /></span>
                                 <span className="nav-text">Payroll &amp; HR</span>
+                            </li>
+                        )}
+                        {(userProfile?.role === 'Admin / Developer') && (
+                            <li className={`nav-item ${activeTab === 'user-management' ? 'active' : ''}`} onClick={() => onTabChange('user-management')}>
+                                <span className="nav-icon"><UserCog size={20} /></span>
+                                <span className="nav-text">Users &amp; Roles</span>
                             </li>
                         )}
                     </ul>

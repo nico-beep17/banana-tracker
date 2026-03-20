@@ -19,6 +19,7 @@ import ShipmentTracker from './components/ShipmentTracker';
 import MaterialsInventory from './components/MaterialsInventory';
 import Consignees from './components/Consignees';
 import AIAssistantWidget from './components/AIAssistantWidget';
+import UserManagement from './components/UserManagement';
 import { supabase } from './supabaseClient';
 import { BotMessageSquare } from 'lucide-react';
 
@@ -927,6 +928,10 @@ function App() {
             containers={containers}
             onUpdateTransitStatus={handleUpdateTransitStatus}
           />
+        )}
+
+        {activeTab === 'user-management' && (
+          <UserManagement userProfile={userProfile} />
         )}
 
         {/* Premium AI Assistant FAB Trigger */}
