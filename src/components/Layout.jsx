@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, Bell, Settings } from 'lucide-react';
+import { RefreshCw, Bell, Settings, LayoutDashboard, ClipboardEdit, TestTubes, Leaf, Handshake, Ship, Package, Globe, LineChart, Calculator, Users, LogOut } from 'lucide-react';
 import './Layout.css';
 
 const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notifications = [], onRefresh }) => {
@@ -59,76 +59,76 @@ const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notif
                 <nav className="sidebar-nav">
                     <ul className="nav-list">
                         <li className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => onTabChange('dashboard')}>
-                            <span className="nav-icon">&#x1F4CA;</span>
+                            <span className="nav-icon"><LayoutDashboard size={20} /></span>
                             <span className="nav-text">Dashboard</span>
                         </li>
 
                         {(userProfile?.role === 'Admin / Developer' || userProfile?.role === 'Hub Receiver' || userProfile?.role === 'Production Manager' || userProfile?.role === 'Quality Manager') && (
                             <li className={`nav-item ${activeTab === 'log-arrival' ? 'active' : ''}`} onClick={() => onTabChange('log-arrival')}>
-                                <span className="nav-icon">&#x1F4DD;</span>
+                                <span className="nav-icon"><ClipboardEdit size={20} /></span>
                                 <span className="nav-text">Log Arrival</span>
                             </li>
                         )}
 
                         {(userProfile?.role === 'Admin / Developer' || userProfile?.role === 'Quality Manager' || userProfile?.role === 'Quality Supervisor') && (
                             <li className={`nav-item ${activeTab === 'sampling' ? 'active' : ''}`} onClick={() => onTabChange('sampling')}>
-                                <span className="nav-icon">&#x1F52C;</span>
+                                <span className="nav-icon"><TestTubes size={20} /></span>
                                 <span className="nav-text">Daily Sampling</span>
                             </li>
                         )}
 
                         {(userProfile?.role === 'Admin / Developer' || userProfile?.role === 'Production Manager' || userProfile?.role === 'Production Supervisor') && (
                             <li className={`nav-item ${activeTab === 'farms' ? 'active' : ''}`} onClick={() => onTabChange('farms')}>
-                                <span className="nav-icon">&#x1F33F;</span>
+                                <span className="nav-icon"><Leaf size={20} /></span>
                                 <span className="nav-text">Farms &amp; Growers</span>
                             </li>
                         )}
 
                         {(userProfile?.role === 'Admin / Developer' || userProfile?.role === 'Accounting Staff' || userProfile?.role === 'Accounting Manager' || userProfile?.role === 'Shipping Documentation Supervisor') && (
                             <li className={`nav-item ${activeTab === 'consignees' ? 'active' : ''}`} onClick={() => onTabChange('consignees')}>
-                                <span className="nav-icon">&#x1F91D;</span>
+                                <span className="nav-icon"><Handshake size={20} /></span>
                                 <span className="nav-text">Consignees</span>
                             </li>
                         )}
 
                         {(userProfile?.role === 'Admin / Developer' || userProfile?.role === 'Hub Operations In-Charge' || userProfile?.role === 'Shipping Documentation Supervisor' || userProfile?.role === 'Logistics Supervisor' || userProfile?.role === 'Hub Receiver') && (
                             <li className={`nav-item ${activeTab === 'new-container' || activeTab === 'containers-list' || activeTab === 'edit-container' ? 'active' : ''}`} onClick={() => onTabChange('containers-list')}>
-                                <span className="nav-icon">&#x1F6A2;</span>
+                                <span className="nav-icon"><Ship size={20} /></span>
                                 <span className="nav-text">Container Hub</span>
                             </li>
                         )}
 
                         {(userProfile?.role === 'Admin / Developer' || userProfile?.role === 'Hub Operations In-Charge' || userProfile?.role === 'Production Manager') && (
                             <li className={`nav-item ${activeTab === 'inventory' ? 'active' : ''}`} onClick={() => onTabChange('inventory')}>
-                                <span className="nav-icon">&#x1F4E6;</span>
+                                <span className="nav-icon"><Package size={20} /></span>
                                 <span className="nav-text">Materials Inventory</span>
                             </li>
                         )}
 
                         {(userProfile?.role === 'Admin / Developer' || userProfile?.role === 'Hub Operations In-Charge' || userProfile?.role === 'Shipping Documentation Supervisor' || userProfile?.role === 'Logistics Supervisor') && (
                             <li className={`nav-item ${activeTab === 'shipment-tracker' ? 'active' : ''}`} onClick={() => onTabChange('shipment-tracker')}>
-                                <span className="nav-icon">&#x1F30D;</span>
+                                <span className="nav-icon"><Globe size={20} /></span>
                                 <span className="nav-text">Shipment Tracker</span>
                             </li>
                         )}
 
                         {(userProfile?.role === 'Admin / Developer' || userProfile?.role === 'Production Manager' || userProfile?.role === 'Quality Manager' || userProfile?.role === 'Accounting Staff') && (
                             <li className={`nav-item ${activeTab === 'reports' ? 'active' : ''}`} onClick={() => onTabChange('reports')}>
-                                <span className="nav-icon">&#x1F4C8;</span>
+                                <span className="nav-icon"><LineChart size={20} /></span>
                                 <span className="nav-text">Reports</span>
                             </li>
                         )}
 
                         {(userProfile?.role === 'Admin / Developer' || userProfile?.role === 'Accounting Staff' || userProfile?.role === 'Accounting Manager') && (
                             <li className={`nav-item ${activeTab === 'accounting' ? 'active' : ''}`} onClick={() => onTabChange('accounting')}>
-                                <span className="nav-icon">&#x1F9FE;</span>
+                                <span className="nav-icon"><Calculator size={20} /></span>
                                 <span className="nav-text">Accounting &amp; Billing</span>
                             </li>
                         )}
 
                         {(userProfile?.role === 'Admin / Developer' || userProfile?.role === 'Accounting Manager' || userProfile?.role === 'HR Manager') && (
                             <li className={`nav-item ${activeTab === 'payroll' ? 'active' : ''}`} onClick={() => onTabChange('payroll')}>
-                                <span className="nav-icon">&#x1F465;</span>
+                                <span className="nav-icon"><Users size={20} /></span>
                                 <span className="nav-text">Payroll &amp; HR</span>
                             </li>
                         )}
@@ -145,8 +145,8 @@ const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notif
                                 <span className="user-name">{userProfile.full_name || 'User'}</span>
                                 <span className="user-role">{userProfile.role || 'Guest'}</span>
                             </div>
-                            <button onClick={onLogout} title="Sign Out" style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '1.2rem' }}>
-                                &#x23CE;
+                            <button onClick={onLogout} title="Sign Out" style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex' }}>
+                                <LogOut size={20} />
                             </button>
                         </div>
                     ) : (
