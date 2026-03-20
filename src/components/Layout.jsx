@@ -4,6 +4,7 @@ import './Layout.css';
 
 const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notifications = [], onRefresh }) => {
     const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
     const unreadCount = notifications.filter(n => !n.read).length;
@@ -41,7 +42,10 @@ const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notif
     };
 
     return (
-        <div className="layout" onClick={() => isNotificationOpen && setIsNotificationOpen(false)}>
+        <div className="layout" onClick={() => { 
+            if (isNotificationOpen) setIsNotificationOpen(false); 
+            if (isSettingsOpen) setIsSettingsOpen(false); 
+        }}>
             {/* Mobile Sidebar Overlay */}
             {isMobileSidebarOpen && (
                 <div className="mobile-overlay" onClick={() => setIsMobileSidebarOpen(false)} />
@@ -224,9 +228,45 @@ const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notif
                                 </div>
                             )}
                         </div>
-                        <button className="icon-btn">
-                            <Settings size={20} />
-                        </button>
+                        <div style={{ position: 'relative' }}>
+                            <button
+                                className="icon-btn"
+                                onClick={(e) => { 
+                                    e.stopPropagation(); 
+                                    setIsSettingsOpen(!isSettingsOpen); 
+                                    setIsNotificationOpen(false); 
+                                }}
+                            >
+                                <Settings size={20} />
+                            </button>
+                            {isSettingsOpen && (
+                                <div className="notifications-dropdown" onClick={(e) => e.stopPropagation()}>
+                                    <div className="notifications-header">
+                                        <h3>System Settings</h3>
+                                    </div>
+                                    <div className="notifications-list" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Skeuomorphic Mode</span>
+                                            <div style={{ background: 'linear-gradient(180deg, #10b981 0%, #059669 100%)', boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.3)', width: '44px', height: '24px', borderRadius: '12px', position: 'relative', cursor: 'pointer' }}>
+                                                <div style={{ width: '20px', height: '20px', background: 'linear-gradient(180deg, #ffffff 0%, #e2e8f0 100%)', borderRadius: '50%', position: 'absolute', right: '2px', top: '2px', boxShadow: '0 2px 4px rgba(0,0,0,0.2), inset 0 1px 1px rgba(255,255,255,1)' }}></div>
+                                            </div>
+                                        </div>
+                                        <hr style={{ border: 'none', borderTop: '1px solid #cbd5e1' }} />
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>AI Copilot Logging</span>
+                                            <div style={{ background: 'linear-gradient(180deg, #10b981 0%, #059669 100%)', boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.3)', width: '44px', height: '24px', borderRadius: '12px', position: 'relative', cursor: 'pointer' }}>
+                                                <div style={{ width: '20px', height: '20px', background: 'linear-gradient(180deg, #ffffff 0%, #e2e8f0 100%)', borderRadius: '50%', position: 'absolute', right: '2px', top: '2px', boxShadow: '0 2px 4px rgba(0,0,0,0.2), inset 0 1px 1px rgba(255,255,255,1)' }}></div>
+                                            </div>
+                                        </div>
+                                        <hr style={{ border: 'none', borderTop: '1px solid #cbd5e1' }} />
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>App Version</span>
+                                            <span style={{ color: 'var(--color-primary-main)', fontWeight: 800, fontSize: '0.9rem', padding: '0.25rem 0.5rem', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px' }}>v1.4.0 (Live)</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </header>
 
