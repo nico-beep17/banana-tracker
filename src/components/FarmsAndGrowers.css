@@ -138,6 +138,12 @@
     padding: 1.5rem;
 }
 
+.rates-modal-content {
+    width: 95%;
+    max-width: 800px;
+    max-height: 90vh;
+}
+
 /* ===== FARMS & GROWERS MOBILE ===== */
 @media (max-width: 768px) {
 

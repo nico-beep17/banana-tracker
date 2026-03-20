@@ -83,6 +83,13 @@ const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notif
                             </li>
                         )}
 
+                        {(userProfile?.role === 'Admin / Developer' || userProfile?.role === 'Accounting Staff' || userProfile?.role === 'Accounting Manager' || userProfile?.role === 'Shipping Documentation Supervisor') && (
+                            <li className={`nav-item ${activeTab === 'consignees' ? 'active' : ''}`} onClick={() => onTabChange('consignees')}>
+                                <span className="nav-icon">&#x1F91D;</span>
+                                <span className="nav-text">Consignees</span>
+                            </li>
+                        )}
+
                         {(userProfile?.role === 'Admin / Developer' || userProfile?.role === 'Hub Operations In-Charge' || userProfile?.role === 'Shipping Documentation Supervisor' || userProfile?.role === 'Logistics Supervisor' || userProfile?.role === 'Hub Receiver') && (
                             <li className={`nav-item ${activeTab === 'new-container' || activeTab === 'containers-list' || activeTab === 'edit-container' ? 'active' : ''}`} onClick={() => onTabChange('containers-list')}>
                                 <span className="nav-icon">&#x1F6A2;</span>

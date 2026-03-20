@@ -57,11 +57,11 @@
   --border-radius-pill: 9999px;
   --border-color: rgba(15, 23, 42, 0.08);
 
-  /* Premium Shadows */
-  --shadow-sm: 0 2px 4px -1px rgba(0, 0, 0, 0.03), 0 1px 2px -1px rgba(0, 0, 0, 0.02);
-  --shadow-md: 0 4px 12px -2px rgba(0, 0, 0, 0.05), 0 2px 6px -1px rgba(0, 0, 0, 0.03);
-  --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.02);
-  --shadow-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.1);
+  /* Skeuomorphic Premium Shadows */
+  --shadow-sm: inset 0 1px 1px rgba(255, 255, 255, 0.8), 0 2px 4px rgba(0, 0, 0, 0.15), 0 1px 2px rgba(0, 0, 0, 0.1);
+  --shadow-md: inset 0 1px 1px rgba(255, 255, 255, 0.9), 0 6px 12px rgba(0, 0, 0, 0.2), 0 4px 6px rgba(0, 0, 0, 0.12);
+  --shadow-lg: inset 0 1px 1px rgba(255, 255, 255, 1), 0 12px 24px rgba(0, 0, 0, 0.25), 0 8px 10px rgba(0, 0, 0, 0.15);
+  --shadow-xl: inset 0 2px 2px rgba(255, 255, 255, 1), 0 25px 50px rgba(0, 0, 0, 0.35);
 
   --shadow-glow: 0 0 20px rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.3);
 
@@ -95,7 +95,9 @@ html {
 
 body {
   font-family: var(--font-family-base);
-  background-color: var(--bg-app);
+  background-color: #ebeef2;
+  background-image: linear-gradient(135deg, rgba(255,255,255,0.4) 0%, rgba(0,0,0,0.02) 100%), 
+                    url("data:image/svg+xml,%3Csvg width='10' height='10' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%239C92AC' fill-opacity='0.05' fill-rule='evenodd'%3E%3Ccircle cx='3' cy='3' r='1'/%3E%3Ccircle cx='13' cy='13' r='1'/%3E%3C/g%3E%3C/svg%3E");
   color: var(--text-primary);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
@@ -136,17 +138,18 @@ button {
 }
 
 .card {
-  background: var(--bg-surface);
+  background: linear-gradient(180deg, var(--bg-surface) 0%, #f4f6f8 100%);
   border-radius: var(--border-radius-lg);
-  box-shadow: var(--shadow-sm);
-  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-md);
+  border: 1px solid #ffffff;
+  border-bottom-color: #d1d5db;
   transition: var(--transition-bounce);
 }
 
 .card:hover {
   box-shadow: var(--shadow-lg);
-  transform: translateY(-4px);
-  border-color: rgba(15, 23, 42, 0.12);
+  transform: translateY(-2px);
+  background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
 }
 
 .glass-panel {
@@ -160,15 +163,18 @@ button {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--color-primary-main), var(--color-primary-dark));
+  background: linear-gradient(180deg, var(--color-primary-light) 0%, var(--color-primary-main) 40%, var(--color-primary-dark) 100%);
   color: var(--text-on-dark);
   padding: 0.8rem 1.75rem;
   border-radius: var(--border-radius-pill);
-  font-weight: 600;
+  font-weight: 700;
   font-size: 0.95rem;
-  box-shadow: 0 4px 10px -2px rgba(16, 185, 129, 0.4);
+  box-shadow: inset 0 2px 2px rgba(255, 255, 255, 0.4), inset 0 -2px 4px rgba(0, 0, 0, 0.4), 0 4px 8px rgba(0, 0, 0, 0.3);
+  text-shadow: 0 -1px 1px rgba(0, 0, 0, 0.6);
+  border: 1px solid var(--color-primary-dark);
+  border-bottom: 2px solid #064e3b;
   cursor: pointer;
-  transition: var(--transition-bounce);
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -177,24 +183,30 @@ button {
 }
 
 .btn-primary:hover {
-  background: linear-gradient(135deg, var(--color-primary-light), var(--color-primary-main));
-  box-shadow: 0 12px 20px -5px rgba(16, 185, 129, 0.5);
-  transform: translateY(-2px) scale(1.02);
+  background: linear-gradient(180deg, #34d399 0%, var(--color-primary-main) 50%, var(--color-primary-dark) 100%);
+  box-shadow: inset 0 2px 2px rgba(255, 255, 255, 0.6), inset 0 -2px 4px rgba(0, 0, 0, 0.4), 0 6px 12px rgba(0, 0, 0, 0.4);
+  transform: translateY(-1px);
 }
 
 .btn-primary:active {
-  transform: translateY(1px) scale(0.98);
+  background: linear-gradient(180deg, var(--color-primary-dark) 0%, var(--color-primary-main) 100%);
+  box-shadow: inset 0 4px 6px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.2);
+  transform: translateY(2px);
+  border-bottom-width: 1px;
 }
 
 .btn-secondary {
-  background: rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.05);
-  color: var(--color-primary-main);
-  border: 2px solid transparent;
+  background: linear-gradient(180deg, #ffffff 0%, #e2e8f0 100%);
+  color: #1e293b;
+  border: 1px solid #cbd5e1;
+  border-bottom: 2px solid #94a3b8;
   padding: 0.75rem 1.6rem;
   border-radius: var(--border-radius-pill);
-  font-weight: 600;
+  font-weight: 700;
   font-size: 0.95rem;
-  transition: var(--transition-bounce);
+  box-shadow: inset 0 2px 2px rgba(255, 255, 255, 1), 0 4px 6px rgba(0, 0, 0, 0.1);
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 1);
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -203,38 +215,43 @@ button {
 }
 
 .btn-secondary:hover {
-  background: var(--color-primary-soft);
-  border-color: var(--color-primary-light);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-sm);
+  background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
+  box-shadow: inset 0 2px 2px rgba(255, 255, 255, 1), 0 6px 10px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
 }
 
 .btn-secondary:active {
-  transform: translateY(1px) scale(0.98);
+  background: linear-gradient(180deg, #cbd5e1 0%, #f1f5f9 100%);
+  box-shadow: inset 0 4px 6px rgba(0, 0, 0, 0.15), 0 1px 1px rgba(0, 0, 0, 0.05);
+  transform: translateY(2px);
+  border-bottom-width: 1px;
 }
 
 .input-field {
   width: 100%;
   padding: 0.75rem 1rem;
-  border: 2px solid var(--border-color);
+  border: 1px solid #94a3b8;
+  border-top-color: #64748b;
   border-radius: var(--border-radius-md);
   font-family: var(--font-family-base);
   font-size: 0.95rem;
   transition: var(--transition-normal);
   color: var(--text-primary);
-  background-color: var(--bg-surface);
+  background-color: #f8fafc;
+  box-shadow: inset 0 3px 5px rgba(0, 0, 0, 0.08), inset 0 1px 2px rgba(0, 0, 0, 0.1), 0 1px 1px rgba(255, 255, 255, 0.8);
   height: 48px;
 }
 
 .input-field:focus {
   outline: none;
   border-color: var(--color-primary-main);
-  box-shadow: 0 0 0 4px var(--color-primary-soft);
-  transform: translateY(-1px);
+  background-color: #ffffff;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05), 0 0 0 3px rgba(16, 185, 129, 0.2), 0 1px 1px rgba(255, 255, 255, 0.8);
 }
 
 .input-field::placeholder {
   color: var(--text-tertiary);
+  text-shadow: none;
 }
 
 /* Premium Tables */

@@ -17,6 +17,7 @@ import Payroll from './components/Payroll';
 import Login from './components/Login';
 import ShipmentTracker from './components/ShipmentTracker';
 import MaterialsInventory from './components/MaterialsInventory';
+import Consignees from './components/Consignees';
 import AIAssistantWidget from './components/AIAssistantWidget';
 import { supabase } from './supabaseClient';
 import { BotMessageSquare } from 'lucide-react';
@@ -47,6 +48,10 @@ function App() {
   const [samplings, setSamplings] = useState([]);
   const [containers, setContainers] = useState([]);
   const [weeklyRates, setWeeklyRates] = useState([]);
+
+  // Consignee (Buyer) State
+  const [consignees, setConsignees] = useState([]);
+  const [consigneeWeeklyRates, setConsigneeWeeklyRates] = useState([]);
 
   // Phase 12 Accounting State
   const [chartOfAccounts, setChartOfAccounts] = useState([]);
@@ -126,6 +131,17 @@ function App() {
 
       try {
         await supabase.from('accounting_periods').select('*');
+      } catch (_) { /* table may not exist yet */ }
+
+      // Consignees
+      try {
+        const { data: consData, error: consErr } = await supabase.from('consignees').select('*').order('last_modified', { ascending: false });
+        if (!consErr && consData) setConsignees(consData);
+      } catch (_) { /* table may not exist yet */ }
+
+      try {
+        const { data: cwrData, error: cwrErr } = await supabase.from('consignee_weekly_rates').select('*').order('created_at', { ascending: false });
+        if (!cwrErr && cwrData) setConsigneeWeeklyRates(cwrData);
       } catch (_) { /* table may not exist yet */ }
 
     } catch (err) {
@@ -648,6 +664,27 @@ function App() {
     detailed: remainingInventoryDetailed
   };
 
+  // ADVANCED ANALYTICS
+  const globalSampledBoxes = samplings.flatMap(s => s.boxes || []);
+  const downgradeRate = globalSampledBoxes.length > 0
+    ? (globalSampledBoxes.filter(b => b.decision === 'DOWNGRADED').length / globalSampledBoxes.length) * 100
+    : 0;
+
+  const farmVolumes = {};
+  approvedArrivals.forEach(arr => {
+     farmVolumes[arr.farmName || 'Unknown'] = (farmVolumes[arr.farmName || 'Unknown'] || 0) + (arr.quantity || 0);
+  });
+  const topFarmsList = Object.entries(farmVolumes)
+     .sort((a,b) => b[1] - a[1])
+     .slice(0, 5)
+     .map(([name, volume]) => ({ name, volume }));
+
+  const totalRev = containers.reduce((s, c) => s + (Number(c.totalBoxes || 0) * (Number(c.agreed_rate) || 0)), 0);
+  const collected = containers.reduce((s, c) => s + (Number(c.amount_paid_partial) || 0), 0);
+  const collectionRate = totalRev > 0 ? (collected / totalRev) * 100 : 100;
+
+  const advancedAnalytics = { downgradeRate, topFarms: topFarmsList, collectionRate };
+
   const [smartNotifications, setSmartNotifications] = useState([]);
 
   useEffect(() => {
@@ -688,9 +725,7 @@ function App() {
     }
 
     // STRATEGIC ANALYSIS: Quality Trends
-    const sampledBoxes = samplings.flatMap(s => s.boxes || []);
-    if (sampledBoxes.length > 0) {
-      const downgradeRate = (sampledBoxes.filter(b => b.decision === 'DOWNGRADED').length / sampledBoxes.length) * 100;
+    if (globalSampledBoxes.length > 0) {
       if (downgradeRate > 15) {
         notifs.push({
           id: 'quality-analysis',
@@ -711,10 +746,6 @@ function App() {
     }
 
     // STRATEGIC ANALYSIS: Collection Efficiency
-    const totalRev = containers.reduce((s, c) => s + (Number(c.totalBoxes || 0) * (Number(c.agreed_rate) || 0)), 0);
-    const collected = containers.reduce((s, c) => s + (Number(c.amount_paid_partial) || 0), 0);
-    const collectionRate = totalRev > 0 ? (collected / totalRev) * 100 : 100;
-
     if (collectionRate < 70) {
       notifs.push({
         id: 'finance-analysis',
@@ -729,7 +760,7 @@ function App() {
     // Here we'd typically have a query for recent violations
 
     setSmartNotifications(notifs);
-  }, [arrivals, containers, totalBoxesToday, uniqueFarms.size]);
+  }, [arrivals, containers, totalBoxesToday, uniqueFarms.size, downgradeRate, globalSampledBoxes.length, collectionRate]);
 
 
   if (authLoading) {
@@ -755,7 +786,8 @@ function App() {
               remainingInventory: inventoryMetrics,
               pendingArrivalsCount: arrivals.filter(a => a.approval_status !== 'APPROVED').length,
               unsealedContainersCount: containers.filter(c => !c.transit_status || c.transit_status === 'PENDING').length,
-              activeSamplingsCount: samplings.filter(s => s.status !== 'COMPLETED').length
+              activeSamplingsCount: samplings.filter(s => s.status !== 'COMPLETED').length,
+              advancedAnalytics: advancedAnalytics
             }}
             userProfile={userProfile}
             onNavigate={handleNavigate}
@@ -799,10 +831,20 @@ function App() {
           />
         )}
 
+        {activeTab === 'consignees' && (
+          <Consignees
+            consignees={consignees}
+            setConsignees={setConsignees}
+            consigneeWeeklyRates={consigneeWeeklyRates}
+            setConsigneeWeeklyRates={setConsigneeWeeklyRates}
+          />
+        )}
+
         {activeTab === 'new-container' && (
           <NewContainerForm
             onSaveContainer={handleSaveContainer}
             onCancel={() => handleNavigate('containers-list')}
+            consignees={consignees}
           />
         )}
 
@@ -811,6 +853,7 @@ function App() {
             onSaveContainer={handleSaveContainer}
             initialData={containers.find(c => c.id === tabState.containerId)}
             onCancel={() => handleNavigate('containers-list')}
+            consignees={consignees}
           />
         )}
 
@@ -922,6 +965,9 @@ function App() {
             arrivals={arrivals}
             containers={containers}
             farms={farms}
+            inventoryMetrics={inventoryMetrics}
+            totalBoxesToday={totalBoxesToday}
+            advancedAnalytics={advancedAnalytics}
             onClose={() => setIsAIOpen(false)}
           />
         )}

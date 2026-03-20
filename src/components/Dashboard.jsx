@@ -1,4 +1,5 @@
 import React from 'react';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import './Dashboard.css';
 
 const Dashboard = ({ metrics, userProfile, onNavigate, children }) => {
@@ -179,24 +180,116 @@ const Dashboard = ({ metrics, userProfile, onNavigate, children }) => {
                     </div>
                 )}
 
-                {/* Operational Intelligence (For Admins) */}
+                {/* Operational Analytics & Intelligence (For Admins) */}
                 {isAdmin && (
                     <div className="intelligence-widget" style={{ marginBottom: '2rem' }}>
-                        <h2 style={{ fontSize: '1.25rem', marginBottom: '1rem' }}>Operational Intelligence</h2>
-                        <div className="grid-2">
-                            <div className="card" style={{ padding: '1.25rem', background: 'linear-gradient(to right, #f8fafc, #f1f5f9)' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                                    <strong>Efficiency Index</strong>
-                                    <span style={{ color: '#10b981' }}>Optimal</span>
-                                </div>
-                                <p style={{ fontSize: '0.9rem', color: 'var(--text-tertiary)' }}>Current throughput and dispatch times are within target ranges for the current week.</p>
+                        <h2 style={{ fontSize: '1.25rem', marginBottom: '1rem', fontFamily: 'var(--font-family-heading)' }}>Operational Intelligence & Analytics</h2>
+                        
+                        <div className="grid-3" style={{ marginBottom: '1rem' }}>
+                            {/* Dynamic Chart: Inventory Distribution */}
+                            <div className="card" style={{ padding: '1.25rem', background: 'var(--bg-surface)' }}>
+                                <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>Hub Inventory Balance</h3>
+                                {metrics.remainingInventory && metrics.remainingInventory.total > 0 ? (
+                                    <div style={{ width: '100%', height: '220px' }}>
+                                        <ResponsiveContainer>
+                                            <PieChart>
+                                                <Pie
+                                                    data={[
+                                                        { name: 'Class A', value: metrics.remainingInventory.classA },
+                                                        { name: 'Class B', value: metrics.remainingInventory.classB }
+                                                    ]}
+                                                    cx="50%"
+                                                    cy="50%"
+                                                    innerRadius={55}
+                                                    outerRadius={85}
+                                                    paddingAngle={5}
+                                                    dataKey="value"
+                                                >
+                                                    <Cell fill="#10b981" />
+                                                    <Cell fill="#f59e0b" />
+                                                </Pie>
+                                                <Tooltip 
+                                                    formatter={(value) => [`${value} Boxes`, 'Available']}
+                                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: 'var(--shadow-md)' }}
+                                                />
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                ) : (
+                                    <div style={{ height: '220px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-tertiary)' }}>
+                                        No inventory data available
+                                    </div>
+                                )}
                             </div>
-                            <div className="card" style={{ padding: '1.25rem', background: 'linear-gradient(to right, #f8fafc, #f1f5f9)' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                                    <strong>Quality Variance</strong>
-                                    <span style={{ color: '#f59e0b' }}>Stable</span>
+
+                            {/* Dynamic Chart: Top Producing Farms */}
+                            <div className="card" style={{ padding: '1.25rem', background: 'var(--bg-surface)' }}>
+                                <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>Top Contributing Growers</h3>
+                                {metrics.advancedAnalytics && metrics.advancedAnalytics.topFarms.length > 0 ? (
+                                    <div style={{ width: '100%', height: '220px' }}>
+                                        <ResponsiveContainer>
+                                            <BarChart data={metrics.advancedAnalytics.topFarms} layout="vertical" margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
+                                                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
+                                                <XAxis type="number" hide />
+                                                <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} width={90} />
+                                                <Tooltip 
+                                                    formatter={(value) => [`${value} Boxes`, 'Received']}
+                                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: 'var(--shadow-md)' }}
+                                                    cursor={{ fill: 'rgba(16, 185, 129, 0.05)' }}
+                                                />
+                                                <Bar dataKey="volume" fill="#10b981" radius={[0, 4, 4, 0]} barSize={20}>
+                                                    {metrics.advancedAnalytics.topFarms.map((entry, index) => (
+                                                        <Cell key={`cell-${index}`} fill={index === 0 ? '#10b981' : 'var(--color-primary-light)'} />
+                                                    ))}
+                                                </Bar>
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                ) : (
+                                    <div style={{ height: '220px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-tertiary)' }}>
+                                        No arrival data available
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Intelligent Insights */}
+                            <div className="card" style={{ padding: '1.25rem', background: 'var(--bg-surface)', display: 'flex', flexDirection: 'column', gap: '1rem', justifyContent: 'center' }}>
+                                <div style={{ borderLeft: '4px solid #3b82f6', paddingLeft: '1rem' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                                        <strong style={{ fontSize: '0.95rem' }}>Production Volume</strong>
+                                        <span style={{ color: '#3b82f6', fontSize: '0.85rem', fontWeight: 'bold' }}>{metrics.totalBoxes} Boxes</span>
+                                    </div>
+                                    <p style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)', margin: 0 }}>Total production logged today across {metrics.totalTrips} aggregate trips.</p>
                                 </div>
-                                <p style={{ fontSize: '0.9rem', color: 'var(--text-tertiary)' }}>Downgrade rates have stabilized at ~12% over the last 3 days of packing.</p>
+                                <div style={{ borderLeft: '4px solid #10b981', paddingLeft: '1rem' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                                        <strong style={{ fontSize: '0.95rem' }}>Class A Ratio</strong>
+                                        <span style={{ color: '#10b981', fontSize: '0.85rem', fontWeight: 'bold' }}>{classAPercent}%</span>
+                                    </div>
+                                    <p style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)', margin: 0 }}>Premium yield output variance remains within normal thresholds.</p>
+                                </div>
+                                <div style={{ borderLeft: `4px solid ${metrics.advancedAnalytics?.downgradeRate > 10 ? '#ef4444' : '#f59e0b'}`, paddingLeft: '1rem' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                                        <strong style={{ fontSize: '0.95rem' }}>Sampling Downgrades</strong>
+                                        <span style={{ color: metrics.advancedAnalytics?.downgradeRate > 10 ? '#ef4444' : '#f59e0b', fontSize: '0.85rem', fontWeight: 'bold' }}>
+                                            {metrics.advancedAnalytics?.downgradeRate.toFixed(1)}%
+                                        </span>
+                                    </div>
+                                    <p style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)', margin: 0 }}>
+                                        {metrics.advancedAnalytics?.downgradeRate > 10 ? 'Warning: Downgrade rate is unusually high. Review sampling metrics immediately.' : 'Downgrade variance is minimal. Quality stands highly stable.'}
+                                    </p>
+                                </div>
+                                <div style={{ borderLeft: `4px solid ${metrics.advancedAnalytics?.collectionRate < 70 ? '#ef4444' : '#8b5cf6'}`, paddingLeft: '1rem' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                                        <strong style={{ fontSize: '0.95rem' }}>Collection Efficiency</strong>
+                                        <span style={{ color: metrics.advancedAnalytics?.collectionRate < 70 ? '#ef4444' : '#8b5cf6', fontSize: '0.85rem', fontWeight: 'bold' }}>
+                                            {metrics.advancedAnalytics?.collectionRate.toFixed(1)}%
+                                        </span>
+                                    </div>
+                                    <p style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)', margin: 0 }}>
+                                        {metrics.advancedAnalytics?.collectionRate < 70 ? 'Warning: Cash flow liquidity is tightening. Review outstanding receivables on shipped containers.' : 'Collection and cash flow cycles remain exceptionally healthy.'}
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     </div>

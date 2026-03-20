@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import './FarmsAndGrowers.css';
 import { supabase } from '../supabaseClient';
+import { ArrowLeft, Plus, Edit, Settings, FileSpreadsheet, Save, X, CheckCircle, AlertTriangle } from 'lucide-react';
 
 const FarmsAndGrowers = ({ farms = [], setFarms, weeklyRates = [], setWeeklyRates }) => {
     const [isFormOpen, setIsFormOpen] = useState(false);
@@ -137,7 +138,7 @@ const FarmsAndGrowers = ({ farms = [], setFarms, weeklyRates = [], setWeeklyRate
             }
         }
 
-        // Reset and close form
+        // Reset form to clear inputs right after saving
         resetForm();
     };
 
@@ -186,7 +187,7 @@ const FarmsAndGrowers = ({ farms = [], setFarms, weeklyRates = [], setWeeklyRate
                         style={{ padding: '0.6rem', borderRadius: '50%', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                         title="Back to Dashboard"
                     >
-                        <span style={{ fontSize: '1.4rem', fontWeight: 'bold' }}>←</span>
+                        <ArrowLeft size={20} color="var(--text-secondary)" />
                     </button>
                     <div>
                         <h2 style={{ fontSize: '1.25rem', margin: 0 }}>Grower Registry</h2>
@@ -196,21 +197,15 @@ const FarmsAndGrowers = ({ farms = [], setFarms, weeklyRates = [], setWeeklyRate
                 <button 
                     className={`btn-primary ${isFormOpen ? 'btn-danger' : ''}`}
                     onClick={() => {
-                        setIsFormOpen(!isFormOpen);
-                        if (!isFormOpen) {
-                            setEditGrowerId(null);
-                            setNewGrower({
-                                farmCode: '', name: '', location: '', elevation: 'LOW LAND',
-                                prodHas: '', activeHas: '', farmType: '', company: '',
-                                pointOfDelivery: '', otherGrouping: '', status: 'ACTIVE',
-                                physicalPhName: '', physicalPhAddress: '',
-                                bankName: '', accountName: '', accountNumber: ''
-                            });
+                        if (isFormOpen) {
+                            resetForm();
+                        } else {
+                            setIsFormOpen(true);
                         }
                     }}
-                    style={{ marginTop: '0.5rem' }}
+                    style={{ marginTop: '0.5rem', background: isFormOpen ? 'var(--color-error)' : undefined, boxShadow: isFormOpen ? '0 4px 10px -2px rgba(239, 68, 68, 0.4)' : undefined }}
                 >
-                    {isFormOpen ? 'Cancel' : '+ Register New Farm'}
+                    {isFormOpen ? <><X size={18} /> Cancel</> : <><Plus size={18} /> Register New Farm</>}
                 </button>
             </div>
 
@@ -309,16 +304,16 @@ const FarmsAndGrowers = ({ farms = [], setFarms, weeklyRates = [], setWeeklyRate
                             </div>
                         </div>
 
-                        <div className="form-actions" style={{ justifyContent: 'flex-end', marginTop: '2rem', gap: '1rem' }}>
+                        <div className="form-actions" style={{ justifyContent: 'flex-end', marginTop: '2rem', gap: '1rem', display: 'flex' }}>
                             <button 
                                 type="button" 
                                 className="btn-secondary" 
-                                onClick={() => { setIsFormOpen(false); setEditGrowerId(null); }}
+                                onClick={resetForm}
                             >
-                                Cancel
+                                <X size={18} /> Cancel
                             </button>
                             <button type="submit" className="btn-primary">
-                                {editGrowerId ? 'Update Grower Details' : 'Save New Grower'}
+                                <Save size={18} /> {editGrowerId ? 'Update Grower Details' : 'Save New Grower'}
                             </button>
                         </div>
                     </form>
@@ -397,14 +392,18 @@ const FarmsAndGrowers = ({ farms = [], setFarms, weeklyRates = [], setWeeklyRate
                                                                 gap: '8px'
                                                             }}
                                                         >
+                                                            <Settings size={18} />
                                                             <span>Manage Weekly Rates</span>
                                                             {hasCurrentWeekRate && (
                                                                 <span style={{
                                                                     background: 'rgba(255,255,255,0.2)', 
                                                                     padding: '2px 8px', 
                                                                     borderRadius: '20px', 
-                                                                    fontSize: '0.75rem'
-                                                                }}>✓ Set</span>
+                                                                    fontSize: '0.75rem',
+                                                                    display: 'inline-flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '4px'
+                                                                }}><CheckCircle size={12} /> Set</span>
                                                             )}
                                                         </button>
                                                     </div>
@@ -420,10 +419,14 @@ const FarmsAndGrowers = ({ farms = [], setFarms, weeklyRates = [], setWeeklyRate
                                                     padding: '0.85rem', 
                                                     width: '100%',
                                                     fontSize: '0.95rem',
-                                                    borderRadius: '12px'
+                                                    borderRadius: '12px',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    gap: '8px'
                                                 }}
                                             >
-                                                Edit Farm Details
+                                                <Edit size={16} /> Edit Farm Details
                                             </button>
                                         </div>
                                     </td>
@@ -437,25 +440,23 @@ const FarmsAndGrowers = ({ farms = [], setFarms, weeklyRates = [], setWeeklyRate
             {/* Weekly Rates Modal */}
             {showRatesModal && activeFarmForRates && (
                 <div className="modal-backdrop" style={{ zIndex: 9999 }}>
-                    <div className="modal-content" style={{ 
-                        width: '100vw', 
-                        height: '100dvh', 
-                        maxWidth: '100vw', 
-                        maxHeight: '100dvh',
-                        borderRadius: 0,
+                    <div className="modal-content rates-modal-content" style={{ 
                         display: 'flex', 
                         flexDirection: 'column',
-                        position: 'fixed',
-                        top: 0,
-                        left: 0
+                        overflow: 'hidden'
                     }}>
-                        <div className="modal-header" style={{ padding: '1.25rem', borderBottom: '1px solid var(--border-color)', background: 'white', flexShrink: 0 }}>
+                        <div className="modal-header" style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border-color)', background: 'white', flexShrink: 0 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <div>
-                                    <h2 style={{ margin: 0, fontSize: '1.2rem' }}>Weekly Pricing</h2>
-                                    <p className="subtitle" style={{ margin: '2px 0 0', fontSize: '0.85rem' }}>{activeFarmForRates.farmCode} - {activeFarmForRates.physicalPhName}</p>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                    <div style={{ padding: '0.5rem', background: '#f1f5f9', borderRadius: '8px', color: 'var(--color-primary-main)' }}>
+                                        <FileSpreadsheet size={24} />
+                                    </div>
+                                    <div>
+                                        <h2 style={{ margin: 0, fontSize: '1.25rem', fontFamily: 'var(--font-family-heading)', fontWeight: '700' }}>Weekly Pricing</h2>
+                                        <p className="subtitle" style={{ margin: '2px 0 0', fontSize: '0.85rem' }}>{activeFarmForRates.farmCode} - {activeFarmForRates.physicalPhName}</p>
+                                    </div>
                                 </div>
-                                <button className="close-btn" onClick={() => setShowRatesModal(false)} style={{ fontSize: '2rem', padding: '0.5rem' }}>×</button>
+                                <button className="close-btn" onClick={() => setShowRatesModal(false)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={24} /></button>
                             </div>
                         </div>
 
@@ -570,9 +571,11 @@ const FarmsAndGrowers = ({ farms = [], setFarms, weeklyRates = [], setWeeklyRate
                             </div>
                         </div>
 
-                        <div className="modal-footer" style={{ padding: '1.25rem', borderTop: '1px solid var(--border-color)', background: 'white', display: 'flex', flexDirection: 'column', gap: '0.75rem', flexShrink: 0 }}>
-                            <button type="submit" form="weekly-rate-form" className="btn-primary" style={{ width: '100%', padding: '1rem', fontSize: '1.1rem', fontWeight: 'bold' }}>Save Weekly Rate</button>
-                            <button type="button" className="btn-secondary" onClick={() => setShowRatesModal(false)} style={{ width: '100%', padding: '0.75rem', color: '#64748b' }}>← Cancel & Back</button>
+                        <div className="modal-footer" style={{ padding: '1.25rem 1.5rem', borderTop: '1px solid var(--border-color)', background: 'white', display: 'flex', justifyContent: 'flex-end', gap: '1rem', flexShrink: 0 }}>
+                            <button type="button" className="btn-secondary" onClick={() => setShowRatesModal(false)} style={{ padding: '0.75rem 1.5rem', color: '#64748b' }}>Cancel</button>
+                            <button type="submit" form="weekly-rate-form" className="btn-primary" style={{ padding: '0.75rem 2rem', fontSize: '1rem', fontWeight: 'bold' }}>
+                                <Save size={18} /> Save Weekly Rate
+                            </button>
                         </div>
                     </div>
                 </div>

@@ -11,7 +11,7 @@ const getISOWeek = (date) => {
     return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
 };
 
-const NewContainerForm = ({ onSaveContainer, initialData = null, onCancel }) => {
+const NewContainerForm = ({ onSaveContainer, initialData = null, onCancel, consignees = [] }) => {
     const [formData, setFormData] = useState({
         // Header 1
         brand: 'LFJ',
@@ -57,6 +57,14 @@ const NewContainerForm = ({ onSaveContainer, initialData = null, onCancel }) => 
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
+
+        // Auto-fill destination port when selecting a consignee
+        if (name === 'buyer_name' && value) {
+            const selectedConsignee = consignees.find(c => c.company_name === value);
+            if (selectedConsignee && selectedConsignee.default_port) {
+                setFormData(prev => ({ ...prev, [name]: value, destination: selectedConsignee.default_port }));
+            }
+        }
     };
 
     const handleSubmit = (e) => {
@@ -89,6 +97,9 @@ const NewContainerForm = ({ onSaveContainer, initialData = null, onCancel }) => 
             });
         }
     };
+
+    // Active consignees for dropdown
+    const activeConsignees = consignees.filter(c => c.status === 'ACTIVE');
 
     return (
         <div className="container-stuffing-page animation-fade-in" style={{ padding: '0 2rem' }}>
@@ -142,8 +153,23 @@ const NewContainerForm = ({ onSaveContainer, initialData = null, onCancel }) => 
                                 <input type="text" name="brand" className="input-field" value={formData.brand} onChange={handleChange} required placeholder="e.g. LFJ" />
                             </div>
                             <div className="form-group">
-                                <label className="label">Buyer Name</label>
-                                <input type="text" name="buyer_name" className="input-field" value={formData.buyer_name} onChange={handleChange} placeholder="e.g. Trading Co." />
+                                <label className="label">Buyer / Consignee</label>
+                                {activeConsignees.length > 0 ? (
+                                    <select name="buyer_name" className="input-field" value={formData.buyer_name} onChange={handleChange}>
+                                        <option value="">Select Consignee...</option>
+                                        {activeConsignees.map(c => (
+                                            <option key={c.id} value={c.company_name}>{c.company_name} ({c.country || 'N/A'})</option>
+                                        ))}
+                                        <option value="__manual__" disabled style={{ fontStyle: 'italic', color: '#94a3b8' }}>── or type below ──</option>
+                                    </select>
+                                ) : (
+                                    <input type="text" name="buyer_name" className="input-field" value={formData.buyer_name} onChange={handleChange} placeholder="e.g. Trading Co." />
+                                )}
+                                {activeConsignees.length > 0 && (
+                                    <span style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', marginTop: '4px', display: 'block' }}>
+                                        Selecting a consignee will auto-fill the destination port.
+                                    </span>
+                                )}
                             </div>
                         </div>
                     </div>
