@@ -33,10 +33,12 @@ const Payroll = ({ showToast, employees = [], dtrRecords = [], attendanceLocatio
     const [empForm, setEmpForm] = useState({
         employee_code: '', first_name: '', last_name: '', department: '', role: '',
         employment_status: 'ACTIVE', basic_rate: '', rate_type: 'DAILY',
+        employee_type: 'EMPLOYEE',
         bank_account_no: '', sss_no: '', phic_no: '', hdmf_no: '', tin_no: ''
     });
     const [isEditingEmp, setIsEditingEmp] = useState(false);
     const [editingEmpId, setEditingEmpId] = useState(null);
+    const [empListTab, setEmpListTab] = useState('EMPLOYEE'); // 'EMPLOYEE' or 'OFFICER'
 
     const handleSaveEmployee = async () => {
         if (!empForm.employee_code || !empForm.first_name || !empForm.last_name) {
@@ -58,6 +60,7 @@ const Payroll = ({ showToast, employees = [], dtrRecords = [], attendanceLocatio
             setEmpForm({
                 employee_code: '', first_name: '', last_name: '', department: '', role: '',
                 employment_status: 'ACTIVE', basic_rate: '', rate_type: 'DAILY',
+                employee_type: 'EMPLOYEE',
                 bank_account_no: '', sss_no: '', phic_no: '', hdmf_no: '', tin_no: ''
             });
             setIsEditingEmp(false);
@@ -362,9 +365,18 @@ const Payroll = ({ showToast, employees = [], dtrRecords = [], attendanceLocatio
                 </div>
             )}
 
-            {activeTab === 'employees' && (
+            {activeTab === 'employees' && (() => {
+                const canViewOfficers = userProfile?.role === 'Administrator' ||
+                    userProfile?.role === 'HR Manager' ||
+                    userProfile?.role === 'Accounting Manager';
+                const rankAndFile = employees.filter(e => e.employee_type !== 'OFFICER');
+                const officers = employees.filter(e => e.employee_type === 'OFFICER');
+                const displayList = empListTab === 'OFFICER' ? officers : rankAndFile;
+
+                return (
                 <div className="erp-content-section slide-down">
                     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 1fr) 2fr', gap: '2rem' }}>
+                        {/* Form */}
                         <div className="card" style={{ padding: '2rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', alignSelf: 'start' }}>
                             <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 0, marginBottom: '1.5rem', color: '#0f172a' }}>
                                 {isEditingEmp ? <Edit size={20} className="text-blue-500" /> : <UserPlus size={20} className="text-green-500" />}
@@ -374,6 +386,14 @@ const Payroll = ({ showToast, employees = [], dtrRecords = [], attendanceLocatio
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                                 <div className="input-group"><label>First Name</label><input type="text" className="input-field" value={empForm.first_name} onChange={e => setEmpForm({ ...empForm, first_name: e.target.value })} /></div>
                                 <div className="input-group"><label>Last Name</label><input type="text" className="input-field" value={empForm.last_name} onChange={e => setEmpForm({ ...empForm, last_name: e.target.value })} /></div>
+                            </div>
+                            {/* Employee Type */}
+                            <div className="input-group">
+                                <label>Employee Classification</label>
+                                <select className="input-field" value={empForm.employee_type || 'EMPLOYEE'} onChange={e => setEmpForm({ ...empForm, employee_type: e.target.value })}>
+                                    <option value="EMPLOYEE">🏭 Rank & File / Regular Employee</option>
+                                    <option value="OFFICER">👔 Officer / Management</option>
+                                </select>
                             </div>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                                 <div className="input-group">
@@ -390,39 +410,63 @@ const Payroll = ({ showToast, employees = [], dtrRecords = [], attendanceLocatio
                                 <Save size={18} /> {isEditingEmp ? 'Update Employee' : 'Create Employee'}
                             </button>
                         </div>
-                        <div className="card" style={{ padding: '0', overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '12px' }}>
-                            <table className="banana-table">
-                                <thead>
-                                    <tr>
-                                        <th>Code</th>
-                                        <th>QR</th>
-                                        <th>Name</th>
-                                        <th>Type</th>
-                                        <th>Rate</th>
-                                        <th>Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {employees.map(emp => (
-                                        <tr key={emp.id}>
-                                            <td>{emp.employee_code}</td>
-                                            <td>
-                                                <div style={{ background: '#f1f5f9', padding: '4px 8px', borderRadius: '4px', fontSize: '0.7rem', fontFamily: 'monospace', color: '#1e293b' }}>
-                                                    {emp.employee_code}
-                                                </div>
-                                            </td>
-                                            <td>{emp.last_name}, {emp.first_name}</td>
-                                            <td><span style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem', background: '#e2e8f0', borderRadius: '4px' }}>{emp.rate_type}</span></td>
-                                            <td>₱{emp.basic_rate}</td>
-                                            <td><button onClick={() => handleEditEmployee(emp)}>Edit</button></td>
+
+                        {/* Employee List with type tabs */}
+                        <div>
+                            {/* Tab switcher */}
+                            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                                <button
+                                    onClick={() => setEmpListTab('EMPLOYEE')}
+                                    style={{ padding: '0.4rem 1rem', borderRadius: '8px', border: `1px solid ${empListTab === 'EMPLOYEE' ? '#3b82f6' : 'var(--border-color)'}`, background: empListTab === 'EMPLOYEE' ? '#eff6ff' : 'none', color: empListTab === 'EMPLOYEE' ? '#1d4ed8' : 'var(--text-secondary)', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}
+                                >🏭 Rank & File ({rankAndFile.length})</button>
+                                {canViewOfficers && (
+                                    <button
+                                        onClick={() => setEmpListTab('OFFICER')}
+                                        style={{ padding: '0.4rem 1rem', borderRadius: '8px', border: `1px solid ${empListTab === 'OFFICER' ? '#8b5cf6' : 'var(--border-color)'}`, background: empListTab === 'OFFICER' ? '#f5f3ff' : 'none', color: empListTab === 'OFFICER' ? '#6d28d9' : 'var(--text-secondary)', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}
+                                    >👔 Officers / Management ({officers.length})</button>
+                                )}
+                            </div>
+                            <div className="card" style={{ padding: '0', overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '12px' }}>
+                                <table className="banana-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Code</th>
+                                            <th>QR</th>
+                                            <th>Name</th>
+                                            <th>Classification</th>
+                                            <th>Rate Type</th>
+                                            <th>Rate</th>
+                                            <th>Action</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        {displayList.map(emp => (
+                                            <tr key={emp.id}>
+                                                <td>{emp.employee_code}</td>
+                                                <td>
+                                                    <div style={{ background: '#f1f5f9', padding: '4px 8px', borderRadius: '4px', fontSize: '0.7rem', fontFamily: 'monospace', color: '#1e293b' }}>
+                                                        {emp.employee_code}
+                                                    </div>
+                                                </td>
+                                                <td>{emp.last_name}, {emp.first_name}</td>
+                                                <td>
+                                                    <span style={{ fontSize: '0.75rem', padding: '0.15rem 0.5rem', borderRadius: '4px', fontWeight: 700, background: emp.employee_type === 'OFFICER' ? '#f5f3ff' : '#f0fdf4', color: emp.employee_type === 'OFFICER' ? '#6d28d9' : '#065f46' }}>
+                                                        {emp.employee_type === 'OFFICER' ? '👔 Officer' : '🏭 Rank & File'}
+                                                    </span>
+                                                </td>
+                                                <td><span style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem', background: '#e2e8f0', borderRadius: '4px' }}>{emp.rate_type}</span></td>
+                                                <td>₱{emp.basic_rate}</td>
+                                                <td><button onClick={() => handleEditEmployee(emp)}>Edit</button></td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
-            )}
+                );
+            })()}
 
             {activeTab === 'dtr' && (
                 <div className="erp-content-section slide-down">
@@ -743,21 +787,64 @@ const ScanComponent = ({ onScan }) => {
 
     useEffect(() => {
         let scanner;
-        import('html5-qrcode').then(({ Html5QrcodeScanner }) => {
-            scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
-            scannerRef.current = scanner;
-            scanner.render(decodedText => {
-                onScan(decodedText);
-                scanner.clear();
-            }, () => { });
-        }).catch(err => console.error('QR scanner failed to load:', err));
+        
+        const initScanner = async () => {
+            try {
+                if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+                    const { Camera } = await import('@capacitor/camera');
+                    const perms = await Camera.checkPermissions();
+                    if (perms.camera !== 'granted') {
+                        await Camera.requestPermissions({ permissions: ['camera'] });
+                    }
+                }
+            } catch (e) {
+                console.warn('Camera permission check skipped (web):', e);
+            }
+
+            try {
+                const { Html5Qrcode } = await import('html5-qrcode');
+                
+                // Initialize directly instead of using the pre-built Scanner UI
+                scanner = new Html5Qrcode("reader");
+                scannerRef.current = scanner;
+                
+                // Request 'environment' (back) camera directly
+                await scanner.start(
+                    { facingMode: "environment" },
+                    { fps: 10, qrbox: { width: 250, height: 250 } },
+                    (decodedText) => {
+                        // Success callback
+                        if (scannerRef.current) {
+                            scannerRef.current.stop().then(() => {
+                                onScan(decodedText);
+                            }).catch(err => {
+                                console.log("Failed to stop scanner", err);
+                                onScan(decodedText);
+                            });
+                        }
+                    },
+                    (errorMessage) => {
+                        // ignore background scan errors 
+                    }
+                );
+            } catch (err) {
+                console.error('QR scanner failed to start:', err);
+                if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+                    alert('Camera could not start. Please ensure the app has permission in Android Settings.');
+                }
+            }
+        };
+        initScanner();
 
         return () => {
             if (scannerRef.current) {
-                scannerRef.current.clear().catch(() => { });
+                // Ignore stop errors on unmount
+                scannerRef.current.stop().catch(() => {}).finally(() => {
+                    scannerRef.current.clear();
+                });
             }
         };
-    }, []);
+    }, [onScan]);
 
     return <div id="reader" style={{ width: '100%', maxWidth: '400px', margin: '0 auto' }}></div>;
 };

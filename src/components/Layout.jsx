@@ -1,13 +1,44 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { RefreshCw, Bell, Settings, LayoutDashboard, ClipboardEdit, TestTubes, Leaf, Handshake, Ship, Package, Globe, LineChart, Calculator, Users, LogOut, UserCog } from 'lucide-react';
 import './Layout.css';
 
-const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notifications = [], onRefresh }) => {
+const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notifications = [], onRefresh, arrivals = [], farms = [], samplings = [] }) => {
     const [isNotificationOpen, setIsNotificationOpen] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchOpen, setSearchOpen] = useState(false);
+    const searchRef = useRef(null);
     const unreadCount = notifications.filter(n => !n.read).length;
+
+    const role = userProfile?.role || 'Guest';
+    const isAdmin = role === 'Administrator';
+
+    // canAccess: Admins bypass everything. Otherwise check allowed_modules if set, else fall back to role.
+    const canAccess = (moduleKey) => {
+        if (isAdmin) return true;
+        if (Array.isArray(userProfile?.allowed_modules) && userProfile.allowed_modules.length > 0) {
+            return userProfile.allowed_modules.includes(moduleKey);
+        }
+        // Role-based fallback (mirrors DEFAULT_ACCESS in UserManagement)
+        const roleDefaults = {
+            'Hub Receiver': ['dashboard', 'log-arrival', 'containers-list', 'sampling'],
+            'Production Manager': ['dashboard', 'log-arrival', 'farms', 'sampling', 'reports', 'containers-list', 'inventory'],
+            'Production Supervisor': ['dashboard', 'log-arrival', 'farms', 'sampling'],
+            'Quality Manager': ['dashboard', 'sampling', 'reports'],
+            'Quality Supervisor': ['dashboard', 'sampling'],
+            'Accounting Manager': ['dashboard', 'consignees', 'accounting', 'payroll', 'reports'],
+            'Accounting Staff': ['dashboard', 'consignees', 'accounting', 'reports'],
+            'HR Manager': ['dashboard', 'payroll'],
+            'Logistics Supervisor': ['dashboard', 'containers-list', 'shipment-tracker'],
+            'Shipping Documentation Supervisor': ['dashboard', 'consignees', 'containers-list', 'shipment-tracker'],
+            'Hub Operations In-Charge': ['dashboard', 'containers-list', 'inventory', 'shipment-tracker'],
+            'Guest': ['dashboard'],
+            'Pending': [],
+        };
+        return (roleDefaults[role] || []).includes(moduleKey);
+    };
 
     // Close mobile sidebar when tab changes
     useEffect(() => {
@@ -41,6 +72,36 @@ const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notif
         }
     };
 
+    // Global search results
+    const searchResults = useMemo(() => {
+        const q = searchQuery.trim().toLowerCase();
+        if (q.length < 2) return [];
+        const results = [];
+        farms.filter(f =>
+            f.name?.toLowerCase().includes(q) || f.farmCode?.toLowerCase().includes(q) || f.location?.toLowerCase().includes(q)
+        ).slice(0, 4).forEach(f => results.push({ type: 'Farm', icon: '🌿', tab: 'farms', title: f.name, sub: `${f.farmCode} · ${f.location || ''}`, color: '#16a34a', bg: '#f0fdf4' }));
+        const seen = new Set();
+        arrivals.filter(a =>
+            a.deliveryReceipt?.toLowerCase().includes(q) || a.farmCode?.toLowerCase().includes(q) ||
+            a.farmName?.toLowerCase().includes(q) || a.batchId?.toLowerCase().includes(q) || a.plateNumber?.toLowerCase().includes(q)
+        ).forEach(a => {
+            const key = a.batchId || a.id;
+            if (seen.has(key) || results.filter(r => r.type === 'Arrival').length >= 4) return;
+            seen.add(key);
+            results.push({ type: 'Arrival', icon: '📦', tab: 'log-arrival', title: `DR ${a.deliveryReceipt || '—'} · ${a.farmName || a.farmCode}`, sub: `${a.dateOfPacking ? new Date(a.dateOfPacking).toLocaleDateString() : ''} · ${a.approval_status || 'PENDING'}`, color: '#3b82f6', bg: '#eff6ff' });
+        });
+        samplings.filter(s =>
+            s.farmName?.toLowerCase().includes(q) || s.farmCode?.toLowerCase().includes(q) || s.inspector?.toLowerCase().includes(q)
+        ).slice(0, 3).forEach(s => results.push({ type: 'Sampling', icon: '🔬', tab: 'sampling', title: `${s.farmName || s.farmCode} — ${s.overallDecision || '?'}`, sub: `${s.date ? new Date(s.date).toLocaleDateString() : ''} · ${s.inspector || ''}`, color: '#8b5cf6', bg: '#f5f3ff' }));
+        return results.slice(0, 10);
+    }, [searchQuery, farms, arrivals, samplings]);
+
+    useEffect(() => {
+        const handler = (e) => { if (searchRef.current && !searchRef.current.contains(e.target)) setSearchOpen(false); };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
     return (
         <div className="layout" onClick={() => { 
             if (isNotificationOpen) setIsNotificationOpen(false); 
@@ -67,76 +128,77 @@ const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notif
                             <span className="nav-text">Dashboard</span>
                         </li>
 
-                        {(userProfile?.role === 'Admin / Developer' || userProfile?.role === 'Hub Receiver' || userProfile?.role === 'Production Manager' || userProfile?.role === 'Quality Manager') && (
+                        {canAccess('log-arrival') && (
                             <li className={`nav-item ${activeTab === 'log-arrival' ? 'active' : ''}`} onClick={() => onTabChange('log-arrival')}>
                                 <span className="nav-icon"><ClipboardEdit size={20} /></span>
                                 <span className="nav-text">Log Arrival</span>
                             </li>
                         )}
 
-                        {(userProfile?.role === 'Admin / Developer' || userProfile?.role === 'Quality Manager' || userProfile?.role === 'Quality Supervisor') && (
+                        {canAccess('sampling') && (
                             <li className={`nav-item ${activeTab === 'sampling' ? 'active' : ''}`} onClick={() => onTabChange('sampling')}>
                                 <span className="nav-icon"><TestTubes size={20} /></span>
                                 <span className="nav-text">Daily Sampling</span>
                             </li>
                         )}
 
-                        {(userProfile?.role === 'Admin / Developer' || userProfile?.role === 'Production Manager' || userProfile?.role === 'Production Supervisor') && (
+                        {canAccess('farms') && (
                             <li className={`nav-item ${activeTab === 'farms' ? 'active' : ''}`} onClick={() => onTabChange('farms')}>
                                 <span className="nav-icon"><Leaf size={20} /></span>
                                 <span className="nav-text">Farms &amp; Growers</span>
                             </li>
                         )}
 
-                        {(userProfile?.role === 'Admin / Developer' || userProfile?.role === 'Accounting Staff' || userProfile?.role === 'Accounting Manager' || userProfile?.role === 'Shipping Documentation Supervisor') && (
+                        {canAccess('consignees') && (
                             <li className={`nav-item ${activeTab === 'consignees' ? 'active' : ''}`} onClick={() => onTabChange('consignees')}>
                                 <span className="nav-icon"><Handshake size={20} /></span>
                                 <span className="nav-text">Consignees</span>
                             </li>
                         )}
 
-                        {(userProfile?.role === 'Admin / Developer' || userProfile?.role === 'Hub Operations In-Charge' || userProfile?.role === 'Shipping Documentation Supervisor' || userProfile?.role === 'Logistics Supervisor' || userProfile?.role === 'Hub Receiver') && (
+                        {canAccess('containers-list') && (
                             <li className={`nav-item ${activeTab === 'new-container' || activeTab === 'containers-list' || activeTab === 'edit-container' ? 'active' : ''}`} onClick={() => onTabChange('containers-list')}>
                                 <span className="nav-icon"><Ship size={20} /></span>
                                 <span className="nav-text">Container Hub</span>
                             </li>
                         )}
 
-                        {(userProfile?.role === 'Admin / Developer' || userProfile?.role === 'Hub Operations In-Charge' || userProfile?.role === 'Production Manager') && (
+                        {canAccess('inventory') && (
                             <li className={`nav-item ${activeTab === 'inventory' ? 'active' : ''}`} onClick={() => onTabChange('inventory')}>
                                 <span className="nav-icon"><Package size={20} /></span>
                                 <span className="nav-text">Materials Inventory</span>
                             </li>
                         )}
 
-                        {(userProfile?.role === 'Admin / Developer' || userProfile?.role === 'Hub Operations In-Charge' || userProfile?.role === 'Shipping Documentation Supervisor' || userProfile?.role === 'Logistics Supervisor') && (
+                        {canAccess('shipment-tracker') && (
                             <li className={`nav-item ${activeTab === 'shipment-tracker' ? 'active' : ''}`} onClick={() => onTabChange('shipment-tracker')}>
                                 <span className="nav-icon"><Globe size={20} /></span>
                                 <span className="nav-text">Shipment Tracker</span>
                             </li>
                         )}
 
-                        {(userProfile?.role === 'Admin / Developer' || userProfile?.role === 'Production Manager' || userProfile?.role === 'Quality Manager' || userProfile?.role === 'Accounting Staff') && (
+                        {canAccess('reports') && (
                             <li className={`nav-item ${activeTab === 'reports' ? 'active' : ''}`} onClick={() => onTabChange('reports')}>
                                 <span className="nav-icon"><LineChart size={20} /></span>
                                 <span className="nav-text">Reports</span>
                             </li>
                         )}
 
-                        {(userProfile?.role === 'Admin / Developer' || userProfile?.role === 'Accounting Staff' || userProfile?.role === 'Accounting Manager') && (
+                        {canAccess('accounting') && (
                             <li className={`nav-item ${activeTab === 'accounting' ? 'active' : ''}`} onClick={() => onTabChange('accounting')}>
                                 <span className="nav-icon"><Calculator size={20} /></span>
                                 <span className="nav-text">Accounting &amp; Billing</span>
                             </li>
                         )}
 
-                        {(userProfile?.role === 'Admin / Developer' || userProfile?.role === 'Accounting Manager' || userProfile?.role === 'HR Manager') && (
+                        {canAccess('payroll') && (
                             <li className={`nav-item ${activeTab === 'payroll' ? 'active' : ''}`} onClick={() => onTabChange('payroll')}>
                                 <span className="nav-icon"><Users size={20} /></span>
                                 <span className="nav-text">Payroll &amp; HR</span>
                             </li>
                         )}
-                        {(userProfile?.role === 'Admin / Developer') && (
+
+                        {isAdmin && (
                             <li className={`nav-item ${activeTab === 'user-management' ? 'active' : ''}`} onClick={() => onTabChange('user-management')}>
                                 <span className="nav-icon"><UserCog size={20} /></span>
                                 <span className="nav-text">Users &amp; Roles</span>
@@ -183,8 +245,57 @@ const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notif
                         <span className={`hamburger-line ${isMobileSidebarOpen ? 'open' : ''}`}></span>
                         <span className={`hamburger-line ${isMobileSidebarOpen ? 'open' : ''}`}></span>
                     </button>
-                    <div className="header-search">
-                        <input type="text" className="input-field" placeholder="Search arrivals, growers..." />
+                    <div className="header-search" ref={searchRef} style={{ position: 'relative' }}>
+                        <input
+                            type="text"
+                            className="input-field"
+                            placeholder="Search farms, arrivals, samplings…"
+                            value={searchQuery}
+                            onChange={e => { setSearchQuery(e.target.value); setSearchOpen(true); }}
+                            onFocus={() => setSearchOpen(true)}
+                            onKeyDown={e => e.key === 'Escape' && setSearchOpen(false)}
+                            style={{ paddingLeft: '2rem' }}
+                        />
+                        <span style={{ position: 'absolute', left: '0.6rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.9rem', pointerEvents: 'none' }}>🔍</span>
+                        {searchOpen && searchQuery.trim().length >= 2 && (
+                            <div style={{
+                                position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0,
+                                background: 'white', borderRadius: '12px', boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+                                border: '1px solid #e2e8f0', zIndex: 9999, overflow: 'hidden', minWidth: '320px'
+                            }}>
+                                {searchResults.length === 0 ? (
+                                    <div style={{ padding: '1.25rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem' }}>No results for "{searchQuery}"</div>
+                                ) : (
+                                    <div>
+                                        {searchResults.map((r, i) => (
+                                            <button
+                                                key={i}
+                                                onClick={() => { onTabChange(r.tab); setSearchQuery(''); setSearchOpen(false); }}
+                                                style={{
+                                                    display: 'flex', alignItems: 'center', gap: '0.75rem',
+                                                    width: '100%', padding: '0.65rem 1rem', border: 'none',
+                                                    background: 'white', cursor: 'pointer', textAlign: 'left',
+                                                    borderBottom: i < searchResults.length - 1 ? '1px solid #f1f5f9' : 'none',
+                                                    transition: 'background 0.1s'
+                                                }}
+                                                onMouseEnter={e => e.currentTarget.style.background = r.bg}
+                                                onMouseLeave={e => e.currentTarget.style.background = 'white'}
+                                            >
+                                                <span style={{ fontSize: '1.1rem', flexShrink: 0 }}>{r.icon}</span>
+                                                <div style={{ flex: 1, minWidth: 0 }}>
+                                                    <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.title}</div>
+                                                    <div style={{ fontSize: '0.73rem', color: '#64748b' }}>{r.sub}</div>
+                                                </div>
+                                                <span style={{ fontSize: '0.68rem', fontWeight: 700, color: r.color, background: r.bg, padding: '0.15rem 0.45rem', borderRadius: '4px', flexShrink: 0 }}>{r.type}</span>
+                                            </button>
+                                        ))}
+                                        <div style={{ padding: '0.5rem 1rem', background: '#f8fafc', fontSize: '0.72rem', color: '#94a3b8', borderTop: '1px solid #e2e8f0' }}>
+                                            {searchResults.length} result{searchResults.length !== 1 ? 's' : ''} · Press Esc to close
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                     <div className="header-actions">
                         {/* Sync / Refresh Button */}
@@ -315,18 +426,18 @@ const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notif
                     <span className="mobile-nav-label">Log</span>
                 </button>
                 <button
+                    className={`mobile-nav-btn ${activeTab === 'sampling' ? 'active' : ''}`}
+                    onClick={() => handleMobileTabChange('sampling')}
+                >
+                    <span className="mobile-nav-icon">&#x1F52C;</span>
+                    <span className="mobile-nav-label">Sampling</span>
+                </button>
+                <button
                     className={`mobile-nav-btn ${activeTab === 'containers-list' || activeTab === 'new-container' ? 'active' : ''}`}
                     onClick={() => handleMobileTabChange('containers-list')}
                 >
                     <span className="mobile-nav-icon">&#x1F6A2;</span>
                     <span className="mobile-nav-label">Containers</span>
-                </button>
-                <button
-                    className={`mobile-nav-btn ${activeTab === 'reports' ? 'active' : ''}`}
-                    onClick={() => handleMobileTabChange('reports')}
-                >
-                    <span className="mobile-nav-icon">&#x1F4C8;</span>
-                    <span className="mobile-nav-label">Reports</span>
                 </button>
                 <button
                     className="mobile-nav-btn"

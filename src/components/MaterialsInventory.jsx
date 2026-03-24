@@ -156,13 +156,18 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
-    // PERSISTENCE KEY NAMES
-    const DELIVERIES_KEY = 'farm_material_deliveries';
-
     // State for Physical Deliveries (Usage)
-    const [deliveries, setDeliveries] = useState(() => {
-        try { return JSON.parse(localStorage.getItem(DELIVERIES_KEY) || '[]'); } catch { return []; }
-    });
+    const [deliveries, setDeliveries] = useState([]);
+
+    useEffect(() => {
+        const fetchDeliveries = async () => {
+            const { data, error } = await supabase.from('material_deliveries').select('*');
+            if (!error && data) {
+                setDeliveries(data);
+            }
+        };
+        fetchDeliveries();
+    }, []);
 
     const [farmFilter, setFarmFilter] = useState('ALL');
     const [expandedFarm, setExpandedFarm] = useState(null);
@@ -176,10 +181,7 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
     const [bulkDate, setBulkDate] = useState(new Date().toISOString().split('T')[0]);
     const [bulkItems, setBulkItems] = useState([{ itemCode: '', quantity: '' }]);
 
-    const saveDeliveries = (newDeliveries) => {
-        setDeliveries(newDeliveries);
-        localStorage.setItem(DELIVERIES_KEY, JSON.stringify(newDeliveries));
-    };
+
 
     // COMPUTED VALUES
     
@@ -230,13 +232,12 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
         });
     };
 
-    const handleBulkSubmit = () => {
+    const handleBulkSubmit = async () => {
         if (!bulkFarm) { alert('Please select a farm.'); return; }
         const validItems = bulkItems.filter(it => it.itemCode && it.quantity > 0);
         if (validItems.length === 0) { alert('Add at least one item with qty > 0.'); return; }
 
         const newEntries = validItems.map(it => ({
-            id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
             date: bulkDate,
             farmCode: bulkFarm,
             itemCode: it.itemCode,
@@ -244,16 +245,32 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
             referenceNo: bulkRef
         }));
 
-        saveDeliveries([...newEntries, ...deliveries]);
+        const { data, error } = await supabase.from('material_deliveries').insert(newEntries).select();
+        
+        if (error) {
+            console.error('Insert error:', error);
+            alert('Failed to save deliveries to database: ' + error.message);
+            return;
+        }
+
+        if (data) {
+            setDeliveries(prev => [...data, ...prev]);
+        }
+        
         setIsBulkDeliveryOpen(false);
 
         // Reset
         setBulkFarm(''); setBulkRef(''); setBulkItems([{ itemCode: '', quantity: '' }]);
     };
 
-    const handleDeleteRecord = (id) => {
+    const handleDeleteRecord = async (id) => {
         if (!window.confirm('Delete this record?')) return;
-        saveDeliveries(deliveries.filter(d => d.id !== id));
+        const { error } = await supabase.from('material_deliveries').delete().eq('id', id);
+        if (error) {
+            alert('Failed to delete: ' + error.message);
+            return;
+        }
+        setDeliveries(prev => prev.filter(d => d.id !== id));
     };
 
     // ITEM MANAGEMENT (SUPABASE)
@@ -390,12 +407,12 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
                     .sig-line { border-top: 1px solid #000; padding-top: 4px; font-size: 11px; font-weight: bold; }
                     .sig-title { font-size: 10px; margin-top: 2px; }
                     .remarks-row { text-align: left; font-size: 11px; font-weight: bold; text-transform: uppercase; border: 1px solid #000; border-top: none; padding: 6px 8px; }
-                    .logo-placeholder { position: absolute; left: 0; top: 0; font-weight: 800; color: #16a34a; font-size: 20px; text-align: center; line-height: 1; border: 2px solid #16a34a; padding: 4px; border-radius: 4px; }
+                    .logo-img { position: absolute; left: 0; top: 0; width: 60px; height: auto; }
                 </style>
             </head>
             <body>
                 <div class="header">
-                    <div class="logo-placeholder">LAVC</div>
+                    <img src="${window.location.origin}/lavc-logo.png" class="logo-img" alt="LAVC Logo" />
                     <h1>LFJ AGRI VENTURES CORP.</h1>
                     <p>PUROK 3, SAN VICENTE PANABO CITY DAVAO DEL NORTE</p>
                     
