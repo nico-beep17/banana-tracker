@@ -341,15 +341,136 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
 
     const closeModal = () => { setIsFormOpen(false); setEditItemId(null); setNewItem(initialItemState); setErrorMsg(null); };
 
-    const handlePrintReport = () => {
+     const handlePrintReport = () => {
         const printWindow = window.open('', '_blank');
         printWindow.document.write(`<html><head><title>Inventory Report</title><style>body{font-family:sans-serif;padding:2rem}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background:#f4f4f4}</style></head>
         <body><h1>Materials Inventory Report</h1><p>Generated: ${new Date().toLocaleString()}</p>
-        <table><thead><tr><th>Code</th><th>Item Name</th><th>Total In</th><th>Total Out</th><th>Delivered</th><th>Global Balance</th></tr></thead><tbody>
-        ${warehouseStock.map(i => `<tr><td>${i.item_code}</td><td>${i.item_name}</td><td>${i.stock_in}</td><td>${i.stock_out}</td><td>${totalDeliveredPerItem[i.item_code] || 0}</td><td><strong>${i.warehouseBalance}</strong></td></tr>`).join('')}
-        </tbody></table></body></html>`);
+        <table><tr><th>Item Code</th><th>Name</th><th>Warehouse Stock</th></tr>
+        ${warehouseStock.map(i => `<tr><td>${i.item_code}</td><td>${i.item_name}</td><td>${i.warehouseBalance}</td></tr>`).join('')}
+        </table></body></html>`);
         printWindow.document.close();
         printWindow.print();
+    };
+
+    const handlePrintMIS = (misNumber, date, farmCode) => {
+        // Collect all delivery records with this MIS Number, Date, and Farm
+        const deliveredItems = deliveries.filter(d => 
+            d.referenceNo === misNumber && d.date === date && d.farmCode === farmCode
+        );
+
+        if (deliveredItems.length === 0) {
+            alert("No items found for this MIS Number.");
+            return;
+        }
+
+        const farmName = farms.find(f => (f.farmCode || f.code) === farmCode)?.name || farmCode;
+
+        const dateObj = new Date(date);
+        const formattedDate = !isNaN(dateObj) ? dateObj.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : date;
+
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write(`
+            <html>
+            <head>
+                <title>Materials Issuance Slip - ${misNumber}</title>
+                <style>
+                    body { font-family: 'Arial', sans-serif; font-size: 13px; margin: 0; padding: 40px; }
+                    .header { text-align: center; margin-bottom: 20px; position: relative; }
+                    .header h1 { font-family: 'Arial Black', Impact, sans-serif; font-size: 24px; margin: 0; letter-spacing: 1px; }
+                    .header p { font-size: 11px; margin: 2px 0 0 0; }
+                    .slip-title { text-align: center; margin: 25px 0 15px 0; font-size: 18px; font-weight: bold; letter-spacing: 2px; }
+                    .top-right-info { position: absolute; right: 0; top: 25px; text-align: right; }
+                    .mis-no { color: #dc2626; font-weight: bold; font-size: 14px; margin-bottom: 5px; font-family: 'Courier New', monospace; }
+                    .date-text { text-transform: uppercase; font-size: 11px; }
+                    table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+                    th, td { border: 1px solid #000; padding: 6px 8px; text-align: center; }
+                    th { font-weight: bold; font-size: 12px; }
+                    td.desc { text-align: left; text-transform: uppercase; font-size: 11px; font-weight: bold; }
+                    .signatures { display: grid; grid-template-columns: 1fr 1.2fr 1fr; gap: 40px; margin-top: 60px; text-align: center; }
+                    .sig-line { border-top: 1px solid #000; padding-top: 4px; font-size: 11px; font-weight: bold; }
+                    .sig-title { font-size: 10px; margin-top: 2px; }
+                    .remarks-row { text-align: left; font-size: 11px; font-weight: bold; text-transform: uppercase; border: 1px solid #000; border-top: none; padding: 6px 8px; }
+                    .logo-placeholder { position: absolute; left: 0; top: 0; font-weight: 800; color: #16a34a; font-size: 20px; text-align: center; line-height: 1; border: 2px solid #16a34a; padding: 4px; border-radius: 4px; }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <div class="logo-placeholder">LAVC</div>
+                    <h1>LFJ AGRI VENTURES CORP.</h1>
+                    <p>PUROK 3, SAN VICENTE PANABO CITY DAVAO DEL NORTE</p>
+                    
+                    <div class="top-right-info">
+                        <div class="mis-no">No. ${misNumber || '__________'}</div>
+                        <div class="date-text">DATE: ${formattedDate}</div>
+                    </div>
+                </div>
+
+                <div class="slip-title">MATERIALS ISSUANCE SLIP</div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 15%">ITEM CODE</th>
+                            <th style="width: 40%">ITEM DESCRIPTION</th>
+                            <th style="width: 10%">UOM</th>
+                            <th style="width: 15%">QUANTITY</th>
+                            <th style="width: 20%">PURPOSE/ACTIVITY</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${deliveredItems.map((item, idx) => {
+                            const itemName = inventoryItems.find(i => i.item_code === item.itemCode)?.item_name || item.itemCode;
+                            // Infer UOM if possible, else default to PCS
+                            let uom = 'PCS';
+                            if (itemName.toUpperCase().includes('RUBBER BAND') || itemName.toUpperCase().includes('GLUE')) uom = 'KILO';
+                            if (itemName.toUpperCase().includes('STICKER')) uom = 'SHEET';
+                            
+                            return `
+                                <tr>
+                                    <td>${item.itemCode}</td>
+                                    <td class="desc">${itemName}</td>
+                                    <td>${uom}</td>
+                                    <td style="font-weight: bold">${item.quantity}</td>
+                                    ${idx === 0 ? `<td rowspan="${Math.max(deliveredItems.length, 5)}" style="vertical-align: middle; font-size: 11px;">PACKING HOUSE USED</td>` : ''}
+                                </tr>
+                            `;
+                        }).join('')}
+                        ${Array.from({ length: Math.max(0, 10 - deliveredItems.length) }).map((_, idx) => `
+                            <tr>
+                                <td>&nbsp;</td>
+                                <td></td>
+                                <td></td>
+                                <td></td>
+                                ${(deliveredItems.length === 0 && idx === 0) ? `<td rowspan="10"></td>` : ''}
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+                <div class="remarks-row">
+                    REMARKS @ ${farmName.toUpperCase()}
+                </div>
+
+                <div class="signatures">
+                    <div>
+                        <div style="height: 40px;"></div>
+                        <div class="sig-line">ISSUED BY</div>
+                        <div class="sig-title">WAREHOUSEMAN</div>
+                    </div>
+                    <div>
+                        <div style="height: 40px;"></div>
+                        <div class="sig-line">TRUCK DRIVER/PLATE #</div>
+                    </div>
+                    <div>
+                        <div style="height: 40px;"></div>
+                        <div class="sig-line">RECEIVED BY</div>
+                        <div class="sig-title">GROWER/END USER</div>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
+        setTimeout(() => printWindow.print(), 250);
     };
 
     const filteredItems = warehouseStock.filter(item => 
@@ -519,7 +640,10 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
                                                                 </td>
                                                                 <td data-label="Ref">{row.referenceNo || '—'}</td>
                                                                 <td data-label="" className="text-center">
-                                                                    <button onClick={() => handleDeleteRecord(row.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}><Trash2 size={14} /></button>
+                                                                    <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
+                                                                        <button onClick={() => handleDeleteRecord(row.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }} title="Delete History"><Trash2 size={16} /></button>
+                                                                        <button onClick={() => handlePrintMIS(row.referenceNo, row.date, farmCode)} style={{ background: 'none', border: 'none', color: '#3b82f6', cursor: 'pointer' }} title="Print MIS Slip"><Printer size={16} /></button>
+                                                                    </div>
                                                                 </td>
                                                             </tr>
                                                         ))}
@@ -557,8 +681,8 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
                                     <input type="date" className="input-field" value={bulkDate} onChange={e => setBulkDate(e.target.value)} />
                                 </div>
                                 <div className="form-group">
-                                    <label className="label">Operation/DR Ref</label>
-                                    <input type="text" className="input-field" value={bulkRef} onChange={e => setBulkRef(e.target.value)} placeholder="e.g. BATCH-2025" />
+                                    <label className="label">MIS Number</label>
+                                    <input type="text" className="input-field" value={bulkRef} onChange={e => setBulkRef(e.target.value)} placeholder="e.g. MIS-0007" />
                                 </div>
                             </div>
 
