@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { Package, Search, Printer, Plus, Edit2, Archive, AlertTriangle, TrendingUp, TrendingDown, Box, Trash2, ListPlus, Warehouse, Tractor, ChevronDown, ChevronRight, ClipboardList, Truck, Camera, Loader, CheckCircle, XCircle } from 'lucide-react';
 import './MaterialsInventory.css';
