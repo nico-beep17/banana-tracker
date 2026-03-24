@@ -813,7 +813,7 @@ function App() {
           }
         }
       }
-      return { id: row.id, locked_rate: lockedRate, approval_status: 'APPROVED', approved_by: user?.id };
+      return { ...row, locked_rate: lockedRate, approval_status: 'APPROVED', approved_by: user?.id };
     });
 
     // ── Step 3: Batch-update all rows in one upsert ──
