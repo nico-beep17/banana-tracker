@@ -366,7 +366,7 @@ const Payroll = ({ showToast, employees = [], dtrRecords = [], attendanceLocatio
             )}
 
             {activeTab === 'employees' && (() => {
-                const canViewOfficers = userProfile?.role === 'Administrator' ||
+                const canViewOfficers = (userProfile?.role === 'Administrator' || userProfile?.role === 'Admin / Developer') ||
                     userProfile?.role === 'HR Manager' ||
                     userProfile?.role === 'Accounting Manager';
                 const rankAndFile = employees.filter(e => e.employee_type !== 'OFFICER');

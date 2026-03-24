@@ -339,7 +339,7 @@ const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, setAr
                     <tbody>
                         {displayArrivals.map((arrival, index) => {
                             const isApproved = arrival.approval_status === 'APPROVED';
-                            const canApprove = userProfile?.role === 'Administrator' || userProfile?.role === 'Hub Operations In-Charge' || userProfile?.role === 'Data Management Supervisor and Hub operations in-charge' || userProfile?.role === 'Production Supervisor';
+                            const canApprove = userProfile?.role === 'Administrator' || userProfile?.role === 'Admin / Developer' || userProfile?.role === 'Hub Operations In-Charge' || userProfile?.role === 'Data Management Supervisor and Hub operations in-charge' || userProfile?.role === 'Production Supervisor';
                             const confirmKey = arrival.batchId || arrival.id;
                             const isConfirming = confirmApprovalId === confirmKey;
 

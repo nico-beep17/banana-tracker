@@ -6,7 +6,7 @@ import AIInsightCarousel from './AIInsightCarousel';
 const Dashboard = ({ metrics, userProfile, onNavigate, arrivals = [], containers = [], samplings = [], farms = [], weeklyRates = [] }) => {
 
     const role = userProfile?.role || 'Guest';
-    const isAdmin = role === 'Administrator';
+    const isAdmin = role === 'Administrator' || role === 'Admin / Developer';
 
     // Calculate percentages securely
     const classAPercent = metrics.totalBoxes > 0

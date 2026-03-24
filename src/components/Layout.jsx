@@ -13,7 +13,7 @@ const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notif
     const unreadCount = notifications.filter(n => !n.read).length;
 
     const role = userProfile?.role || 'Guest';
-    const isAdmin = role === 'Administrator';
+    const isAdmin = role === 'Administrator' || role === 'Admin / Developer';
 
     // canAccess: Admins bypass everything. Otherwise check allowed_modules if set, else fall back to role.
     const canAccess = (moduleKey) => {

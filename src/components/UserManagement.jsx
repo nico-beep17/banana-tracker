@@ -39,6 +39,7 @@ const ROLES = [
 // Default module access per role (used as fallback when no custom permissions saved)
 const DEFAULT_ACCESS = {
     'Administrator': ALL_MODULES.map(m => m.key),
+    'Admin / Developer': ALL_MODULES.map(m => m.key),
     'Hub Receiver': ['dashboard', 'log-arrival', 'containers-list', 'sampling'],
     'Production Manager': ['dashboard', 'log-arrival', 'farms', 'sampling', 'reports', 'containers-list', 'inventory'],
     'Production Supervisor': ['dashboard', 'log-arrival', 'farms', 'sampling'],
@@ -137,7 +138,7 @@ export default function UserManagement({ userProfile }) {
         }
     };
 
-    if (userProfile?.role !== 'Administrator') {
+    if (userProfile?.role !== 'Administrator' && userProfile?.role !== 'Admin / Developer') {
         return (
             <div className="placeholder-state">
                 <AlertCircle size={48} color="#ef4444" />
@@ -167,7 +168,7 @@ export default function UserManagement({ userProfile }) {
                     <div style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-tertiary)' }}>No user profiles found.</div>
                 ) : profiles.map(profile => {
                     const isExpanded = expandedId === profile.id;
-                    const isAdmin = profile.role === 'Administrator';
+                    const isAdmin = profile.role === 'Administrator' || profile.role === 'Admin / Developer';
                     const isPending = profile.role === 'Pending' || profile.role === 'Guest';
                     const perms = localPerms[profile.id] || new Set();
                     const isSaving = savingPermId === profile.id;
