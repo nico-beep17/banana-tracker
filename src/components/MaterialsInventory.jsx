@@ -487,7 +487,7 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
                         <Package size={28} color="var(--color-primary-dark)" />
                         Materials Hub
                     </h2>
-                    <p style={{ color: 'var(--text-tertiary)', margin: '0.25rem 0 0', fontSize: '0.9rem' }}>Comprehensive tracking of earmarks, usage, and global stock.</p>
+                    <p style={{ color: 'var(--text-tertiary)', margin: '0.25rem 0 0', fontSize: '0.9rem' }}>Comprehensive tracking of inventory stock and direct farm deliveries.</p>
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                     <button className="btn-secondary" onClick={handlePrintReport}><Printer size={16} /> Print</button>
@@ -501,21 +501,9 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
                     <button className="btn-primary" onClick={() => setIsFormOpen(true)}><Plus size={16} /> Register Item</button>
                 </div>
             </div>
-
-            {/* View Switcher */}
-            <div className="chrome-tabs-container" style={{ marginBottom: '1.5rem' }}>
-                <button className={`chrome-tab ${activeView === 'global' ? 'active' : ''}`} onClick={() => setActiveView('global')}>
-                    <Warehouse size={16} /> Global Warehouse
-                </button>
-                <button className={`chrome-tab ${activeView === 'farm' ? 'active' : ''}`} onClick={() => setActiveView('farm')}>
-                    <Tractor size={16} /> Farm Pools
-                </button>
-            </div>
-
             {/* GLOBAL VIEW */}
-            {activeView === 'global' && (
-                <div className="animation-fade-in">
-                    <div className="metrics-grid" style={{ marginBottom: '1.5rem', gridTemplateColumns: 'repeat(2, 1fr)' }}>
+            <div className="animation-fade-in">
+                <div className="metrics-grid" style={{ marginBottom: '1.5rem', gridTemplateColumns: 'repeat(2, 1fr)' }}>
                         <div className="metric-card">
                             <span className="metric-label">Warehouse Items</span>
                             <span className="metric-value">{inventoryItems.length}</span>
@@ -533,6 +521,9 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
                                 <input type="text" className="search-input" placeholder="Search materials..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
                             </div>
                             <button className="btn-secondary" onClick={() => setIsBatchFormOpen(true)}><ListPlus size={16} /> Batch Update</button>
+                            <button className="btn-primary" onClick={() => setIsBulkDeliveryOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                <Truck size={16} /> Physical Delivery
+                            </button>
                         </div>
                         <div className="table-responsive">
                             <table className="banana-table">
@@ -569,21 +560,11 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
                             </table>
                         </div>
                     </div>
-                </div>
-            )}
 
-            {/* FARM VIEW */}
-            {activeView === 'farm' && (
-                <div className="animation-fade-in">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '2rem 0 1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
                         <div>
                             <h3 style={{ margin: 0 }}>Farm Deliveries Log</h3>
                             <p style={{ margin: 0, color: '#64748b', fontSize: '0.9rem' }}>Record and view direct deliveries to farms.</p>
-                        </div>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                            <button className="btn-primary" onClick={() => setIsBulkDeliveryOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                <Truck size={16} /> Physical Delivery
-                            </button>
                         </div>
                     </div>
 
@@ -657,9 +638,8 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
                         );
                     })}
                 </div>
-            )}
 
-            {/* BULK MODALS (DELIVERY) */}
+            {/* MODALS */}
             {isBulkDeliveryOpen && (
                 <div className="inventory-form-overlay" onClick={() => setIsBulkDeliveryOpen(false)}>
                     <div className="inventory-form-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '700px' }}>
