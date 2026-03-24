@@ -1,24 +1,163 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { supabase } from '../supabaseClient';
-import { Package, Search, Printer, Plus, Edit2, Archive, AlertTriangle, TrendingUp, TrendingDown, Box, Trash2, ListPlus, Warehouse, Tractor, ChevronDown, ChevronRight, ClipboardList, Truck } from 'lucide-react';
+import { Package, Search, Printer, Plus, Edit2, Archive, AlertTriangle, TrendingUp, TrendingDown, Box, Trash2, ListPlus, Warehouse, Tractor, ChevronDown, ChevronRight, ClipboardList, Truck, Camera, Loader, CheckCircle, XCircle } from 'lucide-react';
 import './MaterialsInventory.css';
 
 const MaterialsInventory = ({ inventoryItems = [], setInventoryItems, farms = [] }) => {
-    const [activeView, setActiveView] = useState('global'); // 'global' | 'farm'
+    const [activeView, setActiveView] = useState('global');
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isBatchFormOpen, setIsBatchFormOpen] = useState(false);
     const [editItemId, setEditItemId] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [errorMsg, setErrorMsg] = useState(null);
 
-    // PERSISTENCE KEY NAMES
-    const ALLOCATIONS_KEY = 'farm_material_allocations';
-    const DELIVERIES_KEY = 'farm_material_deliveries';
+    // ── AI Receipt Scanner ────────────────────────────────────────────────────
+    const [isScanOpen, setIsScanOpen] = useState(false);
+    const [scanImage, setScanImage] = useState(null);       // base64 data URL
+    const [scanImageFile, setScanImageFile] = useState(null); // File object
+    const [scanState, setScanState] = useState('idle');     // idle | scanning | preview | saving | done | error
+    const [scanError, setScanError] = useState('');
+    const [scanResult, setScanResult] = useState(null);    // { drNo, date, supplier, items: [{code,name,qty}] }
+    const fileInputRef = useRef(null);
 
-    // State for Earmarks (Allocations)
-    const [allocations, setAllocations] = useState(() => {
-        try { return JSON.parse(localStorage.getItem(ALLOCATIONS_KEY) || '[]'); } catch { return []; }
-    });
+    const handleFileSelect = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setScanImageFile(file);
+        const reader = new FileReader();
+        reader.onload = (ev) => setScanImage(ev.target.result);
+        reader.readAsDataURL(file);
+        setScanState('idle');
+        setScanResult(null);
+        setScanError('');
+    };
+
+    const handleScanReceipt = async () => {
+        if (!scanImage) return;
+        setScanState('scanning');
+        setScanError('');
+        try {
+            const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+            if (!apiKey) throw new Error('OpenAI API Key missing. Check .env file.');
+
+            // Convert image to base64 content (strip data URL prefix)
+            const base64 = scanImage.split(',')[1];
+            const mimeType = scanImage.split(';')[0].split(':')[1] || 'image/jpeg';
+
+            const body = {
+                model: 'gpt-4o',
+                max_tokens: 1000,
+                messages: [{
+                    role: 'user',
+                    content: [
+                        {
+                            type: 'text',
+                            text: `You are a data extraction AI for an inventory system at LFJ Agri-Ventures Corp, a banana exporting company.
+Analyze this supplier delivery receipt image and extract ALL line items.
+
+Return ONLY valid JSON (no markdown, no explanation) in this exact format:
+{
+  "drNo": "string (DR/receipt number)",
+  "date": "YYYY-MM-DD (receipt date)",
+  "supplier": "string (supplier company name)",
+  "items": [
+    {
+      "code": "short item code like COVER-40ECT or BODY-51ECT or BOTPAD-200",
+      "name": "full item name from receipt",
+      "qty": number
+    }
+  ]
+}
+
+Banana packaging items to recognize:
+- "PREMIUM BANANAS COVER" or "COVER WKL" or "40ECT" = banana box cover (code: COVER-40ECT)
+- "LFJ BODY" or "BODY - 51ECT" = banana box body (code: BODY-51ECT)
+- "ALL IN BOTTOM PADS" or "BOTTOM PADS" or "200GSM" = bottom pads (code: BOTPAD-200GSM)
+- Any other item = use a short descriptive code
+
+For quantities, use the printed number in the "Quantity" column, not bundle counts. Only return items that have a clear quantity.`
+                        },
+                        {
+                            type: 'image_url',
+                            image_url: { url: `data:${mimeType};base64,${base64}`, detail: 'high' }
+                        }
+                    ]
+                }]
+            };
+
+            const res = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+                body: JSON.stringify(body)
+            });
+            if (!res.ok) throw new Error(`OpenAI API error: ${res.status}`);
+            const json = await res.json();
+            const raw = json.choices?.[0]?.message?.content?.trim();
+            if (!raw) throw new Error('No response from AI.');
+
+            // Parse JSON (strip any accidental markdown)
+            const cleaned = raw.replace(/^```json\n?|^```\n?|\n?```$/g, '').trim();
+            const parsed = JSON.parse(cleaned);
+
+            if (!parsed.items || parsed.items.length === 0)
+                throw new Error('No items detected. Try a clearer photo.');
+
+            setScanResult(parsed);
+            setScanState('preview');
+        } catch (err) {
+            console.error('Scan error:', err);
+            setScanError(err.message || 'Unknown error');
+            setScanState('error');
+        }
+    };
+
+    const handleScanConfirm = async () => {
+        if (!scanResult?.items?.length) return;
+        setScanState('saving');
+        try {
+            const payloads = scanResult.items
+                .filter(it => it.qty > 0)
+                .map(it => {
+                    const existing = inventoryItems.find(i =>
+                        i.item_code === it.code ||
+                        i.item_name?.toLowerCase().includes(it.name?.toLowerCase().slice(0, 10))
+                    );
+                    return {
+                        ...(existing ? { id: existing.id } : {}),
+                        item_code: it.code,
+                        item_name: it.name,
+                        supplier_details: scanResult.supplier || 'Scanned Receipt',
+                        stock_in: (existing?.stock_in || 0) + Number(it.qty),
+                        stock_out: existing?.stock_out || 0,
+                        last_updated: new Date().toISOString()
+                    };
+                });
+
+            const { data, error } = await supabase.from('materials_inventory').upsert(payloads).select();
+            if (error) throw new Error(error.message);
+            if (data) {
+                const ids = data.map(d => d.id);
+                setInventoryItems(prev => [...data, ...prev.filter(p => !ids.includes(p.id))]);
+            }
+            setScanState('done');
+        } catch (err) {
+            setScanError(err.message);
+            setScanState('error');
+        }
+    };
+
+    const closeScan = () => {
+        setIsScanOpen(false);
+        setScanImage(null);
+        setScanImageFile(null);
+        setScanState('idle');
+        setScanResult(null);
+        setScanError('');
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
+    // PERSISTENCE KEY NAMES
+    const DELIVERIES_KEY = 'farm_material_deliveries';
 
     // State for Physical Deliveries (Usage)
     const [deliveries, setDeliveries] = useState(() => {
@@ -29,7 +168,6 @@ const MaterialsInventory = ({ inventoryItems = [], setInventoryItems, farms = []
     const [expandedFarm, setExpandedFarm] = useState(null);
 
     // Modals
-    const [isBulkAllocateOpen, setIsBulkAllocateOpen] = useState(false);
     const [isBulkDeliveryOpen, setIsBulkDeliveryOpen] = useState(false);
     
     // Bulk Forms State
@@ -37,11 +175,6 @@ const MaterialsInventory = ({ inventoryItems = [], setInventoryItems, farms = []
     const [bulkRef, setBulkRef] = useState('');
     const [bulkDate, setBulkDate] = useState(new Date().toISOString().split('T')[0]);
     const [bulkItems, setBulkItems] = useState([{ itemCode: '', quantity: '' }]);
-
-    const saveAllocations = (newAllocations) => {
-        setAllocations(newAllocations);
-        localStorage.setItem(ALLOCATIONS_KEY, JSON.stringify(newAllocations));
-    };
 
     const saveDeliveries = (newDeliveries) => {
         setDeliveries(newDeliveries);
@@ -60,20 +193,6 @@ const MaterialsInventory = ({ inventoryItems = [], setInventoryItems, farms = []
         return result;
     }, [deliveries]);
 
-    // Total earmarked per item (not yet delivered)
-    const totalEarmarkedPerItem = useMemo(() => {
-        const result = {};
-        allocations.forEach(a => {
-            if (!result[a.itemCode]) result[a.itemCode] = 0;
-            result[a.itemCode] += Number(a.quantity) || 0;
-        });
-        // Subtract delivered amounts from earmarked ones to get "current holding"
-        Object.keys(result).forEach(code => {
-            result[code] = Math.max(0, result[code] - (totalDeliveredPerItem[code] || 0));
-        });
-        return result;
-    }, [allocations, totalDeliveredPerItem]);
-
     // Global Stock = stock_in - stock_out - physical deliveries
     const warehouseStock = useMemo(() => {
         return inventoryItems.map(item => {
@@ -86,27 +205,19 @@ const MaterialsInventory = ({ inventoryItems = [], setInventoryItems, farms = []
     // Per-farm balance
     const farmData = useMemo(() => {
         const result = {};
-        // 1. Add all earmarks
-        allocations.forEach(a => {
-            if (!result[a.farmCode]) result[a.farmCode] = { earmarked: {}, history: [], pool: {} };
-            if (!result[a.farmCode].pool[a.itemCode]) result[a.farmCode].pool[a.itemCode] = 0;
-            result[a.farmCode].pool[a.itemCode] += Number(a.quantity) || 0;
-            result[a.farmCode].history.push({ ...a, type: 'ALLOCATION' });
-        });
-        // 2. Subtract deliveries from pool
         deliveries.forEach(d => {
-            if (!result[d.farmCode]) result[d.farmCode] = { earmarked: {}, history: [], pool: {} };
-            if (!result[d.farmCode].pool[d.itemCode]) result[d.farmCode].pool[d.itemCode] = 0;
-            result[d.farmCode].pool[d.itemCode] -= Number(d.quantity) || 0;
+            if (!result[d.farmCode]) result[d.farmCode] = { history: [], delivered: {} };
+            if (!result[d.farmCode].delivered[d.itemCode]) result[d.farmCode].delivered[d.itemCode] = 0;
+            result[d.farmCode].delivered[d.itemCode] += Number(d.quantity) || 0;
             result[d.farmCode].history.push({ ...d, type: 'DELIVERY' });
         });
         return result;
-    }, [allocations, deliveries]);
+    }, [deliveries]);
 
     const farmsWithActivity = useMemo(() => {
-        const set = new Set([...allocations.map(a => a.farmCode), ...deliveries.map(d => d.farmCode)]);
+        const set = new Set([...deliveries.map(d => d.farmCode)]);
         return [...set];
-    }, [allocations, deliveries]);
+    }, [deliveries]);
 
     // BULK HANDLERS
     const addBulkRow = () => setBulkItems(prev => [...prev, { itemCode: '', quantity: '' }]);
@@ -119,21 +230,10 @@ const MaterialsInventory = ({ inventoryItems = [], setInventoryItems, farms = []
         });
     };
 
-    const handleBulkSubmit = (type) => {
+    const handleBulkSubmit = () => {
         if (!bulkFarm) { alert('Please select a farm.'); return; }
         const validItems = bulkItems.filter(it => it.itemCode && it.quantity > 0);
         if (validItems.length === 0) { alert('Add at least one item with qty > 0.'); return; }
-
-        if (type === 'DELIVERY') {
-            // Check if farm has enough in pool
-            for (const it of validItems) {
-                const currentPool = farmData[bulkFarm]?.pool[it.itemCode] || 0;
-                if (it.quantity > currentPool) {
-                    alert(`Not enough '${it.itemCode}' earmarked for this farm. Available: ${currentPool}`);
-                    return;
-                }
-            }
-        }
 
         const newEntries = validItems.map(it => ({
             id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -144,25 +244,16 @@ const MaterialsInventory = ({ inventoryItems = [], setInventoryItems, farms = []
             referenceNo: bulkRef
         }));
 
-        if (type === 'ALLOCATION') {
-            saveAllocations([...newEntries, ...allocations]);
-            setIsBulkAllocateOpen(false);
-        } else {
-            saveDeliveries([...newEntries, ...deliveries]);
-            setIsBulkDeliveryOpen(false);
-        }
+        saveDeliveries([...newEntries, ...deliveries]);
+        setIsBulkDeliveryOpen(false);
 
         // Reset
         setBulkFarm(''); setBulkRef(''); setBulkItems([{ itemCode: '', quantity: '' }]);
     };
 
-    const handleDeleteRecord = (id, type) => {
+    const handleDeleteRecord = (id) => {
         if (!window.confirm('Delete this record?')) return;
-        if (type === 'ALLOCATION') {
-            saveAllocations(allocations.filter(a => a.id !== id));
-        } else {
-            saveDeliveries(deliveries.filter(d => d.id !== id));
-        }
+        saveDeliveries(deliveries.filter(d => d.id !== id));
     };
 
     // ITEM MANAGEMENT (SUPABASE)
@@ -224,7 +315,9 @@ const MaterialsInventory = ({ inventoryItems = [], setInventoryItems, farms = []
 
     const handleAddItem = async (e) => {
         e.preventDefault();
-        const payload = { ...newItem, last_updated: new Date().toISOString() };
+        // Strip computed/virtual fields that don't exist as DB columns
+        const { warehouseBalance, warehouseDelivered, ...cleanItem } = newItem;
+        const payload = { ...cleanItem, last_updated: new Date().toISOString() };
         if (editItemId) {
             const { data, error } = await supabase.from('materials_inventory').update(payload).eq('id', editItemId).select();
             if (error) { setErrorMsg(`⚠️ ${error.message}`); return; }
@@ -233,6 +326,16 @@ const MaterialsInventory = ({ inventoryItems = [], setInventoryItems, farms = []
             const { data, error } = await supabase.from('materials_inventory').insert([payload]).select();
             if (error) { setErrorMsg(`⚠️ ${error.message}`); return; }
             if (data?.[0]) { setInventoryItems(prev => [data[0], ...prev]); closeModal(); }
+        }
+    };
+
+    const handleDeleteInventoryItem = async (id) => {
+        if (!window.confirm('Are you sure you want to permanently delete this item?')) return;
+        const { error } = await supabase.from('materials_inventory').delete().eq('id', id);
+        if (error) {
+            setErrorMsg(`⚠️ Error deleting item: ${error.message}`);
+        } else {
+            setInventoryItems(prev => prev.filter(i => i.id !== id));
         }
     };
 
@@ -265,8 +368,15 @@ const MaterialsInventory = ({ inventoryItems = [], setInventoryItems, farms = []
                     </h2>
                     <p style={{ color: 'var(--text-tertiary)', margin: '0.25rem 0 0', fontSize: '0.9rem' }}>Comprehensive tracking of earmarks, usage, and global stock.</p>
                 </div>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                     <button className="btn-secondary" onClick={handlePrintReport}><Printer size={16} /> Print</button>
+                    <button
+                        className="btn-secondary"
+                        onClick={() => setIsScanOpen(true)}
+                        style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', color: 'white', border: 'none', fontWeight: 700 }}
+                    >
+                        <Camera size={16} /> Scan Receipt
+                    </button>
                     <button className="btn-primary" onClick={() => setIsFormOpen(true)}><Plus size={16} /> Register Item</button>
                 </div>
             </div>
@@ -284,7 +394,7 @@ const MaterialsInventory = ({ inventoryItems = [], setInventoryItems, farms = []
             {/* GLOBAL VIEW */}
             {activeView === 'global' && (
                 <div className="animation-fade-in">
-                    <div className="metrics-grid" style={{ marginBottom: '1.5rem' }}>
+                    <div className="metrics-grid" style={{ marginBottom: '1.5rem', gridTemplateColumns: 'repeat(2, 1fr)' }}>
                         <div className="metric-card">
                             <span className="metric-label">Warehouse Items</span>
                             <span className="metric-value">{inventoryItems.length}</span>
@@ -292,10 +402,6 @@ const MaterialsInventory = ({ inventoryItems = [], setInventoryItems, farms = []
                         <div className="metric-card">
                             <span className="metric-label">Total Stock Units</span>
                             <span className="metric-value">{warehouseStock.reduce((a,c) => a+c.warehouseBalance, 0).toLocaleString()}</span>
-                        </div>
-                        <div className="metric-card">
-                            <span className="metric-label">Earmarked (Reserved)</span>
-                            <span className="metric-value" style={{ color: '#8b5cf6' }}>{Object.values(totalEarmarkedPerItem).reduce((a,c)=>a+c, 0).toLocaleString()}</span>
                         </div>
                     </div>
 
@@ -314,7 +420,6 @@ const MaterialsInventory = ({ inventoryItems = [], setInventoryItems, farms = []
                                         <th>Material</th>
                                         <th className="text-right">Units In</th>
                                         <th className="text-right">Units Out</th>
-                                        <th className="text-right" style={{ color: '#8b5cf6' }}>Earmarked</th>
                                         <th className="text-right" style={{ color: '#ef4444' }}>Delivered</th>
                                         <th className="text-right">Global Stock</th>
                                         <th className="text-center">Action</th>
@@ -329,11 +434,13 @@ const MaterialsInventory = ({ inventoryItems = [], setInventoryItems, farms = []
                                             </td>
                                             <td data-label="In" className="text-right">{item.stock_in}</td>
                                             <td data-label="Out" className="text-right">{item.stock_out}</td>
-                                            <td data-label="Earmarked" className="text-right" style={{ color: '#8b5cf6', fontWeight: 600 }}>{totalEarmarkedPerItem[item.item_code] || 0}</td>
                                             <td data-label="Delivered" className="text-right" style={{ color: '#ef4444', fontWeight: 600 }}>{totalDeliveredPerItem[item.item_code] || 0}</td>
                                             <td data-label="Stock" className="text-right highlight-col" style={{ fontWeight: 800 }}>{item.warehouseBalance}</td>
                                             <td data-label="" className="text-center">
-                                                <button className="btn-secondary btn-sm" onClick={() => { setEditItemId(item.id); setNewItem(item); setIsFormOpen(true); }}>Edit</button>
+                                                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                                                    <button className="btn-secondary btn-sm" onClick={() => { const { warehouseBalance, warehouseDelivered, ...editItem } = item; setEditItemId(item.id); setNewItem(editItem); setIsFormOpen(true); }}>Edit</button>
+                                                    <button className="btn-secondary btn-sm" onClick={() => handleDeleteInventoryItem(item.id)} style={{ color: '#ef4444', borderColor: '#fca5a5' }} title="Delete item"><Trash2 size={16} /></button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
@@ -349,13 +456,10 @@ const MaterialsInventory = ({ inventoryItems = [], setInventoryItems, farms = []
                 <div className="animation-fade-in">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
                         <div>
-                            <h3 style={{ margin: 0 }}>Farm Allocation Pool</h3>
-                            <p style={{ margin: 0, color: '#64748b', fontSize: '0.9rem' }}>Reservations are earmarks. Global stock only drops when physical delivery is recorded.</p>
+                            <h3 style={{ margin: 0 }}>Farm Deliveries Log</h3>
+                            <p style={{ margin: 0, color: '#64748b', fontSize: '0.9rem' }}>Record and view direct deliveries to farms.</p>
                         </div>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
-                            <button className="btn-secondary" onClick={() => setIsBulkAllocateOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                <ClipboardList size={16} /> Earmark Stocks
-                            </button>
                             <button className="btn-primary" onClick={() => setIsBulkDeliveryOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                                 <Truck size={16} /> Physical Delivery
                             </button>
@@ -384,7 +488,7 @@ const MaterialsInventory = ({ inventoryItems = [], setInventoryItems, farms = []
                                         <Tractor size={20} color="#16a34a" />
                                         <div>
                                             <div style={{ fontWeight: '700', fontSize: '1rem' }}>{farmCode} — {farmName}</div>
-                                            <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{Object.keys(data.pool).length} unique items in pool</div>
+                                            <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{Object.keys(data.delivered).length} unique items delivered</div>
                                         </div>
                                     </div>
                                     {isExpanded ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
@@ -392,29 +496,13 @@ const MaterialsInventory = ({ inventoryItems = [], setInventoryItems, farms = []
 
                                 {isExpanded && (
                                     <div className="animation-slide-down">
-                                        <div style={{ padding: '1rem', borderTop: '1px solid #e2e8f0' }}>
-                                            <h4 style={{ fontSize: '0.85rem', textTransform: 'uppercase', color: '#64748b', marginBottom: '1rem' }}>Current Holding (Earmarked Units)</h4>
-                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.75rem' }}>
-                                                {Object.entries(data.pool).map(([code, qty]) => (
-                                                    <div key={code} style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                        <div>
-                                                            <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{code}</div>
-                                                            <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{inventoryItems.find(i=>i.item_code===code)?.item_name || 'Material'}</div>
-                                                        </div>
-                                                        <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#16a34a' }}>{qty}</div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-
-                                        <div style={{ padding: '0 1rem 1rem' }}>
-                                            <h4 style={{ fontSize: '0.85rem', textTransform: 'uppercase', color: '#64748b', marginBottom: '1rem' }}>Activity History</h4>
+                                        <div style={{ padding: '0 1rem 1rem', paddingTop: '1rem' }}>
+                                            <h4 style={{ fontSize: '0.85rem', textTransform: 'uppercase', color: '#64748b', marginBottom: '1rem' }}>Delivery History</h4>
                                             <div className="table-responsive">
                                                 <table className="banana-table" style={{ fontSize: '0.85rem' }}>
                                                     <thead>
                                                         <tr>
                                                             <th>Date</th>
-                                                            <th>Type</th>
                                                             <th>Material</th>
                                                             <th className="text-right">Qty</th>
                                                             <th>Ref/OP</th>
@@ -425,18 +513,13 @@ const MaterialsInventory = ({ inventoryItems = [], setInventoryItems, farms = []
                                                         {data.history.sort((a,b) => b.date.localeCompare(a.date)).map(row => (
                                                             <tr key={row.id}>
                                                                 <td data-label="Date">{row.date}</td>
-                                                                <td data-label="Type">
-                                                                    <span className={`status-badge ${row.type === 'ALLOCATION' ? 'empty' : 'full'}`} style={{ fontSize: '0.65rem' }}>
-                                                                        {row.type === 'ALLOCATION' ? 'EARMARKED' : 'DELIVERED'}
-                                                                    </span>
-                                                                </td>
                                                                 <td data-label="Item">{row.itemCode}</td>
-                                                                <td data-label="Qty" className="text-right" style={{ fontWeight: 700, color: row.type === 'ALLOCATION' ? '#8b5cf6' : '#ef4444' }}>
-                                                                    {row.type === 'ALLOCATION' ? `+${row.quantity}` : `−${row.quantity}`}
+                                                                <td data-label="Qty" className="text-right" style={{ fontWeight: 700, color: '#ef4444' }}>
+                                                                    {row.quantity}
                                                                 </td>
                                                                 <td data-label="Ref">{row.referenceNo || '—'}</td>
                                                                 <td data-label="" className="text-center">
-                                                                    <button onClick={() => handleDeleteRecord(row.id, row.type)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}><Trash2 size={14} /></button>
+                                                                    <button onClick={() => handleDeleteRecord(row.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}><Trash2 size={14} /></button>
                                                                 </td>
                                                             </tr>
                                                         ))}
@@ -452,13 +535,13 @@ const MaterialsInventory = ({ inventoryItems = [], setInventoryItems, farms = []
                 </div>
             )}
 
-            {/* BULK MODALS (EARMARK & DELIVERY) */}
-            {(isBulkAllocateOpen || isBulkDeliveryOpen) && (
-                <div className="inventory-form-overlay" onClick={() => { setIsBulkAllocateOpen(false); setIsBulkDeliveryOpen(false); }}>
+            {/* BULK MODALS (DELIVERY) */}
+            {isBulkDeliveryOpen && (
+                <div className="inventory-form-overlay" onClick={() => setIsBulkDeliveryOpen(false)}>
                     <div className="inventory-form-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '700px' }}>
                         <div className="form-modal-header">
-                            <h3>{isBulkAllocateOpen ? 'Bulk Earmark Reservation' : 'Record Physical Delivery'}</h3>
-                            <button onClick={() => { setIsBulkAllocateOpen(false); setIsBulkDeliveryOpen(false); }}>×</button>
+                            <h3>Record Physical Delivery</h3>
+                            <button onClick={() => setIsBulkDeliveryOpen(false)}>×</button>
                         </div>
                         <div className="form-modal-body">
                             <div className="grid-2" style={{ marginBottom: '1.5rem' }}>
@@ -474,7 +557,7 @@ const MaterialsInventory = ({ inventoryItems = [], setInventoryItems, farms = []
                                     <input type="date" className="input-field" value={bulkDate} onChange={e => setBulkDate(e.target.value)} />
                                 </div>
                                 <div className="form-group">
-                                    <label className="label">{isBulkAllocateOpen ? 'Allocation Ref' : 'Operation/DR Ref'}</label>
+                                    <label className="label">Operation/DR Ref</label>
                                     <input type="text" className="input-field" value={bulkRef} onChange={e => setBulkRef(e.target.value)} placeholder="e.g. BATCH-2025" />
                                 </div>
                             </div>
@@ -486,7 +569,7 @@ const MaterialsInventory = ({ inventoryItems = [], setInventoryItems, farms = []
                                         <option value="">-- Material --</option>
                                         {inventoryItems.map(inv => (
                                             <option key={inv.id} value={inv.item_code}>
-                                                {inv.item_code} — {inv.item_name} {isBulkDeliveryOpen ? `(Pool: ${farmData[bulkFarm]?.pool[inv.item_code] || 0})` : ''}
+                                                {inv.item_code} — {inv.item_name}
                                             </option>
                                         ))}
                                     </select>
@@ -497,9 +580,9 @@ const MaterialsInventory = ({ inventoryItems = [], setInventoryItems, farms = []
                             <button onClick={addBulkRow} style={{ width: '100%', background: '#f8fafc', border: '1px dashed #cbd5e1', padding: '0.5rem', borderRadius: '8px', cursor: 'pointer', marginTop: '0.5rem' }}>+ Add Item</button>
 
                             <div className="form-modal-footer" style={{ border: 'none', padding: '1.5rem 0 0' }}>
-                                <button className="btn-secondary" onClick={() => { setIsBulkAllocateOpen(false); setIsBulkDeliveryOpen(false); }}>Cancel</button>
-                                <button className="btn-primary" onClick={() => handleBulkSubmit(isBulkAllocateOpen ? 'ALLOCATION' : 'DELIVERY')}>
-                                    {isBulkAllocateOpen ? 'Earmark Items' : 'Confirm Delivery'}
+                                <button className="btn-secondary" onClick={() => setIsBulkDeliveryOpen(false)}>Cancel</button>
+                                <button className="btn-primary" onClick={() => handleBulkSubmit()}>
+                                    Confirm Delivery
                                 </button>
                             </div>
                         </div>
@@ -516,6 +599,11 @@ const MaterialsInventory = ({ inventoryItems = [], setInventoryItems, farms = []
                             <button onClick={closeModal}>×</button>
                         </div>
                         <div className="form-modal-body">
+                            {errorMsg && (
+                                <div style={{ padding: '0.75rem 1rem', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '8px', color: '#b91c1c', fontSize: '0.875rem', marginBottom: '1rem' }}>
+                                    {errorMsg}
+                                </div>
+                            )}
                             <form onSubmit={handleAddItem}>
                                 <div className="grid-2">
                                     <div className="form-group" style={{ gridColumn: '1/-1' }}>
@@ -582,8 +670,167 @@ const MaterialsInventory = ({ inventoryItems = [], setInventoryItems, farms = []
                     </div>
                 </div>
             )}
+
+            {/* ── AI RECEIPT SCANNER MODAL ─────────────────────────────────── */}
+            {isScanOpen && (
+                <div className="inventory-form-overlay" onClick={closeScan}>
+                    <div className="inventory-form-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '640px', borderRadius: '16px', overflow: 'hidden' }}>
+
+                        {/* Header */}
+                        <div className="form-modal-header" style={{ background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', color: 'white', padding: '1.25rem 1.5rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                                <Camera size={22} />
+                                <div>
+                                    <h3 style={{ margin: 0, color: 'white' }}>AI Receipt Scanner</h3>
+                                    <p style={{ margin: 0, fontSize: '0.8rem', opacity: 0.85 }}>Capture a supplier DR to auto-add inventory</p>
+                                </div>
+                            </div>
+                            <button onClick={closeScan} style={{ color: 'white', opacity: 0.8, background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.4rem' }}>×</button>
+                        </div>
+
+                        <div className="form-modal-body" style={{ padding: '1.5rem' }}>
+
+                            {/* IDLE: upload / capture */}
+                            {(scanState === 'idle' || scanState === 'error') && (
+                                <div>
+                                    <input
+                                        ref={fileInputRef}
+                                        type="file"
+                                        accept="image/*"
+                                        capture="environment"
+                                        onChange={handleFileSelect}
+                                        style={{ display: 'none' }}
+                                        id="scan-input"
+                                    />
+
+                                    {!scanImage ? (
+                                        <label htmlFor="scan-input" style={{ display: 'block', border: '2px dashed #a78bfa', borderRadius: '12px', padding: '2.5rem', textAlign: 'center', cursor: 'pointer', background: '#faf5ff', transition: 'all 0.2s' }}>
+                                            <Camera size={40} color="#7c3aed" style={{ marginBottom: '0.75rem' }} />
+                                            <p style={{ fontWeight: 700, color: '#6d28d9', margin: '0 0 0.25rem' }}>Tap to capture or upload receipt</p>
+                                            <p style={{ fontSize: '0.82rem', color: '#9ca3af', margin: 0 }}>Steniel DR, delivery receipt, or any supplier invoice</p>
+                                        </label>
+                                    ) : (
+                                        <div>
+                                            <img src={scanImage} alt="Receipt preview" style={{ width: '100%', maxHeight: '300px', objectFit: 'contain', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '1rem' }} />
+                                            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                                                <label htmlFor="scan-input" style={{ cursor: 'pointer', padding: '0.6rem 1rem', background: '#f3f4f6', borderRadius: '8px', fontSize: '0.875rem', fontWeight: 600, color: '#374151', border: '1px solid #d1d5db' }}>
+                                                    🔄 Retake
+                                                </label>
+                                                <button
+                                                    onClick={handleScanReceipt}
+                                                    style={{ flex: 1, padding: '0.7rem 1.25rem', background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontSize: '0.95rem' }}
+                                                >
+                                                    <Camera size={18} /> Scan with AI
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {scanState === 'error' && (
+                                        <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '8px', color: '#b91c1c', fontSize: '0.875rem', display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+                                            <XCircle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
+                                            <div><strong>Scan failed:</strong> {scanError}</div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* SCANNING */}
+                            {scanState === 'scanning' && (
+                                <div style={{ textAlign: 'center', padding: '2.5rem 1rem' }}>
+                                    <div style={{ width: '56px', height: '56px', border: '4px solid #e9d5ff', borderTop: '4px solid #7c3aed', borderRadius: '50%', margin: '0 auto 1.25rem', animation: 'spin 1s linear infinite' }} />
+                                    <p style={{ fontWeight: 700, color: '#6d28d9', margin: '0 0 0.25rem' }}>AI is reading the receipt...</p>
+                                    <p style={{ color: '#9ca3af', fontSize: '0.85rem', margin: 0 }}>Extracting items, quantities, and DR details</p>
+                                </div>
+                            )}
+
+                            {/* SAVING */}
+                            {scanState === 'saving' && (
+                                <div style={{ textAlign: 'center', padding: '2.5rem 1rem' }}>
+                                    <div style={{ width: '56px', height: '56px', border: '4px solid #bbf7d0', borderTop: '4px solid #16a34a', borderRadius: '50%', margin: '0 auto 1.25rem', animation: 'spin 1s linear infinite' }} />
+                                    <p style={{ fontWeight: 700, color: '#166534', margin: 0 }}>Saving to inventory...</p>
+                                </div>
+                            )}
+
+                            {/* DONE */}
+                            {scanState === 'done' && (
+                                <div style={{ textAlign: 'center', padding: '2rem 1rem' }}>
+                                    <CheckCircle size={56} color="#16a34a" style={{ marginBottom: '1rem' }} />
+                                    <h3 style={{ color: '#166534', margin: '0 0 0.5rem' }}>Inventory Updated!</h3>
+                                    <p style={{ color: '#64748b', margin: '0 0 1.5rem', fontSize: '0.9rem' }}>
+                                        {scanResult?.items?.length} item{scanResult?.items?.length !== 1 ? 's' : ''} from DR #{scanResult?.drNo} added to stock.
+                                    </p>
+                                    <button onClick={closeScan} className="btn-primary" style={{ padding: '0.7rem 2rem' }}>Done</button>
+                                </div>
+                            )}
+
+                            {/* PREVIEW: show extracted items for confirmation */}
+                            {scanState === 'preview' && scanResult && (
+                                <div>
+                                    {/* Receipt header pill */}
+                                    <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '0.75rem 1rem', marginBottom: '1.25rem', display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
+                                        <div><span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block' }}>Supplier</span><strong style={{ fontSize: '0.9rem' }}>{scanResult.supplier}</strong></div>
+                                        <div><span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block' }}>DR No.</span><strong style={{ fontSize: '0.9rem' }}>#{scanResult.drNo}</strong></div>
+                                        <div><span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block' }}>Date</span><strong style={{ fontSize: '0.9rem' }}>{scanResult.date}</strong></div>
+                                    </div>
+
+                                    <h4 style={{ margin: '0 0 0.75rem', fontSize: '0.88rem', textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.05em' }}>Extracted Items — verify & confirm</h4>
+
+                                    <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', overflow: 'hidden', marginBottom: '1.25rem' }}>
+                                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
+                                            <thead>
+                                                <tr style={{ background: '#f8fafc' }}>
+                                                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'left', fontWeight: 700, color: '#374151', borderBottom: '1px solid #e2e8f0' }}>Item</th>
+                                                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#374151', borderBottom: '1px solid #e2e8f0', width: '90px' }}>Qty</th>
+                                                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'center', fontWeight: 700, color: '#374151', borderBottom: '1px solid #e2e8f0', width: '40px' }}></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {scanResult.items.map((it, idx) => (
+                                                    <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                                        <td style={{ padding: '0.6rem 0.75rem' }}>
+                                                            <div style={{ fontWeight: 700, color: '#0f172a' }}>{it.name}</div>
+                                                            <div style={{ fontSize: '0.75rem', color: '#64748b', fontFamily: 'monospace' }}>{it.code}</div>
+                                                        </td>
+                                                        <td style={{ padding: '0.6rem 0.75rem', textAlign: 'right' }}>
+                                                            <input
+                                                                type="number"
+                                                                value={it.qty}
+                                                                min="0"
+                                                                onChange={e => setScanResult(prev => ({
+                                                                    ...prev,
+                                                                    items: prev.items.map((item, i) => i === idx ? { ...item, qty: Number(e.target.value) } : item)
+                                                                }))}
+                                                                style={{ width: '75px', padding: '0.35rem 0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', textAlign: 'right', fontWeight: 700, fontSize: '0.9rem' }}
+                                                            />
+                                                        </td>
+                                                        <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center' }}>
+                                                            <button onClick={() => setScanResult(prev => ({ ...prev, items: prev.items.filter((_, i) => i !== idx) }))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444' }}><Trash2 size={14} /></button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <div style={{ display: 'flex', gap: '0.75rem' }}>
+                                        <button onClick={() => { setScanState('idle'); setScanResult(null); }} className="btn-secondary" style={{ flex: 1 }}>← Retake</button>
+                                        <button onClick={handleScanConfirm} className="btn-primary" style={{ flex: 2, background: 'linear-gradient(135deg, #16a34a, #15803d)' }}>
+                                            ✓ Add {scanResult.items.filter(i => i.qty > 0).length} Item{scanResult.items.filter(i => i.qty > 0).length !== 1 ? 's' : ''} to Inventory
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Spin keyframes */}
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
     );
 };
 
 export default MaterialsInventory;
+
