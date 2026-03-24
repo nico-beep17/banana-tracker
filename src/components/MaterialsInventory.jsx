@@ -221,6 +221,29 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
         return [...set];
     }, [deliveries]);
 
+    const handleOpenBulkDelivery = () => {
+        let nextNumber = 1;
+        
+        deliveries.forEach(d => {
+            if (d.referenceNo && d.referenceNo.startsWith('MIS-')) {
+                const parts = d.referenceNo.split('-');
+                if (parts.length > 1) {
+                    const num = parseInt(parts[1], 10);
+                    if (!isNaN(num) && num >= nextNumber) {
+                        nextNumber = num + 1;
+                    }
+                }
+            }
+        });
+        
+        const nextMisNumber = `MIS-${String(nextNumber).padStart(4, '0')}`;
+        
+        setBulkFarm('');
+        setBulkRef(nextMisNumber);
+        setBulkItems([{ itemCode: '', quantity: '' }]);
+        setIsBulkDeliveryOpen(true);
+    };
+
     // BULK HANDLERS
     const addBulkRow = () => setBulkItems(prev => [...prev, { itemCode: '', quantity: '' }]);
     const removeBulkRow = (idx) => setBulkItems(prev => prev.filter((_, i) => i !== idx));
@@ -538,7 +561,7 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
                                 <input type="text" className="search-input" placeholder="Search materials..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
                             </div>
                             <button className="btn-secondary" onClick={() => setIsBatchFormOpen(true)}><ListPlus size={16} /> Batch Update</button>
-                            <button className="btn-primary" onClick={() => setIsBulkDeliveryOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <button className="btn-primary" onClick={handleOpenBulkDelivery} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                                 <Truck size={16} /> Physical Delivery
                             </button>
                         </div>
