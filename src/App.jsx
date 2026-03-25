@@ -12,6 +12,7 @@ import UserManagement from './components/UserManagement';
 import { supabase } from './supabaseClient';
 import { BotMessageSquare } from 'lucide-react';
 import { logAudit } from './utils/auditLog';
+import { offlineSync } from './utils/offlineSync';
 
 // Lazy-loaded heavy modules — only downloaded when user navigates to the tab
 const ArrivalForm = lazy(() => import('./components/ArrivalForm'));
@@ -453,20 +454,24 @@ function App() {
   };
 
   const handleAddArrival = async (newArrivalsBatch) => {
-    const { data, error } = await supabase
-      .from('arrivals')
-      .insert(newArrivalsBatch)
-      .select();
+    try {
+      const { success, data, queued } = await offlineSync.mutate('insert', 'arrivals', newArrivalsBatch);
 
-    if (error) {
-      console.error("Supabase error (Arrivals):", error);
+      if (success) {
+        if (queued) {
+          // Optimistic local state rendering for offline PWA
+          setArrivals(prev => [...newArrivalsBatch, ...prev]);
+          alert('📱 Offline Mode: Arrival logged securely and queued for background syncing when internet returns.');
+          return true;
+        } else if (data) {
+          setArrivals(prev => [...data, ...prev]);
+          return true;
+        }
+      }
+    } catch (error) {
+      console.error("Offline Sync error (Arrivals):", error);
       alert(`⚠️ Database Insert Failed: ${error.message || error.details || 'Unknown constraint error.'}`);
       return false;
-    }
-
-    if (data) {
-      setArrivals(prev => [...data, ...prev]);
-      return true;
     }
   };
 
@@ -488,39 +493,30 @@ function App() {
     } = containerData;
 
     if (isUpdate) {
-      const { data, error } = await supabase
-        .from('containers')
-        .update(dbPayload)
-        .eq('id', containerData.id)
-        .select();
-
-      if (error) {
+      try {
+        const { success, data, queued } = await offlineSync.mutate('update', 'containers', dbPayload, { id: containerData.id });
+        if (success) {
+          const updatedContainer = { ...(data ? data[0] : dbPayload), timeOfDeparture, bookingNo, buyer_name, vesselVoyage, driverName, dateArrived, timeArrived };
+          setContainers(prev => prev.map(c => c.id === containerData.id ? { ...c, ...updatedContainer } : c));
+          if (queued) alert('📱 Offline Mode: Container modifications saved safely locally.');
+          handleNavigate('containers-list');
+        }
+      } catch (error) {
         console.error("Supabase error (Update Container):", error);
         alert(`Failed to update container registry in database. Error: ${error.message}`);
-        return;
-      }
-
-      if (data && data.length > 0) {
-        // Re-inject the front-end properties into local state so the UI functions seamlessly
-        setContainers(prev => prev.map(c => c.id === containerData.id ? { ...data[0], timeOfDeparture, bookingNo, buyer_name, vesselVoyage, driverName, dateArrived, timeArrived } : c));
-        handleNavigate('containers-list');
       }
     } else {
-      const { data, error } = await supabase
-        .from('containers')
-        .insert([dbPayload])
-        .select();
-
-      if (error) {
+      try {
+        const { success, data, queued } = await offlineSync.mutate('insert', 'containers', dbPayload);
+        if (success) {
+          const newContainer = { ...(data ? data[0] : dbPayload), timeOfDeparture, bookingNo, buyer_name, vesselVoyage, driverName, dateArrived, timeArrived };
+          setContainers(prev => [newContainer, ...prev]);
+          if (queued) alert('📱 Offline Mode: New Container correctly registered locally.');
+          handleNavigate('containers-list');
+        }
+      } catch (error) {
         console.error("Supabase error (Create Container):", error);
         alert(`Failed to create container registry in database. Error: ${error.message}`);
-        return;
-      }
-
-      if (data && data.length > 0) {
-        // Re-inject the front-end properties into local state so the UI functions seamlessly
-        setContainers(prev => [{ ...data[0], timeOfDeparture, bookingNo, buyer_name, vesselVoyage, driverName, dateArrived, timeArrived }, ...prev]);
-        handleNavigate('containers-list');
       }
     }
   };
