@@ -184,6 +184,7 @@ const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, setAr
                 let productSpecsCode = `${baseRow.brand || 'XXX'}${ccClass}${sizeCode}V135`;
 
                 const newRowPayload = {
+                    id: crypto.randomUUID(),
                     ...headerPayload,
                     batchId: baseRow.batchId || null,
                     farmCode: baseRow.farmCode,
