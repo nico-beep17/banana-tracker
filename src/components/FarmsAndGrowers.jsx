@@ -1293,7 +1293,12 @@ function GrowerProfileModal({ farm, weeklyRates, arrivals, samplings = [], setWe
                                     </thead>
                                     <tbody>
                                         {grid.map((row, rowIdx) => {
-                                            if (!showAllWeeks && !row.isCurrent && !row.isFuture && !row.dirty) return null;
+                                            const curWk = getCurrentWeekNum();
+                                            const curYr = new Date().getFullYear();
+                                            const isNextWeek = (row.year === curYr && row.week === curWk + 1) || 
+                                                               (row.year === curYr + 1 && row.week === 1 && curWk === 52);
+
+                                            if (!showAllWeeks && !row.isCurrent && !isNextWeek && !row.dirty) return null;
                                             return (
                                                 <tr key={`${row.year}-${row.week}`} style={{ background: row.dirty ? '#fffbeb' : row.isFuture ? '#eff6ff' : row.saved ? '#f0fdf4' : 'white', borderBottom: '1px solid #f1f5f9' }}>
                                                     <td style={{ padding: '0.35rem 0.75rem', fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap', position: 'sticky', left: 0, background: row.dirty ? '#fffbeb' : row.isFuture ? '#eff6ff' : row.saved ? '#f0fdf4' : 'white', zIndex: 1, borderRight: '1px solid #e2e8f0' }}>
