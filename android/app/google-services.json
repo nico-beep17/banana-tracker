@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "365870563675",
+    "project_id": "banana-tracker-327db",
+    "storage_bucket": "banana-tracker-327db.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:365870563675:android:7458b896288e4cb8c51a7e",
+        "android_client_info": {
+          "package_name": "com.lavc.bananatracker"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA_lztMZY3_7by0wP9HHAFuUL45X3HrI0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

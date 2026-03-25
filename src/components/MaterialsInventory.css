@@ -206,7 +206,7 @@
 @media (max-width: 768px) {
 
     .materials-inventory-page {
-        overflow-x: hidden;
+        overflow-x: auto;
         max-width: 100%;
     }
 

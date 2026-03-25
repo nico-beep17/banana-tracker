@@ -83,13 +83,13 @@
     .accounting-dashboard {
         padding: 1rem !important;
         max-width: 100%;
-        overflow-x: hidden;
+        overflow-x: auto;
     }
 
     /* ERP sub-section content */
     .erp-content-section {
         max-width: 100%;
-        overflow-x: hidden;
+        overflow-x: auto;
     }
 
     /* Voucher form: stack columns on mobile */

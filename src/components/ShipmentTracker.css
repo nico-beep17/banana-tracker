@@ -177,7 +177,7 @@
 
     .tracker-container {
         padding: 0;
-        overflow-x: hidden;
+        overflow-x: auto;
         max-width: 100%;
     }
 

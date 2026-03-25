@@ -72,6 +72,285 @@
   --transition-bounce: 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
+/* =============================================
+   DARK MODE — refined premium dark theme
+   ============================================= */
+html.dark-mode {
+  --bg-app: #111318;
+  --bg-surface: #1c1f2b;
+  --bg-surface-glass: rgba(28, 31, 43, 0.9);
+  --bg-sidebar: #0d0f15;
+  --color-primary-soft: rgba(16, 185, 129, 0.12);
+
+  --text-primary: #e8ecf1;
+  --text-secondary: #9ca3af;
+  --text-tertiary: #6b7280;
+  --text-on-dark: #f8fafc;
+
+  --border-color: rgba(148, 163, 184, 0.1);
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 10px 24px rgba(0, 0, 0, 0.6);
+  --shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.7);
+
+  color-scheme: dark;
+}
+
+/* Body */
+html.dark-mode body {
+  background: var(--bg-app);
+  color: var(--text-primary);
+}
+
+/* Cards and surfaces */
+html.dark-mode .card,
+html.dark-mode .metric-card,
+html.dark-mode .form-card,
+html.dark-mode .banana-table-container,
+html.dark-mode .form-section,
+html.dark-mode .registration-card,
+html.dark-mode .um-user-card,
+html.dark-mode .um-roles-manager,
+html.dark-mode .um-module-group {
+  background: var(--bg-surface) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-primary);
+}
+
+/* Inputs */
+html.dark-mode .input-field,
+html.dark-mode .input-premium,
+html.dark-mode select,
+html.dark-mode textarea,
+html.dark-mode .um-add-role-form input {
+  background: #161921 !important;
+  border-color: rgba(148, 163, 184, 0.18) !important;
+  color: var(--text-primary) !important;
+}
+
+html.dark-mode .input-field:focus,
+html.dark-mode .input-premium:focus,
+html.dark-mode select:focus {
+  background: #1a1e2a !important;
+  border-color: var(--color-primary-light) !important;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+}
+
+html.dark-mode .input-field::placeholder,
+html.dark-mode .input-premium::placeholder {
+  color: #4b5563;
+}
+
+/* Header */
+html.dark-mode .top-header {
+  background: #14161e;
+  border-bottom-color: rgba(148, 163, 184, 0.08);
+}
+
+html.dark-mode .page-container {
+  background: var(--bg-app);
+}
+
+/* Buttons */
+html.dark-mode .btn-secondary {
+  background: #1e2231 !important;
+  border-color: rgba(148, 163, 184, 0.15) !important;
+  color: var(--text-secondary) !important;
+}
+
+html.dark-mode .btn-secondary:hover {
+  background: #262a3a !important;
+  color: var(--text-primary) !important;
+}
+
+html.dark-mode .icon-btn {
+  color: var(--text-secondary);
+}
+
+/* Tables */
+html.dark-mode table th {
+  background: #161921;
+  color: var(--text-secondary);
+  border-color: rgba(148, 163, 184, 0.08);
+}
+
+html.dark-mode table td {
+  border-color: rgba(148, 163, 184, 0.06);
+  color: var(--text-primary);
+}
+
+html.dark-mode table tr:hover td {
+  background: rgba(16, 185, 129, 0.04);
+}
+
+html.dark-mode table tr:nth-child(even) td {
+  background: rgba(255, 255, 255, 0.015);
+}
+
+/* Navigation */
+html.dark-mode .mobile-bottom-nav {
+  background: #14161e;
+  border-top-color: rgba(148, 163, 184, 0.08);
+}
+
+html.dark-mode .sidebar {
+  background: var(--bg-sidebar);
+}
+
+html.dark-mode .sidebar .nav-item:hover,
+html.dark-mode .sidebar .nav-item.active {
+  background: rgba(16, 185, 129, 0.1);
+}
+
+/* Dropdowns & Notifications */
+html.dark-mode .notifications-dropdown,
+html.dark-mode .custom-dropdown-menu {
+  background: #1e2231;
+  border-color: rgba(148, 163, 184, 0.12);
+}
+
+html.dark-mode .notifications-header {
+  border-bottom-color: rgba(148, 163, 184, 0.08);
+}
+
+html.dark-mode .custom-dropdown-trigger {
+  background: linear-gradient(180deg, #1e2231 0%, #181b26 100%) !important;
+  border-color: rgba(148, 163, 184, 0.15) !important;
+  color: var(--text-primary) !important;
+}
+
+html.dark-mode .custom-dropdown-option {
+  color: var(--text-primary);
+}
+
+html.dark-mode .custom-dropdown-option:hover {
+  background: rgba(16, 185, 129, 0.1);
+}
+
+html.dark-mode .custom-dropdown-option.selected {
+  background: rgba(16, 185, 129, 0.15);
+  color: #6ee7b7;
+}
+
+/* Text */
+html.dark-mode label,
+html.dark-mode .label,
+html.dark-mode .label-premium,
+html.dark-mode .subtitle {
+  color: var(--text-secondary) !important;
+}
+
+html.dark-mode h1, html.dark-mode h2,
+html.dark-mode h3, html.dark-mode h4 {
+  color: var(--text-primary) !important;
+}
+
+html.dark-mode p {
+  color: var(--text-secondary);
+}
+
+/* Badges & Status */
+html.dark-mode .status-badge,
+html.dark-mode .badge-neutral,
+html.dark-mode .um-status-badge {
+  opacity: 0.9;
+}
+
+html.dark-mode .um-status-badge.active {
+  background: rgba(16, 185, 129, 0.15);
+  color: #6ee7b7;
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+html.dark-mode .um-status-badge.pending {
+  background: rgba(239, 68, 68, 0.12);
+  color: #fca5a5;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+html.dark-mode .um-status-badge.admin {
+  background: rgba(245, 158, 11, 0.12);
+  color: #fcd34d;
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+/* Metric cards */
+html.dark-mode .metric-icon {
+  opacity: 0.85;
+}
+
+html.dark-mode .metric-value {
+  color: var(--text-primary) !important;
+}
+
+html.dark-mode .metric-title {
+  color: var(--text-secondary) !important;
+}
+
+/* Modals */
+html.dark-mode .modal-backdrop {
+  background: rgba(0, 0, 0, 0.75);
+}
+
+html.dark-mode .modal-content,
+html.dark-mode .modal-header,
+html.dark-mode .modal-footer,
+html.dark-mode .rates-modal-content {
+  background: #1c1f2b !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-primary);
+}
+
+html.dark-mode .modal-body {
+  background: #161921 !important;
+}
+
+/* Quick action cards */
+html.dark-mode .quick-actions-widget .card {
+  background: #1c1f2b !important;
+  border-left-color: var(--color-primary-main) !important;
+}
+
+html.dark-mode .quick-actions-widget .card strong {
+  color: var(--text-primary) !important;
+}
+
+/* Dashboard specific */
+html.dark-mode .dashboard-header h1 {
+  color: var(--text-primary) !important;
+}
+
+/* Settings panel */
+html.dark-mode .settings-dropdown {
+  background: #1e2231;
+  border-color: rgba(148, 163, 184, 0.12);
+}
+
+/* Scrollbar */
+html.dark-mode ::-webkit-scrollbar {
+  width: 6px;
+}
+
+html.dark-mode ::-webkit-scrollbar-track {
+  background: #111318;
+}
+
+html.dark-mode ::-webkit-scrollbar-thumb {
+  background: #2d3348;
+  border-radius: 3px;
+}
+
+html.dark-mode ::-webkit-scrollbar-thumb:hover {
+  background: #3d4460;
+}
+
+/* Form highlights */
+html.dark-mode .highlight-green {
+  background: rgba(16, 185, 129, 0.06) !important;
+  border-color: rgba(16, 185, 129, 0.15) !important;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -81,7 +360,7 @@
 
 html, body {
   /* Prevent horizontal scroll on the root level */
-  overflow-x: hidden;
+  overflow-x: auto;
   max-width: 100%;
   /* iOS overscroll behavior */
   overscroll-behavior: none;
@@ -252,6 +531,30 @@ button {
 .input-field::placeholder {
   color: var(--text-tertiary);
   text-shadow: none;
+}
+
+/* ===== CAPACITOR ANDROID SELECT FIX ===== */
+/* Native selects often break (invisible text, white-on-white) on mobile webviews 
+   especially in Dark Mode. This enforces a consistent custom appearance. */
+select.input-field, select {
+  appearance: none;
+  -moz-appearance: none;
+  -webkit-appearance: none;
+  color: var(--text-primary) !important;
+  background-color: #f8fafc !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 0.75rem center !important;
+  background-size: 1.25rem !important;
+  padding-right: 2.5rem !important; /* Make room for arrow */
+}
+select.input-field:focus, select:focus {
+  background-color: #ffffff !important;
+}
+/* Force option rendering colors against dark mode bugs */
+select option {
+  color: #0f172a !important;
+  background-color: #ffffff !important;
 }
 
 /* Premium Tables */
@@ -491,7 +794,7 @@ button {
   .arrivals-table-container,
   .tracker-container {
     max-width: 100%;
-    overflow-x: hidden;
+    overflow-x: auto;
   }
 
   /* Chrome tabs: allow horizontal scroll on mobile */
@@ -564,7 +867,7 @@ button {
     background: var(--bg-surface);
     box-shadow: 0 1px 4px rgba(0,0,0,0.07);
     max-width: calc(100vw - 2rem); /* Enforce mobile width */
-    overflow-x: hidden;
+    overflow-x: auto;
   }
 
   .banana-table tbody tr:hover {
@@ -649,4 +952,44 @@ button {
   .banana-table-container::after {
     display: none;
   }
+
+  /* Better touch targets for mobile inputs and buttons */
+  .input-field,
+  .input-premium,
+  select {
+    min-height: 44px;
+    font-size: 16px !important; /* Prevents iOS zoom on focus */
+  }
+
+  /* Improve form group spacing */
+  .form-group,
+  .input-group {
+    margin-bottom: 0.75rem;
+  }
+
+  /* Stack header row on mobile */
+  .metrics-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.75rem !important;
+  }
+
+  /* Metric card compact on mobile */
+  .metric-card {
+    padding: 0.75rem !important;
+  }
+  .metric-value {
+    font-size: 1.5rem !important;
+  }
+}
+
+/* Utility: wrap-text for long cells on mobile */
+.wrap-text {
+  word-break: break-word;
+  white-space: normal !important;
+}
+
+/* Spinner animation for lazy loading fallback */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }

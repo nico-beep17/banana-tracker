@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { downloadCSV } from '../utils/exportUtils';
-import { LayoutDashboard, Receipt, BookOpen, Package, LineChart, Calendar, Save, Plus } from 'lucide-react';
+import { LayoutDashboard, Receipt, BookOpen, Package, LineChart, Calendar, Save, Plus, BookMarked } from 'lucide-react';
 import './Accounting.css';
 import { supabase } from '../supabaseClient';
 
@@ -96,22 +96,22 @@ const Accounting = ({ arrivals = [], samplings = [], containers = [], farms = []
         };
 
         if (voucherType === 'PAYABLE') {
-            if (!baseAmount) { alert("Please enter an amount."); return; }
+            if (!baseAmount) { showToast("Please enter an amount.", "error"); return; }
             linesToInsert = [
-                { account_id: getAccountId('1310'), debit_amount: phpAmount, credit_amount: 0 },
+                { account_id: getAccountId('5010'), debit_amount: phpAmount, credit_amount: 0 },
                 { account_id: getAccountId('2010'), debit_amount: 0, credit_amount: phpAmount }
             ];
         } else if (voucherType === 'PAYMENT') {
-            if (!baseAmount) { alert("Please enter an amount."); return; }
+            if (!baseAmount) { showToast("Please enter an amount.", "error"); return; }
             linesToInsert = [
                 { account_id: getAccountId('2010'), debit_amount: phpAmount, credit_amount: 0 },
                 { account_id: getAccountId('1010'), debit_amount: 0, credit_amount: phpAmount }
             ];
         } else if (voucherType === 'CASH_RECEIPT') {
-            if (!baseAmount) { alert("Please enter an amount."); return; }
+            if (!baseAmount) { showToast("Please enter an amount.", "error"); return; }
             linesToInsert = [
                 { account_id: getAccountId('1010'), debit_amount: phpAmount, credit_amount: 0 },
-                { account_id: getAccountId('1210'), debit_amount: 0, credit_amount: phpAmount }
+                { account_id: getAccountId('4010'), debit_amount: 0, credit_amount: phpAmount }
             ];
         } else if (voucherType === 'JOURNAL') {
             const validLines = journalLinesForm.filter(l => l.accountCode && (Number(l.debit) > 0 || Number(l.credit) > 0));
@@ -138,7 +138,7 @@ const Accounting = ({ arrivals = [], samplings = [], containers = [], farms = []
         // Validate that all lines resolved to a valid account ID
         const missingAccounts = linesToInsert.filter(l => !l.account_id);
         if (missingAccounts.length > 0) {
-            alert("Error: One or more Journal Lines could not be mapped to the Chart of Accounts. Please refresh to sync the account list.");
+            showToast("One or more accounts not found in COA. Please seed the Chart of Accounts first.", "error");
             return;
         }
 
@@ -186,23 +186,17 @@ const Accounting = ({ arrivals = [], samplings = [], containers = [], farms = []
                 if (vError) throw vError;
             }
 
-            alert("Voucher successfully posted to General Ledger!");
+            showToast("✅ Voucher posted to General Ledger!", "success");
 
-            // Reset form gracefully without hard reload
-            setVoucherForm({
-                entityId: '',
-                amount: '',
-                referenceNo: '',
-                description: '',
-                currency: 'PHP'
-            });
+            // Reset form
+            setVoucherForm({ entityId: '', amount: '', referenceNo: '', description: '', currency: 'PHP' });
             setJournalLinesForm([
                 { accountCode: '', accountName: '', debit: '', credit: '' },
                 { accountCode: '', accountName: '', debit: '', credit: '' }
             ]);
         } catch (error) {
             console.error('Error posting voucher:', error);
-            alert("Error posting voucher: " + error.message);
+            showToast("Error posting voucher: " + error.message, "error");
         }
     };
 
@@ -469,6 +463,9 @@ const Accounting = ({ arrivals = [], samplings = [], containers = [], farms = []
                 </button>
                 <button className={`chrome-tab ${subTab === 'reports' ? 'active' : ''}`} onClick={() => setSubTab('reports')}>
                     <LineChart size={16} /> Financial Reports
+                </button>
+                <button className={`chrome-tab ${subTab === 'coa' ? 'active' : ''}`} onClick={() => setSubTab('coa')}>
+                    <BookMarked size={16} /> Chart of Accounts
                 </button>
                 <button className={`chrome-tab ${subTab === 'periods' ? 'active' : ''}`} onClick={() => setSubTab('periods')}>
                     <Calendar size={16} /> Calendar Periods
@@ -821,7 +818,7 @@ const Accounting = ({ arrivals = [], samplings = [], containers = [], farms = []
                                     <div style={{ marginTop: '2rem', padding: '1rem', background: '#f1f5f9', borderLeft: '4px solid var(--color-primary-main)', borderRadius: '4px' }}>
                                         <h5 style={{ margin: '0 0 0.5rem 0', color: 'var(--text-secondary)' }}>Automated GL Posting Preview</h5>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.25rem' }}>
-                                            <span>Dr. Inventory - Bananas (1310)</span>
+                                            <span>Dr. Cost of Goods - Grower Payments (5010)</span>
                                             <span>₱{(Number(voucherForm.amount || 0) * (voucherForm.currency === 'USD' ? exchangeRate : 1)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                                         </div>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
@@ -901,14 +898,14 @@ const Accounting = ({ arrivals = [], samplings = [], containers = [], farms = []
                                         <label>Description</label>
                                         <textarea className="input-field" rows="3" value={voucherForm.description} onChange={e => setVoucherForm({ ...voucherForm, description: e.target.value })}></textarea>
                                     </div>
-                                    <div style={{ marginTop: '2rem', padding: '1rem', background: '#f1f5f9', borderLeft: '4px solid var(--color-primary-main)', borderRadius: '4px' }}>
+                                    <div style={{ marginTop: '2rem', padding: '1rem', background: '#f1f5f9', borderLeft: '4px solid #10b981', borderRadius: '4px' }}>
                                         <h5 style={{ margin: '0 0 0.5rem 0', color: 'var(--text-secondary)' }}>Automated GL Posting Preview</h5>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.25rem' }}>
-                                            <span>Dr. Cash in Bank - {voucherForm.currency} (1010)</span>
+                                            <span>Dr. Cash in Bank - {voucherForm.currency === 'USD' ? 'USD (1011)' : 'PHP (1010)'}</span>
                                             <span>₱{(Number(voucherForm.amount || 0) * (voucherForm.currency === 'USD' ? exchangeRate : 1)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                                         </div>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                                            <span style={{ paddingLeft: '2rem' }}>Cr. Accounts Receivable - Buyers (1210)</span>
+                                            <span style={{ paddingLeft: '2rem' }}>Cr. Export Sales Revenue - Banana (4010)</span>
                                             <span>₱{(Number(voucherForm.amount || 0) * (voucherForm.currency === 'USD' ? exchangeRate : 1)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                                         </div>
                                     </div>
@@ -1025,43 +1022,9 @@ const Accounting = ({ arrivals = [], samplings = [], containers = [], farms = []
 
             {subTab === 'ledger' && (
                 <div className="erp-content-section slide-down text-left" style={{ padding: '2rem', background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' }}>
-                    <h3 style={{ margin: '0 0 0.5rem 0', color: 'var(--color-primary-dark)' }}>General Ledger Transactions</h3>
-                    <p style={{ margin: '0 0 2rem 0', color: 'var(--text-tertiary)', fontSize: '0.9rem' }}>Comprehensive log of all posted double-entry journal lines.</p>
-
-                    <div style={{ overflowX: 'auto' }}>
-                        <table className="banana-table" style={{ fontSize: '0.85rem' }}>
-                            <thead>
-                                <tr>
-                                    <th>Date</th>
-                                    <th>Reference</th>
-                                    <th>Description</th>
-                                    <th>Account</th>
-                                    <th className="text-right">Debit (PHP)</th>
-                                    <th className="text-right">Credit (PHP)</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {ledgerData.length === 0 ? (
-                                    <tr><td colSpan="6" className="text-center" style={{ padding: '2rem' }}>No journal lines recorded yet.</td></tr>
-                                ) : (
-                                    ledgerData.map((row, idx) => (
-                                        <tr key={row.id} style={{ background: row.credit > 0 ? '#f8fafc' : 'transparent', borderBottom: (idx < ledgerData.length - 1 && ledgerData[idx + 1].reference !== row.reference) ? '2px solid #e2e8f0' : undefined }}>
-                                            <td style={{ whiteSpace: 'nowrap' }}>{new Date(row.date).toLocaleDateString()}</td>
-                                            <td style={{ fontWeight: 600, color: 'var(--color-primary-main)' }}>{row.reference}</td>
-                                            <td style={{ color: 'var(--text-secondary)' }}>{row.description}</td>
-                                            <td><span style={{ color: 'var(--text-tertiary)', marginRight: '0.5rem' }}>{row.accountCode}</span> <strong>{row.accountName}</strong></td>
-                                            <td className="text-right" style={{ color: row.debit > 0 ? 'var(--color-primary-dark)' : 'transparent' }}>
-                                                {row.debit > 0 ? row.debit.toLocaleString(undefined, { minimumFractionDigits: 2 }) : '-'}
-                                            </td>
-                                            <td className="text-right" style={{ color: row.credit > 0 ? '#b45309' : 'transparent' }}>
-                                                {row.credit > 0 ? row.credit.toLocaleString(undefined, { minimumFractionDigits: 2 }) : '-'}
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
+                    <h3 style={{ margin: '0 0 0.25rem 0', color: 'var(--color-primary-dark)' }}>General Ledger Transactions</h3>
+                    <p style={{ margin: '0 0 1.5rem 0', color: 'var(--text-tertiary)', fontSize: '0.9rem' }}>Comprehensive log of all posted double-entry journal lines.</p>
+                    <LedgerTable ledgerData={ledgerData} />
                 </div>
             )}
 
@@ -1557,6 +1520,13 @@ const Accounting = ({ arrivals = [], samplings = [], containers = [], farms = []
                 </div>
             )}
 
+            {subTab === 'coa' && (
+                <ChartOfAccountsTab
+                    localChartOfAccounts={localChartOfAccounts}
+                    setLocalChartOfAccounts={setLocalChartOfAccounts}
+                />
+            )}
+
             {subTab === 'periods' && (
                 <div className="erp-content-section slide-down text-left" style={{ padding: '2rem', background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' }}>
                     <h3 style={{ margin: '0 0 0.5rem 0', color: 'var(--color-primary-dark)' }}>Accounting Periods Config</h3>
@@ -1638,5 +1608,336 @@ const Accounting = ({ arrivals = [], samplings = [], containers = [], farms = []
         </div>
     );
 };
+
+// ============================================================
+// CHART OF ACCOUNTS TAB
+// ============================================================
+const PRESET_ACCOUNTS = [
+    // ASSETS
+    { code: '1010', name: 'Cash in Bank - PHP',                       type: 'ASSET',     normal_balance: 'Debit' },
+    { code: '1011', name: 'Cash in Bank - USD',                       type: 'ASSET',     normal_balance: 'Debit' },
+    { code: '1020', name: 'Petty Cash Fund',                          type: 'ASSET',     normal_balance: 'Debit' },
+    { code: '1100', name: 'Accounts Receivable - Buyers',             type: 'ASSET',     normal_balance: 'Debit' },
+    { code: '1110', name: 'Advances to Growers',                      type: 'ASSET',     normal_balance: 'Debit' },
+    { code: '1200', name: 'Inventory - Packing Materials (Boxes)',    type: 'ASSET',     normal_balance: 'Debit' },
+    { code: '1210', name: 'Inventory - Banana Produce',               type: 'ASSET',     normal_balance: 'Debit' },
+    { code: '1300', name: 'Prepaid Expenses',                         type: 'ASSET',     normal_balance: 'Debit' },
+    { code: '1310', name: 'Input VAT',                                type: 'ASSET',     normal_balance: 'Debit' },
+    { code: '1500', name: 'Property, Plant & Equipment',              type: 'ASSET',     normal_balance: 'Debit' },
+    { code: '1510', name: 'Accumulated Depreciation - PPE',           type: 'ASSET',     normal_balance: 'Credit' },
+    // LIABILITIES
+    { code: '2010', name: 'Accounts Payable - Growers',               type: 'LIABILITY', normal_balance: 'Credit' },
+    { code: '2020', name: 'Accrued Salaries & Wages',                 type: 'LIABILITY', normal_balance: 'Credit' },
+    { code: '2030', name: 'SSS / PHIC / HDMF Payable',               type: 'LIABILITY', normal_balance: 'Credit' },
+    { code: '2040', name: 'Withholding Tax Payable',                  type: 'LIABILITY', normal_balance: 'Credit' },
+    { code: '2050', name: 'Output VAT Payable',                       type: 'LIABILITY', normal_balance: 'Credit' },
+    { code: '2060', name: 'Short-Term Loans Payable',                 type: 'LIABILITY', normal_balance: 'Credit' },
+    { code: '2500', name: 'Long-Term Loans Payable',                  type: 'LIABILITY', normal_balance: 'Credit' },
+    // EQUITY
+    { code: '3010', name: "Owner's Capital",                          type: 'EQUITY',    normal_balance: 'Credit' },
+    { code: '3020', name: 'Retained Earnings',                        type: 'EQUITY',    normal_balance: 'Credit' },
+    { code: '3030', name: 'Current Year Net Income',                  type: 'EQUITY',    normal_balance: 'Credit' },
+    // REVENUE
+    { code: '4010', name: 'Export Sales Revenue - Banana',            type: 'REVENUE',   normal_balance: 'Credit' },
+    { code: '4020', name: 'Local Sales Revenue',                      type: 'REVENUE',   normal_balance: 'Credit' },
+    { code: '4030', name: 'Other Income',                             type: 'REVENUE',   normal_balance: 'Credit' },
+    // EXPENSES
+    { code: '5010', name: 'Cost of Goods - Grower Payments',          type: 'EXPENSE',   normal_balance: 'Debit' },
+    { code: '5020', name: 'Freight & Logistics Costs',                type: 'EXPENSE',   normal_balance: 'Debit' },
+    { code: '5030', name: 'Salaries & Wages - Employees',             type: 'EXPENSE',   normal_balance: 'Debit' },
+    { code: '5031', name: 'Salaries & Wages - Officers',              type: 'EXPENSE',   normal_balance: 'Debit' },
+    { code: '5040', name: 'SSS / PHIC / HDMF Contributions',          type: 'EXPENSE',   normal_balance: 'Debit' },
+    { code: '5050', name: 'Packing Materials Expense',                type: 'EXPENSE',   normal_balance: 'Debit' },
+    { code: '5060', name: 'Depreciation Expense',                     type: 'EXPENSE',   normal_balance: 'Debit' },
+    { code: '5070', name: 'Bank Charges & Wire Transfer Fees',        type: 'EXPENSE',   normal_balance: 'Debit' },
+    { code: '5080', name: 'Utilities Expense',                        type: 'EXPENSE',   normal_balance: 'Debit' },
+    { code: '5090', name: 'Repairs & Maintenance',                    type: 'EXPENSE',   normal_balance: 'Debit' },
+    { code: '5100', name: 'Communication Expense',                    type: 'EXPENSE',   normal_balance: 'Debit' },
+    { code: '5110', name: 'Professional Fees',                        type: 'EXPENSE',   normal_balance: 'Debit' },
+    { code: '5120', name: 'Miscellaneous Expense',                    type: 'EXPENSE',   normal_balance: 'Debit' },
+];
+
+const COA_TYPE_COLORS = { ASSET: '#3b82f6', LIABILITY: '#ef4444', EQUITY: '#8b5cf6', REVENUE: '#10b981', EXPENSE: '#f59e0b' };
+
+function ChartOfAccountsTab({ localChartOfAccounts, setLocalChartOfAccounts }) {
+    const [newAcc, setNewAcc] = useState({ code: '', name: '', type: 'ASSET', normal_balance: 'Debit' });
+    const [saving, setSaving] = useState(false);
+    const [seeding, setSeeding] = useState(false);
+    const [showForm, setShowForm] = useState(false);
+
+    const existingCodes = new Set((localChartOfAccounts || []).map(a => a.code));
+    const presetsToAdd = PRESET_ACCOUNTS.filter(p => !existingCodes.has(p.code));
+
+    const grouped = useMemo(() => {
+        const g = { ASSET: [], LIABILITY: [], EQUITY: [], REVENUE: [], EXPENSE: [] };
+        (localChartOfAccounts || []).forEach(a => { if (g[a.type]) g[a.type].push(a); });
+        return g;
+    }, [localChartOfAccounts]);
+
+    const handleSeedPresets = async () => {
+        if (presetsToAdd.length === 0) { alert('All preset accounts are already in your Chart of Accounts!'); return; }
+        if (!window.confirm(`This will add ${presetsToAdd.length} standard banana-export accounts to your COA. Proceed?`)) return;
+        setSeeding(true);
+        try {
+            const { data, error } = await supabase.from('chart_of_accounts').insert(presetsToAdd).select();
+            if (error) throw error;
+            setLocalChartOfAccounts(prev => [...(prev || []), ...(data || [])]);
+            alert(`✅ ${data.length} accounts added successfully!`);
+        } catch (e) {
+            alert('Error seeding accounts: ' + e.message);
+        } finally {
+            setSeeding(false);
+        }
+    };
+
+    const handleAddAccount = async () => {
+        if (!newAcc.code || !newAcc.name) return alert('Code and Name are required.');
+        if (existingCodes.has(newAcc.code)) return alert(`Account code ${newAcc.code} already exists.`);
+        setSaving(true);
+        try {
+            const { data, error } = await supabase.from('chart_of_accounts').insert([newAcc]).select();
+            if (error) throw error;
+            setLocalChartOfAccounts(prev => [...(prev || []), ...(data || [])]);
+            setNewAcc({ code: '', name: '', type: 'Asset', normal_balance: 'Debit' });
+            setShowForm(false);
+        } catch (e) {
+            alert('Error adding account: ' + e.message);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <div className="erp-content-section slide-down text-left" style={{ padding: '2rem', background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+                <div>
+                    <h3 style={{ margin: '0 0 0.25rem', color: 'var(--color-primary-dark)' }}>Chart of Accounts</h3>
+                    <p style={{ margin: 0, color: 'var(--text-tertiary)', fontSize: '0.88rem' }}>{(localChartOfAccounts || []).length} accounts • Banana export standard COA</p>
+                </div>
+                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                    {presetsToAdd.length > 0 && (
+                        <button
+                            onClick={handleSeedPresets}
+                            disabled={seeding}
+                            style={{ padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid #10b981', background: '#f0fdf4', color: '#065f46', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                        >
+                            {seeding ? '⟳ Adding...' : `⬇ Seed ${presetsToAdd.length} Preset Accounts`}
+                        </button>
+                    )}
+                    <button
+                        onClick={() => setShowForm(!showForm)}
+                        style={{ padding: '0.5rem 1rem', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #3b82f6, #2563eb)', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                    >
+                        <Plus size={16} /> Add Custom Account
+                    </button>
+                </div>
+            </div>
+
+            {/* Add Account Form */}
+            {showForm && (
+                <div style={{ padding: '1.25rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', marginBottom: '1.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '1rem', alignItems: 'end' }}>
+                    <div>
+                        <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.3rem' }}>Account Code *</label>
+                        <input className="input-field" placeholder="e.g. 5130" value={newAcc.code} onChange={e => setNewAcc({ ...newAcc, code: e.target.value })} />
+                    </div>
+                    <div style={{ gridColumn: 'span 2' }}>
+                        <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.3rem' }}>Account Name *</label>
+                        <input className="input-field" placeholder="e.g. Transportation Expense" value={newAcc.name} onChange={e => setNewAcc({ ...newAcc, name: e.target.value })} />
+                    </div>
+                    <div>
+                        <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.3rem' }}>Type</label>
+                        <select className="input-field" value={newAcc.type} onChange={e => setNewAcc({ ...newAcc, type: e.target.value })}>
+                            <option value="ASSET">Asset</option><option value="LIABILITY">Liability</option><option value="EQUITY">Equity</option><option value="REVENUE">Revenue</option><option value="EXPENSE">Expense</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.3rem' }}>Normal Balance</label>
+                        <select className="input-field" value={newAcc.normal_balance} onChange={e => setNewAcc({ ...newAcc, normal_balance: e.target.value })}>
+                            <option>Debit</option><option>Credit</option>
+                        </select>
+                    </div>
+                    <button onClick={handleAddAccount} disabled={saving} style={{ padding: '0.55rem 1rem', borderRadius: '8px', border: 'none', background: '#3b82f6', color: '#fff', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <Save size={16} /> {saving ? 'Saving...' : 'Save Account'}
+                    </button>
+                </div>
+            )}
+
+            {/* Accounts By Group */}
+            {Object.entries(grouped).map(([type, accs]) => (
+                accs.length === 0 ? null : (
+                    <div key={type} style={{ marginBottom: '1.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                            <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: COA_TYPE_COLORS[type], display: 'inline-block', flexShrink: 0 }} />
+                            <strong style={{ fontSize: '0.88rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: COA_TYPE_COLORS[type] }}>{type}s</strong>
+                            <span style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)' }}>({accs.length})</span>
+                        </div>
+                        <table className="banana-table" style={{ fontSize: '0.85rem' }}>
+                            <thead><tr><th style={{ width: '90px' }}>Code</th><th>Account Name</th><th style={{ width: '120px' }}>Type</th><th style={{ width: '110px' }}>Normal Balance</th></tr></thead>
+                            <tbody>
+                                {[...accs].sort((a, b) => a.code.localeCompare(b.code)).map(acc => (
+                                    <tr key={acc.id || acc.code}>
+                                        <td style={{ fontFamily: 'monospace', fontWeight: 700, color: COA_TYPE_COLORS[type] }}>{acc.code}</td>
+                                        <td style={{ fontWeight: 500 }}>{acc.name}</td>
+                                        <td><span style={{ background: `${COA_TYPE_COLORS[type]}18`, color: COA_TYPE_COLORS[type], padding: '0.15rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700 }}>{acc.type}</span></td>
+                                        <td style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)' }}>{acc.normal_balance}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )
+            ))}
+            {(localChartOfAccounts || []).length === 0 && (
+                <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-tertiary)' }}>
+                    <p>No accounts yet. Click <strong>"Seed Preset Accounts"</strong> to get started with the standard banana-export COA.</p>
+                </div>
+            )}
+        </div>
+    );
+}
+// ============================================================
+// Ledger Filter & Table Sub-Components
+// ============================================================
+function LedgerAccountFilter({ ledgerData }) {
+    return (
+        <select
+            id="ledger-account-filter"
+            className="input-field"
+            style={{ fontSize: '0.82rem', padding: '0.35rem 0.5rem' }}
+            defaultValue=""
+        >
+            <option value="">All Accounts</option>
+            {[...new Map(ledgerData.map(r => [r.accountCode, r])).values()]
+                .sort((a, b) => a.accountCode.localeCompare(b.accountCode))
+                .map(r => (
+                    <option key={r.accountCode} value={r.accountCode}>{r.accountCode} - {r.accountName}</option>
+                ))}
+        </select>
+    );
+}
+
+function LedgerDateFilter({ id }) {
+    return (
+        <input
+            type="date"
+            id={id}
+            className="input-field"
+            style={{ fontSize: '0.82rem', padding: '0.35rem 0.5rem' }}
+        />
+    );
+}
+
+function LedgerTable({ ledgerData }) {
+    const [accountFilter, setAccountFilter] = useState('');
+    const [dateFrom, setDateFrom] = useState('');
+    const [dateTo, setDateTo] = useState('');
+
+    const filtered = useMemo(() => {
+        return ledgerData.filter(row => {
+            if (accountFilter && row.accountCode !== accountFilter) return false;
+            if (dateFrom && row.date < dateFrom) return false;
+            if (dateTo && row.date > dateTo) return false;
+            return true;
+        });
+    }, [ledgerData, accountFilter, dateFrom, dateTo]);
+
+    const totalDebit = filtered.reduce((s, r) => s + r.debit, 0);
+    const totalCredit = filtered.reduce((s, r) => s + r.credit, 0);
+
+    const uniqueAccounts = useMemo(() => {
+        return [...new Map(ledgerData.map(r => [r.accountCode, r])).values()]
+            .sort((a, b) => a.accountCode.localeCompare(b.accountCode));
+    }, [ledgerData]);
+
+    return (
+        <div>
+            {/* Inline filters (self-contained) */}
+            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.25rem', padding: '1rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <div style={{ flex: '1 1 200px' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.3rem' }}>Filter by Account</label>
+                    <select className="input-field" style={{ fontSize: '0.82rem' }} value={accountFilter} onChange={e => setAccountFilter(e.target.value)}>
+                        <option value="">All Accounts</option>
+                        {uniqueAccounts.map(r => (
+                            <option key={r.accountCode} value={r.accountCode}>{r.accountCode} - {r.accountName}</option>
+                        ))}
+                    </select>
+                </div>
+                <div style={{ flex: '1 1 140px' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.3rem' }}>From Date</label>
+                    <input type="date" className="input-field" style={{ fontSize: '0.82rem' }} value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+                </div>
+                <div style={{ flex: '1 1 140px' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.3rem' }}>To Date</label>
+                    <input type="date" className="input-field" style={{ fontSize: '0.82rem' }} value={dateTo} onChange={e => setDateTo(e.target.value)} />
+                </div>
+                {(accountFilter || dateFrom || dateTo) && (
+                    <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'flex-end' }}>
+                        <button className="btn-secondary" style={{ fontSize: '0.78rem', padding: '0.35rem 0.75rem' }}
+                            onClick={() => { setAccountFilter(''); setDateFrom(''); setDateTo(''); }}>
+                            ✕ Clear Filters
+                        </button>
+                    </div>
+                )}
+            </div>
+
+            <div style={{ overflowX: 'auto' }}>
+                <table className="banana-table" style={{ fontSize: '0.85rem' }}>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Reference</th>
+                            <th>Description</th>
+                            <th>Account</th>
+                            <th className="text-right">Debit (PHP)</th>
+                            <th className="text-right">Credit (PHP)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {filtered.length === 0 ? (
+                            <tr><td colSpan="6" className="text-center" style={{ padding: '2rem', color: 'var(--text-tertiary)' }}>No journal lines match the current filters.</td></tr>
+                        ) : (
+                            filtered.map((row, idx) => (
+                                <tr key={row.id} style={{
+                                    background: row.credit > 0 ? '#fafafa' : 'transparent',
+                                    borderBottom: (idx < filtered.length - 1 && filtered[idx + 1]?.reference !== row.reference) ? '2px solid #e2e8f0' : undefined
+                                }}>
+                                    <td style={{ whiteSpace: 'nowrap', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{new Date(row.date).toLocaleDateString()}</td>
+                                    <td style={{ fontWeight: 700, color: 'var(--color-primary-main)', fontSize: '0.82rem' }}>{row.reference}</td>
+                                    <td style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.description || '—'}</td>
+                                    <td>
+                                        <span style={{ color: 'var(--text-tertiary)', marginRight: '0.4rem', fontSize: '0.78rem' }}>{row.accountCode}</span>
+                                        <strong style={{ fontSize: '0.83rem' }}>{row.accountName}</strong>
+                                    </td>
+                                    <td className="text-right" style={{ fontWeight: row.debit > 0 ? 700 : 400, color: row.debit > 0 ? '#0f4c26' : '#cbd5e1' }}>
+                                        {row.debit > 0 ? row.debit.toLocaleString(undefined, { minimumFractionDigits: 2 }) : '–'}
+                                    </td>
+                                    <td className="text-right" style={{ fontWeight: row.credit > 0 ? 700 : 400, color: row.credit > 0 ? '#b45309' : '#cbd5e1' }}>
+                                        {row.credit > 0 ? row.credit.toLocaleString(undefined, { minimumFractionDigits: 2 }) : '–'}
+                                    </td>
+                                </tr>
+                            ))
+                        )}
+                    </tbody>
+                    {filtered.length > 0 && (
+                        <tfoot>
+                            <tr style={{ background: '#f1f5f9', fontWeight: 700 }}>
+                                <td colSpan="4" style={{ padding: '0.6rem 1rem', fontSize: '0.83rem', color: 'var(--text-secondary)' }}>TOTALS ({filtered.length} lines)</td>
+                                <td className="text-right" style={{ color: '#0f4c26', padding: '0.6rem 1rem' }}>{totalDebit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                                <td className="text-right" style={{ color: '#b45309', padding: '0.6rem 1rem' }}>{totalCredit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                            </tr>
+                            <tr style={{ background: Math.abs(totalDebit - totalCredit) < 0.01 ? '#dcfce7' : '#fef2f2' }}>
+                                <td colSpan="6" style={{ padding: '0.4rem 1rem', fontSize: '0.78rem', fontWeight: 600, color: Math.abs(totalDebit - totalCredit) < 0.01 ? '#166534' : '#dc2626', textAlign: 'right' }}>
+                                    {Math.abs(totalDebit - totalCredit) < 0.01
+                                        ? '✓ Balanced — Debits equal Credits'
+                                        : `⚠ Out of Balance by ₱${Math.abs(totalDebit - totalCredit).toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
+                                </td>
+                            </tr>
+                        </tfoot>
+                    )}
+                </table>
+            </div>
+        </div>
+    );
+}
 
 export default Accounting;

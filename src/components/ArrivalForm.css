@@ -258,7 +258,7 @@
 
     .form-container {
         max-width: 100%;
-        overflow-x: hidden;
+        overflow-x: auto;
     }
 
     .arrival-form {

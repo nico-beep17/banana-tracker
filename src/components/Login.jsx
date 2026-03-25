@@ -89,6 +89,12 @@ const Login = ({ onLoginSuccess }) => {
                     <p>Access is restricted to authorized LAVC personnel.</p>
                     <p className="login-hint">Use your <strong>@gmail.com</strong> account linked to your organization.</p>
                 </div>
+
+                {import.meta.env.DEV && (
+                    <button type="button" className="btn-secondary" onClick={() => window.dispatchEvent(new Event('dev-login'))} style={{ width: '100%', marginTop: '1rem' }}>
+                        ⚙️ DEV: Instant Login
+                    </button>
+                )}
             </div>
         </div>
     );

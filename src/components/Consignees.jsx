@@ -2,13 +2,14 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
     Users, Globe, DollarSign, Calendar, 
-    Search, Plus, Edit3, Trash2, 
+    Search, Plus, Edit3, Trash2, Download,
     ArrowLeft, Copy, CheckCircle2, 
     Building2, Mail, Phone, MapPin,
     AlertCircle, Briefcase
 } from 'lucide-react';
 import './Consignees.css';
 import { supabase } from '../supabaseClient';
+import { exportXlsx } from '../utils/exportXlsx';
 import emptyIllustration from '../assets/consignee_registry_empty_illustration.png';
 
 const Consignees = ({ consignees = [], setConsignees, consigneeWeeklyRates = [], setConsigneeWeeklyRates }) => {
@@ -500,8 +501,41 @@ const Consignees = ({ consignees = [], setConsignees, consigneeWeeklyRates = [],
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
-                <div style={{ color: '#64748b', fontSize: '0.9rem', fontWeight: '600' }}>
-                    Showing {filteredConsignees.length} partner{filteredConsignees.length !== 1 ? 's' : ''}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', fontWeight: '600' }}>
+                        Showing {filteredConsignees.length} partner{filteredConsignees.length !== 1 ? 's' : ''}
+                    </div>
+                    {consignees.length > 0 && (
+                        <button
+                            style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-card)', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-primary)' }}
+                            onClick={async () => {
+                                try {
+                                    const { default: ExcelJS } = await import('exceljs');
+                                    const wb = new ExcelJS.Workbook();
+                                    const ws = wb.addWorksheet('Consignees');
+                                    ws.columns = [
+                                        { header: 'Company Name', key: 'company_name', width: 28 },
+                                        { header: 'Contact Person', key: 'contact_person', width: 22 },
+                                        { header: 'Email', key: 'email', width: 28 },
+                                        { header: 'Phone', key: 'phone', width: 18 },
+                                        { header: 'Country', key: 'country', width: 16 },
+                                        { header: 'Port', key: 'default_port', width: 18 },
+                                        { header: 'Payment Terms', key: 'payment_terms', width: 16 },
+                                        { header: 'Currency', key: 'currency', width: 10 },
+                                        { header: 'Status', key: 'status', width: 12 },
+                                    ];
+                                    ws.getRow(1).eachCell(cell => {
+                                        cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+                                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1e3a5f' } };
+                                    });
+                                    consignees.forEach(c => ws.addRow(c));
+                                    await exportXlsx(wb, `Consignees_${new Date().toISOString().split('T')[0]}.xlsx`);
+                                } catch (err) { alert('Export failed: ' + err.message); }
+                            }}
+                        >
+                            <Download size={15} /> Export Excel
+                        </button>
+                    )}
                 </div>
             </div>
 

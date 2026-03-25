@@ -165,53 +165,6 @@
     flex-shrink: 0;
 }
 
-/* ─── Divider ─── */
-.login-divider {
-    display: flex;
-    align-items: center;
-    width: 100%;
-    gap: 1rem;
-    margin: 0.25rem 0;
-}
-
-.login-divider::before,
-.login-divider::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: rgba(255, 255, 255, 0.15);
-}
-
-.login-divider span {
-    font-size: 0.8rem;
-    color: rgba(255, 255, 255, 0.4);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-}
-
-/* ─── Dev Bypass Button ─── */
-.btn-dev-bypass {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    width: 100%;
-    padding: 0.75rem 1.25rem;
-    font-size: 0.9rem;
-    font-weight: 500;
-    background: transparent;
-    color: #d97706;
-    border: 1px solid rgba(217, 119, 6, 0.35);
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.25s ease;
-}
-
-.btn-dev-bypass:hover {
-    background: rgba(217, 119, 6, 0.1);
-    border-color: #d97706;
-}
-
 /* ─── Footer ─── */
 .login-footer {
     margin-top: 2rem;
