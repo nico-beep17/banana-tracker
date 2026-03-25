@@ -12,6 +12,16 @@ const getISOWeek = (date) => {
 };
 
 const NewContainerForm = ({ onSaveContainer, initialData = null, onCancel, consignees = [] }) => {
+    const getLocalDate = () => {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+
+    const getLocalTime = () => {
+        const d = new Date();
+        return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    };
+
     const [formData, setFormData] = useState({
         // Header 1
         brand: 'LFJ',
@@ -29,8 +39,8 @@ const NewContainerForm = ({ onSaveContainer, initialData = null, onCancel, consi
         timeOfDeparture: '',
         driverName: '', // Changed from driver
         plateNo: '',
-        dateArrived: '',
-        timeArrived: '',
+        dateArrived: getLocalDate(),
+        timeArrived: getLocalTime(),
         temperature: '14.0',
         ventilation: 'CLOSED',
         grossWeight: '',
@@ -94,7 +104,7 @@ const NewContainerForm = ({ onSaveContainer, initialData = null, onCancel, consi
                 brand: 'LFJ', reeferName: '', reeferNo: '', sealNo: '', destination: '', vesselVoyage: '',
                 shipper: 'LFJ AGRI-VENTURES CORP.', bpiSticker: '', buyer_name: '',
                 bookingNo: '', dateDeparted: '', timeOfDeparture: '',
-                driverName: '', plateNo: '', dateArrived: '', timeArrived: '', temperature: '14.0', ventilation: 'CLOSED',
+                driverName: '', plateNo: '', dateArrived: getLocalDate(), timeArrived: getLocalTime(), temperature: '14.0', ventilation: 'CLOSED',
                 grossWeight: '', netWeight: ''
             });
         }
