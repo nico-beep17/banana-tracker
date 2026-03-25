@@ -191,22 +191,6 @@ function App() {
     }
   }, []);
 
-  useEffect(() => {
-    const handleDevLogin = () => {
-      setUser({ id: 'dev-bypass-id-001', email: 'jannicop@gmail.com' });
-      setUserProfile({
-        id: 'dev-bypass-id-001',
-        full_name: 'Dev Tester',
-        role: 'Administrator',
-        email: 'jannicop@gmail.com'
-      });
-      setAuthLoading(false);
-      fetchData();
-    };
-    window.addEventListener('dev-login', handleDevLogin);
-    return () => window.removeEventListener('dev-login', handleDevLogin);
-  }, [fetchData]);
-
   // Fetch initial data & handle Auth
   useEffect(() => {
     // Check initial Supabase session — only for setting user state immediately
