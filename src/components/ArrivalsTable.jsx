@@ -155,13 +155,30 @@ const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, setAr
             return;
         }
 
-        // 2. Update individual row quantities
-        for (const row of batchRows) {
-            if (row.typeId && editForm.quantities[row.typeId] !== undefined) {
-                const newQty = Number(editForm.quantities[row.typeId]) || 0;
-                if (newQty !== Number(row.quantity)) {
-                    await supabase.from('arrivals').update({ quantity: newQty }).eq('id', row.id);
+        // 2. Update individual row quantities & Insert any missing types
+        const baseRow = batchRows[0];
+        for (const typeId of Object.keys(editForm.quantities)) {
+            const newQty = Number(editForm.quantities[typeId]) || 0;
+            const existingRow = batchRows.find(r => r.typeId === typeId);
+            
+            if (existingRow) {
+                if (newQty !== Number(existingRow.quantity)) {
+                    await supabase.from('arrivals').update({ quantity: newQty }).eq('id', existingRow.id);
                 }
+            } else if (newQty > 0) {
+                const newRowPayload = {
+                    ...headerPayload,
+                    batchId: baseRow.batchId || null,
+                    farmCode: baseRow.farmCode,
+                    typeId: typeId,
+                    quantity: newQty,
+                    sync_status: 'SYNCED',
+                    deviceId: baseRow.deviceId,
+                    encodedAt: baseRow.encodedAt || new Date().toISOString(),
+                    dateTimeEncoded: baseRow.dateTimeEncoded || new Date().toISOString(),
+                    approval_status: baseRow.approval_status
+                };
+                await supabase.from('arrivals').insert([newRowPayload]);
             }
         }
 
@@ -190,8 +207,10 @@ const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, setAr
         }
         const { data: freshData } = await reloadQuery;
         if (freshData && freshData.length > 0) {
-            const freshMap = new Map(freshData.map(item => [item.id, item]));
-            setArrivals(prev => prev.map(a => freshMap.has(a.id) ? freshMap.get(a.id) : a));
+            setArrivals(prev => {
+                const withoutOldBatch = prev.filter(a => batchId ? a.batchId !== batchId : a.id !== editingArrival.id);
+                return [...withoutOldBatch, ...freshData];
+            });
         }
 
         setEditingArrival(null);
