@@ -163,22 +163,34 @@ const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, setAr
             
             if (existingRow) {
                 if (newQty !== Number(existingRow.quantity)) {
-                    await supabase.from('arrivals').update({ quantity: newQty }).eq('id', existingRow.id);
+                    const { error: updateError } = await supabase.from('arrivals').update({ quantity: newQty }).eq('id', existingRow.id);
+                    if (updateError) alert(`Update error for ${typeId}: ${updateError.message}`);
                 }
             } else if (newQty > 0) {
+                let ccClass = 'A';
+                if (typeId.includes('sh')) ccClass = 'S'; // 'S' for small or 'SH'
+                if (typeId.includes('cla')) ccClass = 'A';
+                if (typeId.includes('.rhb') || typeId.includes('.shb')) ccClass = 'B';
+                if (typeId.includes('clb')) ccClass = 'B';
+                if (typeId.includes('fp')) ccClass = 'B';
+
+                let sizeCode = typeId.replace(/classA\.[a-z]+/, '').replace(/classB\.[a-z]+/, '').toUpperCase();
+                let productSpecsCode = `${baseRow.brand || 'XXX'}${ccClass}${sizeCode}V135`;
+
                 const newRowPayload = {
                     ...headerPayload,
                     batchId: baseRow.batchId || null,
                     farmCode: baseRow.farmCode,
                     typeId: typeId,
                     quantity: newQty,
-                    sync_status: 'SYNCED',
-                    deviceId: baseRow.deviceId,
-                    encodedAt: baseRow.encodedAt || new Date().toISOString(),
+                    brand: baseRow.brand || 'XXX',
+                    ccClass: ccClass,
+                    productSpecsCode: productSpecsCode,
                     dateTimeEncoded: baseRow.dateTimeEncoded || new Date().toISOString(),
                     approval_status: baseRow.approval_status
                 };
-                await supabase.from('arrivals').insert([newRowPayload]);
+                const { error: insertError } = await supabase.from('arrivals').insert([newRowPayload]);
+                if (insertError) alert(`Insert error for ${typeId}: ${insertError.message}`);
             }
         }
 
