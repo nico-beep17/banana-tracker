@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Capacitor } from '@capacitor/core';
+import { Browser } from '@capacitor/browser';
 import './Login.css';
 import { supabase } from '../supabaseClient';
 
@@ -12,10 +13,13 @@ const Login = ({ onLoginSuccess }) => {
         setErrorMsg('');
 
         try {
-            const { error } = await supabase.auth.signInWithOAuth({
+            const isNative = Capacitor.isNativePlatform();
+            
+            const { data, error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
-                    redirectTo: Capacitor.isNativePlatform() ? 'com.lavc.bananatracker://login-callback' : window.location.origin,
+                    redirectTo: isNative ? 'com.lavc.bananatracker://login-callback' : window.location.origin,
+                    skipBrowserRedirect: isNative, // Prevents generic webview navigation from killing the capacitor app
                     queryParams: {
                         access_type: 'offline',
                         prompt: 'consent',
@@ -24,8 +28,13 @@ const Login = ({ onLoginSuccess }) => {
             });
 
             if (error) throw error;
-            // OAuth will redirect — no need to call onLoginSuccess here.
-            // The auth state listener in App.jsx picks up the session after redirect.
+            
+            // If on Native APK, manually open the URL using the Capacitor Browser overlay plugin
+            if (isNative && data?.url) {
+                await Browser.open({ url: data.url });
+            }
+            
+            // The auth state listener in App.jsx picks up the session automatically.
         } catch (error) {
             setErrorMsg(error.message);
             setLoading(false);
