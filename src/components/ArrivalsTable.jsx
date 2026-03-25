@@ -51,12 +51,17 @@ const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, setAr
             }
         });
 
+        let formattedDateTimeArrive = '';
+        if (arrival.dateTimeArrive) {
+            formattedDateTimeArrive = new Date(arrival.dateTimeArrive).toISOString().slice(0, 16);
+        }
+
         setEditForm({
             farmName: arrival.farmName || '',
             driverName: arrival.driverName || '',
             plateNumber: arrival.plateNumber || '',
             deliveryReceipt: arrival.deliveryReceipt || '',
-            dateTimeArrive: arrival.dateTimeArrive || '',
+            dateTimeArrive: formattedDateTimeArrive,
             dateOfPacking: arrival.dateOfPacking || '',
             // Per-hands quantities
             quantities
@@ -122,26 +127,27 @@ const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, setAr
     };
 
     const handleEditSave = async () => {
-        if (!editingArrival || !setArrivals) return;
+        try {
+            if (!editingArrival || !setArrivals) return;
 
-        const batchId = editingArrival.batchId;
+            const batchId = editingArrival.batchId;
 
-        // Capture old data for audit log (only if this is an override)
-        const batchRows = batchId
-            ? arrivals.filter(a => a.batchId === batchId)
-            : arrivals.filter(a => a.id === editingArrival.id);
+            // Capture old data for audit log (only if this is an override)
+            const batchRows = batchId
+                ? arrivals.filter(a => a.batchId === batchId)
+                : arrivals.filter(a => a.id === editingArrival.id);
 
-        const oldDataSnapshot = batchRows.map(r => ({ id: r.id, typeId: r.typeId, quantity: r.quantity, farmName: r.farmName, driverName: r.driverName, deliveryReceipt: r.deliveryReceipt }));
+            const oldDataSnapshot = batchRows.map(r => ({ id: r.id, typeId: r.typeId, quantity: r.quantity, farmName: r.farmName, driverName: r.driverName, deliveryReceipt: r.deliveryReceipt }));
 
-        // 1. Update header fields on all batch rows
-        const headerPayload = {
-            farmName: editForm.farmName,
-            driverName: editForm.driverName,
-            plateNumber: editForm.plateNumber,
-            deliveryReceipt: editForm.deliveryReceipt,
-            dateTimeArrive: editForm.dateTimeArrive,
-            dateOfPacking: editForm.dateOfPacking,
-        };
+            // 1. Update header fields on all batch rows
+            const headerPayload = {
+                farmName: editForm.farmName,
+                driverName: editForm.driverName,
+                plateNumber: editForm.plateNumber,
+                deliveryReceipt: editForm.deliveryReceipt,
+                dateTimeArrive: editForm.dateTimeArrive || new Date().toISOString(),
+                dateOfPacking: editForm.dateOfPacking,
+            };
 
         let headerQuery = supabase.from('arrivals').update(headerPayload);
         if (batchId) {
@@ -225,7 +231,11 @@ const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, setAr
             });
         }
 
-        setEditingArrival(null);
+            setEditingArrival(null);
+        } catch (err) {
+            console.error(err);
+            alert(`Execution Error during Save: ${err.message}`);
+        }
     };
 
     // Type labels for display
