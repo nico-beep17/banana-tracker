@@ -114,11 +114,11 @@ const PinVerifyModal = ({ isOpen, onClose, onVerified, actionLabel = 'Override' 
                         }}>Override PIN</label>
                         <input
                             ref={pinRef}
-                            type="password"
+                            type="text"
                             maxLength={4}
                             value={pin}
                             onChange={(e) => { setPin(e.target.value.replace(/\D/g, '')); setError(''); }}
-                            placeholder="••••"
+                            placeholder="****"
                             className="input-field"
                             style={{
                                 width: '100%', boxSizing: 'border-box',
@@ -127,7 +127,8 @@ const PinVerifyModal = ({ isOpen, onClose, onVerified, actionLabel = 'Override' 
                                 border: error ? '2px solid #dc2626' : '2px solid #e2e8f0',
                                 borderRadius: '8px',
                                 transition: 'border-color 0.2s ease',
-                                fontFamily: 'monospace'
+                                fontFamily: 'monospace',
+                                WebkitTextSecurity: 'disc'
                             }}
                             inputMode="numeric"
                             autoComplete="off"
