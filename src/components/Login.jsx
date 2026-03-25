@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import './Login.css';
 import { supabase } from '../supabaseClient';
 
@@ -14,7 +15,7 @@ const Login = ({ onLoginSuccess }) => {
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
-                    redirectTo: window.location.origin,
+                    redirectTo: Capacitor.isNativePlatform() ? 'com.lavc.bananatracker://login-callback' : window.location.origin,
                     queryParams: {
                         access_type: 'offline',
                         prompt: 'consent',
@@ -66,10 +67,6 @@ const Login = ({ onLoginSuccess }) => {
                     <p className="login-hint">Use your <strong>@gmail.com</strong> account linked to your organization.</p>
                 </div>
 
-                 style={{ width: '100%', marginTop: '1rem' }}>
-                        ⚙️ DEV: Instant Login
-                    </button>
-                )}
             </div>
         </div>
     );
