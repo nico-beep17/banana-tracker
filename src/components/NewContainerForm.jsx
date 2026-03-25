@@ -30,6 +30,7 @@ const NewContainerForm = ({ onSaveContainer, initialData = null, onCancel, consi
         driverName: '', // Changed from driver
         plateNo: '',
         dateArrived: '',
+        timeArrived: '',
         temperature: '14.0',
         ventilation: 'CLOSED',
         grossWeight: '',
@@ -47,6 +48,7 @@ const NewContainerForm = ({ onSaveContainer, initialData = null, onCancel, consi
                 dateDeparted: initialData.dateDeparted || '',
                 timeOfDeparture: initialData.timeOfDeparture || '',
                 dateArrived: initialData.dateArrived || '',
+                timeArrived: initialData.timeArrived || '',
                 ventilation: initialData.ventilation || 'CLOSED',
                 grossWeight: initialData.grossWeight || '',
                 netWeight: initialData.netWeight || ''
@@ -92,7 +94,7 @@ const NewContainerForm = ({ onSaveContainer, initialData = null, onCancel, consi
                 brand: 'LFJ', reeferName: '', reeferNo: '', sealNo: '', destination: '', vesselVoyage: '',
                 shipper: 'LFJ AGRI-VENTURES CORP.', bpiSticker: '', buyer_name: '',
                 bookingNo: '', dateDeparted: '', timeOfDeparture: '',
-                driverName: '', plateNo: '', dateArrived: '', temperature: '14.0', ventilation: 'CLOSED',
+                driverName: '', plateNo: '', dateArrived: '', timeArrived: '', temperature: '14.0', ventilation: 'CLOSED',
                 grossWeight: '', netWeight: ''
             });
         }
@@ -113,8 +115,9 @@ const NewContainerForm = ({ onSaveContainer, initialData = null, onCancel, consi
             <div className="stuffing-layout" style={{ maxWidth: '1000px', margin: '0 auto', display: 'block' }}>
                 <form onSubmit={handleSubmit}>
                     <div className="form-section">
-                        <h3 className="form-section-title">🚢 Shipment Identification</h3>
+                        <h3 className="form-section-title">🚢 Container Identification</h3>
                         <div className="form-row">
+                            {initialData && (
                             <div className="form-group">
                                 <label className="label">Destination Port</label>
                                 <select
@@ -140,18 +143,27 @@ const NewContainerForm = ({ onSaveContainer, initialData = null, onCancel, consi
                                     <option value="Qatar">Qatar</option>
                                 </select>
                             </div>
+                            )}
                             <div className="form-group">
-                                <label className="label">Reefer Name</label>
+                                <label className="label">Reefer Name <span style={{color:'red'}}>*</span></label>
                                 <input type="text" name="reeferName" className="input-field" value={formData.reeferName} onChange={handleChange} required placeholder="e.g. COSCO" />
                             </div>
                             <div className="form-group">
-                                <label className="label">Reefer Number</label>
+                                <label className="label">Container Number <span style={{color:'red'}}>*</span></label>
                                 <input type="text" name="reeferNo" className="input-field" value={formData.reeferNo} onChange={handleChange} required placeholder="e.g. 12345" />
                             </div>
                             <div className="form-group">
-                                <label className="label">Brand</label>
+                                <label className="label">Brand <span style={{color:'red'}}>*</span></label>
                                 <input type="text" name="brand" className="input-field" value={formData.brand} onChange={handleChange} required placeholder="e.g. LFJ" />
                             </div>
+                            
+                            {/* Seal Number included in initial registration */}
+                            <div className="form-group">
+                                <label className="label">Seal No.</label>
+                                <input type="text" name="sealNo" className="input-field" value={formData.sealNo} onChange={handleChange} />
+                            </div>
+
+                            {initialData && (
                             <div className="form-group">
                                 <label className="label">Buyer / Consignee</label>
                                 {activeConsignees.length > 0 ? (
@@ -171,23 +183,35 @@ const NewContainerForm = ({ onSaveContainer, initialData = null, onCancel, consi
                                     </span>
                                 )}
                             </div>
+                            )}
+
+                            {/* Date and Time Arrived included in initial registration */}
+                            <div className="form-group">
+                                <label className="label">Date Arrived <span style={{color:'red'}}>*</span></label>
+                                <input type="date" name="dateArrived" className="input-field" value={formData.dateArrived} onChange={handleChange} required />
+                            </div>
+                            <div className="form-group">
+                                <label className="label">Time Arrived</label>
+                                <input type="time" name="timeArrived" className="input-field" value={formData.timeArrived || ''} onChange={handleChange} />
+                            </div>
                         </div>
                     </div>
 
+                    {initialData && (
                     <div className="form-section">
                         <h3 className="form-section-title">🎫 Booking & Details</h3>
                         <div className="form-row">
                             <div className="form-group">
                                 <label className="label">Booking Number</label>
-                                <input type="text" name="bookingNo" className="input-field" value={formData.bookingNo} onChange={handleChange} required />
+                                <input type="text" name="bookingNo" className="input-field" value={formData.bookingNo} onChange={handleChange} required={!!initialData} />
                             </div>
                             <div className="form-group">
                                 <label className="label">Vessel / Voyage No.</label>
-                                <input type="text" name="vesselVoyage" className="input-field" value={formData.vesselVoyage} onChange={handleChange} required />
+                                <input type="text" name="vesselVoyage" className="input-field" value={formData.vesselVoyage} onChange={handleChange} required={!!initialData} />
                             </div>
                             <div className="form-group">
                                 <label className="label">Shipper</label>
-                                <input type="text" name="shipper" className="input-field" value={formData.shipper} onChange={handleChange} required />
+                                <input type="text" name="shipper" className="input-field" value={formData.shipper} onChange={handleChange} required={!!initialData} />
                             </div>
                         </div>
                         <div className="form-row">
@@ -203,17 +227,15 @@ const NewContainerForm = ({ onSaveContainer, initialData = null, onCancel, consi
                             </div>
                         </div>
                     </div>
+                    )}
 
+                    {initialData && (
                     <div className="form-section">
                         <h3 className="form-section-title">🚚 Transport & Operation</h3>
                         <div className="form-row">
                             <div className="form-group">
                                 <label className="label">BPI Sticker No.</label>
                                 <input type="text" name="bpiSticker" className="input-field" value={formData.bpiSticker} onChange={handleChange} />
-                            </div>
-                            <div className="form-group">
-                                <label className="label">Seal No.</label>
-                                <input type="text" name="sealNo" className="input-field" value={formData.sealNo} onChange={handleChange} />
                             </div>
                         </div>
                         <div className="form-row">
@@ -224,10 +246,6 @@ const NewContainerForm = ({ onSaveContainer, initialData = null, onCancel, consi
                             <div className="form-group">
                                 <label className="label">Driver Name</label>
                                 <input type="text" name="driverName" className="input-field" value={formData.driverName} onChange={handleChange} />
-                            </div>
-                            <div className="form-group">
-                                <label className="label">Date Arrived</label>
-                                <input type="date" name="dateArrived" className="input-field" value={formData.dateArrived} onChange={handleChange} required />
                             </div>
                         </div>
                         <div className="form-row">
@@ -241,7 +259,9 @@ const NewContainerForm = ({ onSaveContainer, initialData = null, onCancel, consi
                             </div>
                         </div>
                     </div>
+                    )}
 
+                    {initialData && (
                     <div className="form-section">
                         <h3 className="form-section-title">🌡️ Climate Control</h3>
                         <div className="form-row">
@@ -255,6 +275,7 @@ const NewContainerForm = ({ onSaveContainer, initialData = null, onCancel, consi
                             </div>
                         </div>
                     </div>
+                    )}
 
                     <div className="form-actions" style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
                         <button type="button" className="btn-secondary" onClick={onCancel} style={{ padding: '0.75rem 1.5rem', fontWeight: 'bold' }}>

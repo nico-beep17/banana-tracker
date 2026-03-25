@@ -499,6 +499,7 @@ function App() {
       plugInTime: _plugInTime,
       plugOutTime: _plugOutTime,
       dateArrived,
+      timeArrived,
       ...dbPayload
     } = containerData;
 
@@ -517,7 +518,7 @@ function App() {
 
       if (data && data.length > 0) {
         // Re-inject the front-end properties into local state so the UI functions seamlessly
-        setContainers(prev => prev.map(c => c.id === containerData.id ? { ...data[0], timeOfDeparture, bookingNo, buyer_name, vesselVoyage, driverName, dateArrived } : c));
+        setContainers(prev => prev.map(c => c.id === containerData.id ? { ...data[0], timeOfDeparture, bookingNo, buyer_name, vesselVoyage, driverName, dateArrived, timeArrived } : c));
         handleNavigate('containers-list');
       }
     } else {
@@ -534,7 +535,7 @@ function App() {
 
       if (data && data.length > 0) {
         // Re-inject the front-end properties into local state so the UI functions seamlessly
-        setContainers(prev => [{ ...data[0], timeOfDeparture, bookingNo, buyer_name, vesselVoyage, driverName, dateArrived }, ...prev]);
+        setContainers(prev => [{ ...data[0], timeOfDeparture, bookingNo, buyer_name, vesselVoyage, driverName, dateArrived, timeArrived }, ...prev]);
         handleNavigate('containers-list');
       }
     }
