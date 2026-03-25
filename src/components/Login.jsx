@@ -31,20 +31,6 @@ const Login = ({ onLoginSuccess }) => {
         }
     };
 
-    const handleBypass = () => {
-        const mockUser = {
-            id: '00000000-0000-0000-0000-000000000000',
-            email: 'dev@lavc.com',
-            user_metadata: {
-                full_name: 'Developer Admin',
-                role: 'Admin / Developer',
-                department: 'Engineering'
-            }
-        };
-        localStorage.setItem('lavc_dev_bypass_user', JSON.stringify(mockUser));
-        onLoginSuccess(mockUser);
-    };
-
     return (
         <div className="login-container">
             <div className="login-card glass-panel animation-fade-in">
@@ -72,17 +58,7 @@ const Login = ({ onLoginSuccess }) => {
                         {loading ? 'Redirecting to Google...' : 'Sign in with Google'}
                     </button>
 
-                    <div className="login-divider">
-                        <span>or</span>
-                    </div>
-
-                    <button
-                        type="button"
-                        className="btn-dev-bypass"
-                        onClick={handleBypass}
-                    >
-                        🛠️ Skip Login (Dev Bypass)
-                    </button>
+                    
                 </div>
 
                 <div className="login-footer">
@@ -90,8 +66,7 @@ const Login = ({ onLoginSuccess }) => {
                     <p className="login-hint">Use your <strong>@gmail.com</strong> account linked to your organization.</p>
                 </div>
 
-                {import.meta.env.DEV && (
-                    <button type="button" className="btn-secondary" onClick={() => window.dispatchEvent(new Event('dev-login'))} style={{ width: '100%', marginTop: '1rem' }}>
+                 style={{ width: '100%', marginTop: '1rem' }}>
                         ⚙️ DEV: Instant Login
                     </button>
                 )}
