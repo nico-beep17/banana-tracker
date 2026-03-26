@@ -287,6 +287,7 @@ const ArrivalForm = ({
         const itemRate = Number(parsedRates[typeId]) || 0;
 
         newArrivalsBatch.push({
+          id: crypto.randomUUID ? crypto.randomUUID() : `arr-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           farmName: formData.farmName,
           farmCode: formData.farmCode,
           driverName: formData.driverName,
