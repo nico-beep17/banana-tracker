@@ -485,17 +485,12 @@ function App() {
   const handleSaveContainer = async (containerData) => {
     const isUpdate = containerData.id && containers.some(c => c.id === containerData.id);
 
-    // Omit columns that are purely front-end display properties
+    // Omit columns that are purely front-end display properties or remapped
     const {
-      timeOfDeparture,
-      bookingNo,
-      buyer_name,
       vesselVoyage,
       driverName,
       plugInTime: _plugInTime,
       plugOutTime: _plugOutTime,
-      dateArrived,
-      timeArrived,
       ...dbPayload
     } = containerData;
 
@@ -503,7 +498,7 @@ function App() {
       try {
         const { success, data, queued } = await offlineSync.mutate('update', 'containers', dbPayload, { id: containerData.id });
         if (success) {
-          const updatedContainer = { ...(data ? data[0] : dbPayload), timeOfDeparture, bookingNo, buyer_name, vesselVoyage, driverName, dateArrived, timeArrived };
+          const updatedContainer = { ...dbPayload, ...(data ? data[0] : {}), vesselVoyage, driverName };
           setContainers(prev => prev.map(c => c.id === containerData.id ? { ...c, ...updatedContainer } : c));
           if (queued) alert('📱 Offline Mode: Container modifications saved safely locally.');
           handleNavigate('containers-list');
@@ -516,7 +511,7 @@ function App() {
       try {
         const { success, data, queued } = await offlineSync.mutate('insert', 'containers', dbPayload);
         if (success) {
-          const newContainer = { ...(data ? data[0] : dbPayload), timeOfDeparture, bookingNo, buyer_name, vesselVoyage, driverName, dateArrived, timeArrived };
+          const newContainer = { ...dbPayload, ...(data ? data[0] : {}), vesselVoyage, driverName };
           setContainers(prev => [newContainer, ...prev]);
           if (queued) alert('📱 Offline Mode: New Container correctly registered locally.');
           handleNavigate('containers-list');
