@@ -194,17 +194,25 @@ function App() {
 
   // Fetch initial data & handle Auth
   useEffect(() => {
+    // Failsafe timeout to prevent infinite loading
+    const authTimeout = setTimeout(() => {
+      console.warn('[Failsafe] authLoading timeout reached, forcing false.');
+      setAuthLoading(false);
+    }, 6000);
+
     // Check initial Supabase session — only for setting user state immediately
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) console.error('[Auth] getSession error:', error);
       if (session?.user) {
         setUser(session.user);
         fetchUserProfile(session.user.id);
-        // Fetch data here as a safety net — the onAuthStateChange INITIAL_SESSION 
-        // will also fire but may be delayed on native platforms
         fetchData();
       } else {
         setAuthLoading(false);
       }
+    }).catch(err => {
+      console.error('[Auth] getSession crashed:', err);
+      setAuthLoading(false);
     });
 
     // Listen for auth changes
@@ -215,8 +223,6 @@ function App() {
           setUser(session.user);
           fetchUserProfile(session.user.id);
           // Refetch data on ALL session-establishing events
-          // INITIAL_SESSION fires on APK cold start with cached session
-          // TOKEN_REFRESHED fires when Supabase refreshes an expired JWT
           if (event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') {
             fetchData();
           }
@@ -231,7 +237,6 @@ function App() {
       }
     );
 
-    // -- CAPACITOR DEEP LINK HANDLER (OAuth Redirect) --
     let deepLinkCleanup;
     if (Capacitor.isNativePlatform()) {
       // When the external browser redirects to com.lavc.bananatracker://login-callback#access_token=...
