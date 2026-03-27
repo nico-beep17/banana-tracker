@@ -19,33 +19,40 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Missing prompt in request body.' });
     }
 
-    const apiKey = process.env.VITE_OPENAI_API_KEY;
-    if (!apiKey) {
-        return res.status(500).json({ error: 'OpenAI API key not configured on server.' });
+    const apiKey    = process.env.VITE_VERTEX_API_KEY;
+    const projectId = process.env.VITE_VERTEX_PROJECT_ID;
+    const location  = process.env.VITE_VERTEX_LOCATION || 'us-central1';
+
+    if (!apiKey || !projectId) {
+        return res.status(500).json({ error: 'Vertex AI credentials not configured on server.' });
     }
 
+    const model = 'gemini-2.0-flash';
+    const endpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${model}:generateContent?key=${apiKey}`;
+
     try {
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        const response = await fetch(endpoint, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`,
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                model: 'gpt-4o-mini',
-                messages: [{ role: 'user', content: prompt }],
-                max_tokens: 700,
-                temperature: 0.6,
+                contents: [
+                    { role: 'user', parts: [{ text: prompt }] }
+                ],
+                generationConfig: {
+                    maxOutputTokens: 700,
+                    temperature: 0.6,
+                },
             }),
         });
 
         if (!response.ok) {
-            const err = await response.json();
-            return res.status(response.status).json({ error: err.error?.message || 'OpenAI error' });
+            const err = await response.json().catch(() => ({}));
+            return res.status(response.status).json({ error: err?.error?.message || 'Vertex AI error' });
         }
 
         const data = await response.json();
-        return res.status(200).json({ result: data.choices[0].message.content.trim() });
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+        return res.status(200).json({ result: text || '' });
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }

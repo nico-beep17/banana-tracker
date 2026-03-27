@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChatOpenAI } from '@langchain/openai';
-import { HumanMessage, SystemMessage } from '@langchain/core/messages';
+import { chatCompletion } from '../utils/vertexAI';
 import { marked } from 'marked';
 import { Bot, X, Send, User, Sparkles } from 'lucide-react';
 import './AIAssistantWidget.css';
@@ -142,8 +141,7 @@ const AIAssistantWidget = ({
         setIsLoading(true);
 
         try {
-            const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
-            if (!apiKey) throw new Error('OpenAI API Key is missing. Check .env configuration.');
+            // Vertex AI config is validated inside the helper
 
             // ── Step 1: Resolve locally from app state ──
             const localFacts = resolveLocally(userMsg, { arrivals, farms, weeklyRates, samplings });
@@ -268,18 +266,14 @@ ${localFactsBlock ? `## CRITICAL PRE-COMPUTED FACTS (use these verbatim for accu
 - Current date: ${new Date().toLocaleDateString('en-PH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
 - Current week number: ${getWeekNum(new Date())}`;
 
-            const chatModel = new ChatOpenAI({
-                apiKey,
-                model: 'gpt-4o-mini',
+            const responseText = await chatCompletion({
+                systemPrompt: systemContext,
+                userMessage: userMsg,
+                model: 'gemini-2.0-flash',
                 temperature: 0.05,
             });
 
-            const response = await chatModel.invoke([
-                new SystemMessage(systemContext),
-                new HumanMessage(userMsg)
-            ]);
-
-            setMessages(prev => [...prev, { role: 'assistant', text: response.content }]);
+            setMessages(prev => [...prev, { role: 'assistant', text: responseText }]);
 
         } catch (error) {
             console.error('AI Assistant Error:', error);

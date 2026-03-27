@@ -201,7 +201,9 @@ function App() {
     }, 6000);
 
     // Check initial Supabase session — only for setting user state immediately
+    console.log('[Auth] Calling getSession()');
     supabase.auth.getSession().then(({ data: { session }, error }) => {
+      console.log('[Auth] getSession resolved!', !!session);
       if (error) console.error('[Auth] getSession error:', error);
       if (session?.user) {
         setUser(session.user);

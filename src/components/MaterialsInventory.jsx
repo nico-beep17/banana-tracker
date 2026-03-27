@@ -65,23 +65,13 @@ const MaterialsInventory = ({
     setScanState("scanning");
     setScanError("");
     try {
-      const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
-      if (!apiKey) throw new Error("OpenAI API Key missing. Check .env file.");
+      const { visionCompletion } = await import('../utils/vertexAI');
 
       // Convert image to base64 content (strip data URL prefix)
       const base64 = scanImage.split(",")[1];
       const mimeType = scanImage.split(";")[0].split(":")[1] || "image/jpeg";
 
-      const body = {
-        model: "gpt-4o",
-        max_tokens: 1000,
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: `You are a data extraction AI for an inventory system at LFJ Agri-Ventures Corp, a banana exporting company.
+      const prompt = `You are a data extraction AI for an inventory system at LFJ Agri-Ventures Corp, a banana exporting company.
 Analyze this supplier delivery receipt image and extract ALL line items.
 
 Return ONLY valid JSON (no markdown, no explanation) in this exact format:
@@ -104,31 +94,16 @@ Banana packaging items to recognize:
 - "ALL IN BOTTOM PADS" or "BOTTOM PADS" or "200GSM" = bottom pads (code: BOTPAD-200GSM)
 - Any other item = use a short descriptive code
 
-For quantities, use the printed number in the "Quantity" column, not bundle counts. Only return items that have a clear quantity.`,
-              },
-              {
-                type: "image_url",
-                image_url: {
-                  url: `data:${mimeType};base64,${base64}`,
-                  detail: "high",
-                },
-              },
-            ],
-          },
-        ],
-      };
+For quantities, use the printed number in the "Quantity" column, not bundle counts. Only return items that have a clear quantity.`;
 
-      const res = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify(body),
+      const raw = await visionCompletion({
+        prompt,
+        imageBase64: base64,
+        mimeType,
+        model: 'gemini-2.0-flash',
+        maxTokens: 1000,
       });
-      if (!res.ok) throw new Error(`OpenAI API error: ${res.status}`);
-      const json = await res.json();
-      const raw = json.choices?.[0]?.message?.content?.trim();
+
       if (!raw) throw new Error("No response from AI.");
 
       // Parse JSON (strip any accidental markdown)
