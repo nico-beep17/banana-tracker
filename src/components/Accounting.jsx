@@ -4,7 +4,7 @@ import { LayoutDashboard, Receipt, BookOpen, Package, LineChart, Calendar, Save,
 import './Accounting.css';
 import { supabase } from '../supabaseClient';
 
-const Accounting = ({ arrivals = [], samplings = [], containers = [], farms = [], weeklyRates = [], userProfile, exchangeRate, setExchangeRate, chartOfAccounts = [], journalEntries = [], journalLines = [], showToast, fetchData }) => {
+const Accounting = ({ arrivals = [], samplings = [], containers = [], farms = [], weeklyRates = [], consignees = [], consigneeWeeklyRates = [], userProfile, exchangeRate, setExchangeRate, chartOfAccounts = [], journalEntries = [], journalLines = [], showToast, fetchData }) => {
     const [activeTab, setActiveTab] = useState('payables');
     const [subTab, setSubTab] = useState('overview');
 
@@ -341,10 +341,49 @@ const Accounting = ({ arrivals = [], samplings = [], containers = [], farms = []
         const activeContainers = containers.filter(c => c.totalBoxes > 0);
 
         return activeContainers.map(container => {
-            const agreedRate = Number(container.agreed_rate) || 0;
+            let agreedRate = Number(container.agreed_rate) || 0;
             const amountPaid = Number(container.amount_paid_partial) || 0;
             const totalBoxes = Number(container.totalBoxes) || 0;
-            const grossRevenue = totalBoxes * agreedRate;
+            let grossRevenue = totalBoxes * agreedRate;
+
+            if (agreedRate === 0 && container.buyer_name && consignees.length > 0 && consigneeWeeklyRates.length > 0) {
+                const buyer = consignees.find(c => c.company_name === container.buyer_name);
+                if (buyer) {
+                    const getWeekNum = (dateStr) => {
+                        const d = new Date(dateStr); const s = new Date(d.getFullYear(), 0, 1);
+                        return { week: Math.ceil((d.getDay() + 1 + Math.floor((d - s) / 86400000)) / 7), year: d.getFullYear() };
+                    };
+                    const targetDate = container.dateCreated || container.timeOfDeparture || new Date().toISOString();
+                    const { week, year } = getWeekNum(targetDate);
+                    
+                    const rateRecord = consigneeWeeklyRates.find(r => r.consignee_id === buyer.id && r.year === year && r.week_number === week);
+                    
+                    if (rateRecord?.rates_matrix && container.stuffedItems) {
+                        let dynamicGross = 0;
+                        container.stuffedItems.forEach(payload => {
+                            if (payload.data) {
+                                Object.keys(payload.data).forEach(classGroupName => {
+                                    const classObj = payload.data[classGroupName];
+                                    Object.keys(classObj).forEach(sizeKey => {
+                                        const qty = Number(classObj[sizeKey]) || 0;
+                                        if (qty > 0) {
+                                            const typeId = `${classGroupName}.${sizeKey}`;
+                                            const specRate = Number(rateRecord.rates_matrix[typeId]) || 0;
+                                            dynamicGross += (qty * specRate);
+                                        }
+                                    });
+                                });
+                            }
+                        });
+                        
+                        if (dynamicGross > 0) {
+                            grossRevenue = dynamicGross;
+                            agreedRate = Number((dynamicGross / totalBoxes).toFixed(2));
+                        }
+                    }
+                }
+            }
+
             const balanceDue = grossRevenue - amountPaid;
 
             let payStatus = container.receivables_status || 'UNPAID';
@@ -360,7 +399,7 @@ const Accounting = ({ arrivals = [], samplings = [], containers = [], farms = []
                 receivablesStatus: payStatus
             };
         });
-    }, [containers]);
+    }, [containers, consignees, consigneeWeeklyRates]);
 
     // Financial Metrics
     const totalPendingPayables = payablesData.filter(p => p.paymentStatus !== 'PAID').reduce((sum, p) => sum + p.netAmountDue, 0);
