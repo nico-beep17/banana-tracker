@@ -100,7 +100,7 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
         prompt,
         imageBase64: base64,
         mimeType,
-        model: 'gemini-2.0-flash',
+        model: 'gemini-2.5-flash',
         maxTokens: 1000,
       });
 

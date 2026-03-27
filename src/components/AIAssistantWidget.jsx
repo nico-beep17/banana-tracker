@@ -269,7 +269,7 @@ ${localFactsBlock ? `## CRITICAL PRE-COMPUTED FACTS (use these verbatim for accu
             const responseText = await chatCompletion({
                 systemPrompt: systemContext,
                 userMessage: userMsg,
-                model: 'gemini-2.0-flash',
+                model: 'gemini-2.5-flash',
                 temperature: 0.05,
             });
 

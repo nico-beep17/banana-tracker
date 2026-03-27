@@ -2,7 +2,7 @@
  * Google Gemini API Helper (Generative Language API)
  * 
  * Uses the Generative Language API endpoint which supports standard API keys.
- * This gives access to the same Gemini models (gemini-2.0-flash, etc.) as Vertex AI.
+ * This gives access to the same Gemini models (gemini-2.5-flash, etc.) as Vertex AI.
  * 
  * Required env vars:
  *   VITE_GEMINI_API_KEY – GCP API key with Generative Language API enabled
@@ -29,7 +29,7 @@ const buildEndpoint = (model, method = 'generateContent') => {
  * @param {Object} options
  * @param {string} options.systemPrompt  - System instruction text
  * @param {string} options.userMessage   - User's message
- * @param {string} [options.model]       - Model ID (default: gemini-2.0-flash)
+ * @param {string} [options.model]       - Model ID (default: gemini-2.5-flash)
  * @param {number} [options.temperature] - Temperature (default: 0.05)
  * @param {number} [options.maxTokens]   - Max output tokens (default: 2048)
  * @returns {Promise<string>} The model's text response
@@ -37,7 +37,7 @@ const buildEndpoint = (model, method = 'generateContent') => {
 export async function chatCompletion({
   systemPrompt,
   userMessage,
-  model = 'gemini-2.0-flash',
+  model = 'gemini-2.5-flash',
   temperature = 0.05,
   maxTokens = 2048,
 }) {
@@ -86,7 +86,7 @@ export async function chatCompletion({
  * @param {string} options.prompt       - Text prompt
  * @param {string} options.imageBase64  - Base64-encoded image data (raw, no data: prefix)
  * @param {string} options.mimeType     - e.g., "image/jpeg"
- * @param {string} [options.model]      - Model ID (default: gemini-2.0-flash)
+ * @param {string} [options.model]      - Model ID (default: gemini-2.5-flash)
  * @param {number} [options.maxTokens]  - Max output tokens (default: 1500)
  * @returns {Promise<string>} The model's text response
  */
@@ -94,7 +94,7 @@ export async function visionCompletion({
   prompt,
   imageBase64,
   mimeType = 'image/jpeg',
-  model = 'gemini-2.0-flash',
+  model = 'gemini-2.5-flash',
   maxTokens = 1500,
 }) {
   const endpoint = buildEndpoint(model);
