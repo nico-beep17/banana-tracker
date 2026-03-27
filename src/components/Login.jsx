@@ -19,7 +19,7 @@ const Login = ({ onLoginSuccess }) => {
                 provider: 'google',
                 options: {
                     redirectTo: isNative ? 'com.lavc.bananatracker://login-callback' : window.location.origin,
-                    skipBrowserRedirect: isNative, // Prevents generic webview navigation from killing the capacitor app
+                    skipBrowserRedirect: isNative,
                     queryParams: {
                         access_type: 'offline',
                         prompt: 'consent',
@@ -29,14 +29,21 @@ const Login = ({ onLoginSuccess }) => {
 
             if (error) throw error;
             
-            // If on Native APK, manually open the URL using the Capacitor Browser overlay plugin
-            if (isNative && data?.url) {
-                await Browser.open({ url: data.url });
+            // Explicitly force web to navigate just in case library auto-redirect failed
+            if (data?.url) {
+                if (isNative) {
+                    await Browser.open({ url: data.url });
+                    setTimeout(() => setLoading(false), 2000);
+                } else {
+                    window.location.href = data.url;
+                }
+            } else {
+                throw new Error("No authorization URL returned from Supabase.");
             }
             
             // The auth state listener in App.jsx picks up the session automatically.
         } catch (error) {
-            setErrorMsg(error.message);
+            setErrorMsg(error.message || "Failed to initiate login.");
             setLoading(false);
         }
     };
