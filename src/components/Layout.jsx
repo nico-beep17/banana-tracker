@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { RefreshCw, Bell, Settings, LayoutDashboard, ClipboardEdit, TestTubes, Leaf, Handshake, Ship, Package, Globe, LineChart, Calculator, Users, LogOut, UserCog } from 'lucide-react';
+import offlineSync from '../utils/offlineSync';
 import './Layout.css';
 
 const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notifications = [], onRefresh, arrivals = [], farms = [], samplings = [] }) => {
@@ -11,6 +12,31 @@ const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notif
     const [searchOpen, setSearchOpen] = useState(false);
     const searchRef = useRef(null);
     const unreadCount = notifications.filter(n => !n.read).length;
+
+    const [offlineStatus, setOfflineStatus] = useState({
+        syncing: false,
+        pendingCount: offlineSync ? offlineSync.pendingCount : 0,
+        isOnline: navigator.onLine
+    });
+
+    useEffect(() => {
+        if (!offlineSync) return;
+        const unsubscribe = offlineSync.subscribe((status) => {
+            setOfflineStatus(prev => ({ ...prev, ...status }));
+        });
+
+        const handleOnline = () => setOfflineStatus(prev => ({ ...prev, isOnline: true }));
+        const handleOffline = () => setOfflineStatus(prev => ({ ...prev, isOnline: false }));
+
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
+
+        return () => {
+            unsubscribe();
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('offline', handleOffline);
+        };
+    }, []);
 
     const role = userProfile?.role || 'Guest';
     const isAdmin = role === 'Administrator' || role === 'Admin / Developer';
@@ -298,6 +324,30 @@ const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notif
                         )}
                     </div>
                     <div className="header-actions">
+                        {/* Offline / Sync Queue Badge */}
+                        {(!offlineStatus.isOnline || offlineStatus.pendingCount > 0) && (
+                            <div style={{
+                                display: 'flex', alignItems: 'center', gap: '0.5rem',
+                                background: offlineStatus.isOnline ? '#fffbeb' : '#fef2f2',
+                                border: `1px solid ${offlineStatus.isOnline ? '#fde68a' : '#fecaca'}`,
+                                padding: '0.4rem 0.8rem', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '700',
+                                color: offlineStatus.isOnline ? '#92400e' : '#b91c1c'
+                            }}>
+                                <span style={{ animation: offlineStatus.syncing ? 'spin 1s linear infinite' : 'none' }}>
+                                    {offlineStatus.syncing ? '↻' : (offlineStatus.isOnline ? '↑' : '⚠')}
+                                </span>
+                                {!offlineStatus.isOnline ? 'Offline' : 'Pending Sync'}
+                                {offlineStatus.pendingCount > 0 && (
+                                    <span style={{
+                                        background: offlineStatus.isOnline ? '#d97706' : '#ef4444',
+                                        color: 'white', padding: '0.1rem 0.4rem', borderRadius: '10px', fontSize: '0.65rem'
+                                    }}>
+                                        {offlineStatus.pendingCount}
+                                    </span>
+                                )}
+                            </div>
+                        )}
+
                         {/* Sync / Refresh Button */}
                         <button
                             className="icon-btn"
