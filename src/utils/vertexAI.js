@@ -1,36 +1,30 @@
 /**
- * Vertex AI Gemini API Helper
+ * Google Gemini API Helper (Generative Language API)
  * 
- * Wraps the Vertex AI REST API for Gemini models (text + vision).
+ * Uses the Generative Language API endpoint which supports standard API keys.
+ * This gives access to the same Gemini models (gemini-2.0-flash, etc.) as Vertex AI.
  * 
  * Required env vars:
- *   VITE_VERTEX_API_KEY      – GCP API key with Vertex AI API enabled
- *   VITE_VERTEX_PROJECT_ID   – GCP project ID (e.g., "my-project-123456")
- *   VITE_VERTEX_LOCATION     – GCP region (e.g., "us-central1")
+ *   VITE_GEMINI_API_KEY – GCP API key with Generative Language API enabled
  */
 
-const getConfig = () => {
-  const apiKey    = import.meta.env.VITE_VERTEX_API_KEY;
-  const projectId = import.meta.env.VITE_VERTEX_PROJECT_ID;
-  const location  = import.meta.env.VITE_VERTEX_LOCATION || 'us-central1';
-
-  if (!apiKey) throw new Error('Vertex AI API Key is missing. Set VITE_VERTEX_API_KEY in .env');
-  if (!projectId) throw new Error('Vertex AI Project ID is missing. Set VITE_VERTEX_PROJECT_ID in .env');
-
-  return { apiKey, projectId, location };
+const getApiKey = () => {
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  if (!apiKey) throw new Error('Gemini API Key is missing. Set VITE_GEMINI_API_KEY in .env');
+  return apiKey;
 };
 
 /**
- * Build the Vertex AI Gemini endpoint URL with API key as query param.
- * Docs: POST https://{LOCATION}-aiplatform.googleapis.com/v1/projects/{PROJECT_ID}/locations/{LOCATION}/publishers/google/models/{MODEL}:generateContent?key={API_KEY}
+ * Build the Gemini API endpoint URL.
+ * Docs: POST https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent?key={API_KEY}
  */
 const buildEndpoint = (model, method = 'generateContent') => {
-  const { apiKey, projectId, location } = getConfig();
-  return `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${model}:${method}?key=${apiKey}`;
+  const apiKey = getApiKey();
+  return `https://generativelanguage.googleapis.com/v1beta/models/${model}:${method}?key=${apiKey}`;
 };
 
 /**
- * Send a text-only chat completion to Vertex AI Gemini.
+ * Send a text chat completion to Gemini.
  * 
  * @param {Object} options
  * @param {string} options.systemPrompt  - System instruction text
@@ -75,18 +69,18 @@ export async function chatCompletion({
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    const msg = err?.error?.message || `Vertex AI error: ${res.status}`;
+    const msg = err?.error?.message || `Gemini API error: ${res.status}`;
     throw new Error(msg);
   }
 
   const data = await res.json();
   const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) throw new Error('No response from Vertex AI Gemini.');
+  if (!text) throw new Error('No response from Gemini.');
   return text;
 }
 
 /**
- * Send a vision (image + text) request to Vertex AI Gemini.
+ * Send a vision (image + text) request to Gemini.
  * 
  * @param {Object} options
  * @param {string} options.prompt       - Text prompt
@@ -134,13 +128,13 @@ export async function visionCompletion({
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    const msg = err?.error?.message || `Vertex AI vision error: ${res.status}`;
+    const msg = err?.error?.message || `Gemini vision error: ${res.status}`;
     throw new Error(msg);
   }
 
   const data = await res.json();
   const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) throw new Error('No response from Vertex AI vision.');
+  if (!text) throw new Error('No response from Gemini vision.');
   return text;
 }
 

@@ -19,16 +19,13 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Missing prompt in request body.' });
     }
 
-    const apiKey    = process.env.VITE_VERTEX_API_KEY;
-    const projectId = process.env.VITE_VERTEX_PROJECT_ID;
-    const location  = process.env.VITE_VERTEX_LOCATION || 'us-central1';
-
-    if (!apiKey || !projectId) {
-        return res.status(500).json({ error: 'Vertex AI credentials not configured on server.' });
+    const apiKey = process.env.VITE_GEMINI_API_KEY;
+    if (!apiKey) {
+        return res.status(500).json({ error: 'Gemini API key not configured on server.' });
     }
 
     const model = 'gemini-2.0-flash';
-    const endpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${model}:generateContent?key=${apiKey}`;
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
     try {
         const response = await fetch(endpoint, {
@@ -47,7 +44,7 @@ export default async function handler(req, res) {
 
         if (!response.ok) {
             const err = await response.json().catch(() => ({}));
-            return res.status(response.status).json({ error: err?.error?.message || 'Vertex AI error' });
+            return res.status(response.status).json({ error: err?.error?.message || 'Gemini API error' });
         }
 
         const data = await response.json();
