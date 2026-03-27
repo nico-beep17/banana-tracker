@@ -36,6 +36,13 @@ const Login = ({ onLoginSuccess }) => {
                     setTimeout(() => setLoading(false), 2000);
                 } else {
                     window.location.href = data.url;
+                    
+                    // If the browser hasn't navigated away after 2.5 seconds, it usually means 
+                    // an adblocker or Brave Shields intercepted and blocked the redirect.
+                    setTimeout(() => {
+                        setLoading(false);
+                        setErrorMsg("Your browser blocked the Google authentication redirect. Please disable your adblocker/Brave Shields for this site, or clear your cache.");
+                    }, 2500);
                 }
             } else {
                 throw new Error("No authorization URL returned from Supabase.");
