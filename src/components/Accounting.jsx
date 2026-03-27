@@ -4,7 +4,7 @@ import { LayoutDashboard, Receipt, BookOpen, Package, LineChart, Calendar, Save,
 import './Accounting.css';
 import { supabase } from '../supabaseClient';
 
-const Accounting = ({ arrivals = [], samplings = [], containers = [], farms = [], userProfile, exchangeRate, setExchangeRate, chartOfAccounts = [], journalEntries = [], journalLines = [], showToast, fetchData }) => {
+const Accounting = ({ arrivals = [], samplings = [], containers = [], farms = [], weeklyRates = [], userProfile, exchangeRate, setExchangeRate, chartOfAccounts = [], journalEntries = [], journalLines = [], showToast, fetchData }) => {
     const [activeTab, setActiveTab] = useState('payables');
     const [subTab, setSubTab] = useState('overview');
 
@@ -251,9 +251,28 @@ const Accounting = ({ arrivals = [], samplings = [], containers = [], farms = []
             }
 
             // Use the specific rate snapshot locked at the time of arrival
-            const rateApplied = arrival.locked_rate || 0;
+            let rateApplied = arrival.locked_rate || 0;
             const isClassA = arrival.typeId ? arrival.typeId.startsWith('classA') : (arrival.ccClass === 'A' || arrival.ccClass === 'Class A' || arrival.ccClass === 'SH' || arrival.ccClass === 'A (Cluster)');
 
+            // Fallback to active weekly rates if locked_rate is 0 or missing
+            if (rateApplied === 0 && arrival.dateOfPacking) {
+                const getWeekNum = (dateStr) => {
+                    const d = new Date(dateStr); const s = new Date(d.getFullYear(), 0, 1);
+                    return { week: Math.ceil((d.getDay() + 1 + Math.floor((d - s) / 86400000)) / 7), year: d.getFullYear() };
+                };
+                const { week, year } = getWeekNum(arrival.dateOfPacking);
+                const farm = farms.find(f => f.farmCode === arrival.farmCode);
+                
+                if (farm && weeklyRates.length > 0) {
+                    const rateRecord = weeklyRates.find(r => r.farm_id === farm.id && r.year === year && r.week_number === week);
+                    if (rateRecord?.rates_matrix) {
+                        const typeKey = arrival.typeId || (isClassA ? 'classA.rha4' : 'classB.rhb4');
+                        if (rateRecord.rates_matrix[typeKey]) {
+                            rateApplied = Number(rateRecord.rates_matrix[typeKey]) || 0;
+                        }
+                    }
+                }
+            }
             const qty = arrival.quantity || 0;
             const lineGross = qty * rateApplied;
 
@@ -314,7 +333,7 @@ const Accounting = ({ arrivals = [], samplings = [], containers = [], farms = []
         });
 
         return Object.values(grouped);
-    }, [arrivals, samplings, farms]);
+    }, [arrivals, samplings, farms, weeklyRates]);
 
     // RECEIVABLES LOGIC (Revenue from Buyers)
     const receivablesData = useMemo(() => {

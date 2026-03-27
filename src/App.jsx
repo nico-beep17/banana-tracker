@@ -1134,6 +1134,7 @@ function App() {
             samplings={samplings}
             containers={containers}
             farms={farms}
+            weeklyRates={weeklyRates}
             userProfile={userProfile}
             exchangeRate={exchangeRate}
             setExchangeRate={setExchangeRate}
