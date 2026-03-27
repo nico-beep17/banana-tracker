@@ -163,6 +163,25 @@ const Consignees = ({ consignees = [], setConsignees, consigneeWeeklyRates = [],
         setIsFormOpen(true);
     };
 
+    const handleDeleteConsignee = async () => {
+        if (!editId) return;
+        if (!window.confirm("Are you sure you want to delete this buyer profile? This action will permanently remove all associated contracts.")) return;
+
+        const { error } = await supabase
+            .from('consignees')
+            .delete()
+            .eq('id', editId);
+
+        if (error) {
+            console.error("Supabase error (Delete Consignee):", error);
+            alert("Failed to delete consignee.");
+            return;
+        }
+
+        setConsignees(prev => prev.filter(c => c.id !== editId));
+        resetForm();
+    };
+
     const handleManageRates = (consignee) => {
         setActiveConsigneeForRates(consignee);
         setNewWeeklyRate({
@@ -479,6 +498,11 @@ const Consignees = ({ consignees = [], setConsignees, consigneeWeeklyRates = [],
                                 </div>
 
                                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem' }}>
+                                    {editId && (
+                                        <button type="button" className="btn-secondary" onClick={handleDeleteConsignee} style={{ padding: '0.8rem 2rem', borderRadius: '999px', color: '#ef4444', borderColor: '#fee2e2', background: '#fef2f2', marginRight: 'auto', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            <Trash2 size={20} /> Delete Profile
+                                        </button>
+                                    )}
                                     <button type="button" className="btn-secondary" onClick={resetForm} style={{ padding: '0.8rem 2rem', borderRadius: '999px' }}>Discard Details</button>
                                     <button type="submit" className="btn-primary" style={{ padding: '0.8rem 2.5rem', borderRadius: '999px', fontSize: '1rem' }}>
                                         {editId ? <><Edit3 size={20} /> Update Profile</> : <><CheckCircle2 size={20} /> Finalize Registration</>}
