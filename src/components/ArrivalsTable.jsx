@@ -9,6 +9,8 @@ import './ArrivalsTable.css';
 const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, setArrivals, userProfile, samplings = [] }) => {
     const componentRef = useRef(null);
     const [selectedArrival, setSelectedArrival] = useState(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 15;
 
     // Edit modal state
     const [editingArrival, setEditingArrival] = useState(null);
@@ -300,6 +302,10 @@ const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, setAr
         return new Date(b.dateTimeEncoded || 0) - new Date(a.dateTimeEncoded || 0);
     });
 
+    const totalPages = Math.ceil(displayArrivals.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const paginatedArrivals = displayArrivals.slice(startIndex, startIndex + itemsPerPage);
+
     const handleExport = () => {
         const exportData = displayArrivals.map(a => {
             // Aggregate per-hands breakdown from all rows in this batch
@@ -379,7 +385,7 @@ const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, setAr
                         </tr>
                     </thead>
                     <tbody>
-                        {displayArrivals.map((arrival, index) => {
+                        {paginatedArrivals.map((arrival, index) => {
                             const isApproved = arrival.approval_status === 'APPROVED';
                             const canApprove = userProfile?.role === 'Administrator' || userProfile?.role === 'Admin / Developer' || userProfile?.role === 'Hub Operations In-Charge' || userProfile?.role === 'Data Management Supervisor and Hub operations in-charge' || userProfile?.role === 'Production Supervisor';
                             const confirmKey = arrival.batchId || arrival.id;
@@ -471,6 +477,29 @@ const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, setAr
                     </tbody>
                 </table>
             </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '1rem', padding: '1rem' }}>
+                    <button 
+                        disabled={currentPage === 1} 
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        className="btn-secondary btn-sm"
+                    >
+                        Previous
+                    </button>
+                    <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-secondary)' }}>
+                        Page {currentPage} of {totalPages}
+                    </span>
+                    <button 
+                        disabled={currentPage === totalPages} 
+                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                        className="btn-secondary btn-sm"
+                    >
+                        Next
+                    </button>
+                </div>
+            )}
 
             {/* Edit Modal */}
             {editingArrival && (

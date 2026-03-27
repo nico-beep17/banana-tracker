@@ -12,6 +12,8 @@ const ContainersList = ({ containers = [], onNavigate, onDepartContainer, onSeal
     const componentRef = useRef();
     const [selectedContainer, setSelectedContainer] = useState(null);
     const [breakdownContainer, setBreakdownContainer] = useState(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 15;
 
     // Payload manager state
     const [managingContainerId, setManagingContainerId] = useState(null);
@@ -218,8 +220,13 @@ const ContainersList = ({ containers = [], onNavigate, onDepartContainer, onSeal
                                 </td>
                             </tr>
                         ) : (
-                            containers.map(container => {
-                                const isFull = (container.totalBoxes >= 1540);
+                            (() => {
+                                const totalPages = Math.ceil(containers.length / itemsPerPage);
+                                const startIndex = (currentPage - 1) * itemsPerPage;
+                                const paginatedContainers = containers.slice(startIndex, startIndex + itemsPerPage);
+
+                                return paginatedContainers.map(container => {
+                                    const isFull = (container.totalBoxes >= 1540);
                                 const isEmpty = container.totalBoxes === 0;
                                 const isDeparted = !!container.timeDeparted;
                                 const isSealed = !!container.timeSealed;
@@ -298,11 +305,35 @@ const ContainersList = ({ containers = [], onNavigate, onDepartContainer, onSeal
                                         </td>
                                     </tr>
                                 );
-                            })
+                            });
+                        })()
                         )}
                     </tbody>
                 </table>
             </div>
+
+            {/* Pagination Controls */}
+            {Math.ceil(containers.length / itemsPerPage) > 1 && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '1rem', padding: '1rem' }}>
+                    <button 
+                        disabled={currentPage === 1} 
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        className="btn-secondary btn-sm"
+                    >
+                        Previous
+                    </button>
+                    <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-secondary)' }}>
+                        Page {currentPage} of {Math.ceil(containers.length / itemsPerPage)}
+                    </span>
+                    <button 
+                        disabled={currentPage === Math.ceil(containers.length / itemsPerPage)} 
+                        onClick={() => setCurrentPage(prev => Math.min(Math.ceil(containers.length / itemsPerPage), prev + 1))}
+                        className="btn-secondary btn-sm"
+                    >
+                        Next
+                    </button>
+                </div>
+            )}
 
             {/* Hidden component solely for printing */}
             <div style={{ display: 'none' }}>
