@@ -135,7 +135,17 @@ Return this exact JSON structure with exactly 4 cards:
             })
             .then(data => {
                 if (data.error) throw new Error(data.error);
-                const parsed = JSON.parse(data.result);
+                let rawJson = data.result || '';
+                
+                // Safely extract JSON from markdown if Gemini included conversational text
+                const jsonMatch = rawJson.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+                if (jsonMatch) {
+                    rawJson = jsonMatch[1];
+                } else {
+                    rawJson = rawJson.replace(/^```(json)?/mi, '').replace(/```$/m, '').trim();
+                }
+
+                const parsed = JSON.parse(rawJson);
                 if (parsed.cards && parsed.cards.length === 4) {
                     setCards(parsed.cards);
                     sessionStorage.setItem(cacheKey, JSON.stringify(parsed.cards));

@@ -107,8 +107,15 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
 
       if (!raw) throw new Error("No response from AI.");
 
-      // Parse JSON (strip any accidental markdown)
-      const cleaned = raw.replace(/^```json\n?|^```\n?|\n?```$/g, "").trim();
+      // Safely extract JSON from markdown if Gemini included conversational text
+      let cleaned = raw;
+      const jsonMatch = raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+      if (jsonMatch) {
+        cleaned = jsonMatch[1];
+      } else {
+        cleaned = raw.replace(/^```(json)?/mi, '').replace(/```$/m, '').trim();
+      }
+      
       const parsed = JSON.parse(cleaned);
 
       if (!parsed.items || parsed.items.length === 0)
