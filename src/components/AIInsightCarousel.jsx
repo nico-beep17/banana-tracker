@@ -123,7 +123,7 @@ Return this exact JSON structure with exactly 4 cards:
         fetch(AI_API_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt }),
+            body: JSON.stringify({ prompt, jsonMode: true }),
         })
             .then(async r => {
                 const text = await r.text();

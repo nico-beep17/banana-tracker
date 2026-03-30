@@ -14,7 +14,7 @@ export default async function handler(req, res) {
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    const { prompt } = req.body;
+    const { prompt, jsonMode } = req.body;
     if (!prompt) {
         return res.status(400).json({ error: 'Missing prompt in request body.' });
     }
@@ -27,6 +27,14 @@ export default async function handler(req, res) {
     const model = 'gemini-2.5-flash';
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
+    const generationConfig = {
+        maxOutputTokens: jsonMode ? 1000 : 700,
+        temperature: 0.3,
+    };
+    if (jsonMode) {
+        generationConfig.responseMimeType = "application/json";
+    }
+
     try {
         const response = await fetch(endpoint, {
             method: 'POST',
@@ -35,10 +43,7 @@ export default async function handler(req, res) {
                 contents: [
                     { role: 'user', parts: [{ text: prompt }] }
                 ],
-                generationConfig: {
-                    maxOutputTokens: 700,
-                    temperature: 0.6,
-                },
+                generationConfig,
             }),
         });
 
