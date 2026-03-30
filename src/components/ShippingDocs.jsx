@@ -84,7 +84,7 @@ const ShippingDocs = ({ containers, setContainers }) => {
     const [updating, setUpdating] = useState(false);
     
     // Workspace Integration States
-    const [googleClientId, setGoogleClientId] = useState(() => localStorage.getItem('lavc_google_client_id') || '');
+    const [googleClientId, setGoogleClientId] = useState(() => localStorage.getItem('lavc_google_client_id') || import.meta.env.VITE_GOOGLE_CLIENT_ID || '');
     const [isEditingKeys, setIsEditingKeys] = useState(false);
     const [gmailToken, setGmailToken] = useState(null);
 
