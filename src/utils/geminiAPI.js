@@ -39,7 +39,7 @@ export async function chatCompletion({
   userMessage,
   model = 'gemini-2.5-flash',
   temperature = 0.05,
-  maxTokens = 2048,
+  maxTokens = 8192,
 }) {
   const endpoint = buildEndpoint(model);
 
@@ -95,7 +95,7 @@ export async function visionCompletion({
   imageBase64,
   mimeType = 'image/jpeg',
   model = 'gemini-2.5-flash',
-  maxTokens = 1500,
+  maxTokens = 8192,
 }) {
   const endpoint = buildEndpoint(model);
 

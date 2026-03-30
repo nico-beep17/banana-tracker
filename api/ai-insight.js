@@ -28,7 +28,7 @@ export default async function handler(req, res) {
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
     const generationConfig = {
-        maxOutputTokens: jsonMode ? 1000 : 700,
+        maxOutputTokens: 8192,
         temperature: 0.3,
     };
     if (jsonMode) {
