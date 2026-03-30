@@ -19,7 +19,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Missing prompt in request body.' });
     }
 
-    const apiKey = process.env.VITE_GEMINI_API_KEY;
+    const apiKey = process.env.VITE_GEMINI_API_KEY || "AIzaSyB5JwwJYAKVOd_oSLecdAuwk6U58R21AxM";
     if (!apiKey) {
         return res.status(500).json({ error: 'Gemini API key not configured on server.' });
     }

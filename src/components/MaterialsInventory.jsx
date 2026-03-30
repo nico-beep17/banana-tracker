@@ -66,7 +66,7 @@ const MaterialsInventory = ({
     setScanState("scanning");
     setScanError("");
     try {
-      const { visionCompletion } = await import('../utils/vertexAI');
+      const { visionCompletion } = await import('../utils/geminiAPI');
 
       // Convert image to base64 content (strip data URL prefix)
       const base64 = scanImage.split(",")[1];

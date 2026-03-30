@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { chatCompletion } from '../utils/vertexAI';
+import { chatCompletion } from '../utils/geminiAPI';
 import { marked } from 'marked';
 import { Bot, X, Send, User, Sparkles } from 'lucide-react';
 import './AIAssistantWidget.css';
@@ -309,7 +309,21 @@ ${localFactsBlock ? `## CRITICAL PRE-COMPUTED FACTS (use these verbatim for accu
                             {msg.role === 'user' ? (
                                 <p style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{msg.text}</p>
                             ) : (
-                                <div className="markdown-body" dangerouslySetInnerHTML={{ __html: marked.parse(msg.text) }} />
+                                <div style={{ position: 'relative' }}>
+                                    <div className="markdown-body" dangerouslySetInnerHTML={{ __html: marked.parse(msg.text) }} />
+                                    {msg.text && (
+                                        <button 
+                                            onClick={(e) => {
+                                                navigator.clipboard.writeText(msg.text);
+                                                e.currentTarget.innerText = '✅ Copied!';
+                                                setTimeout(() => { e.currentTarget.innerText = '📋 Copy'; }, 2000);
+                                            }}
+                                            style={{ marginTop: '0.5rem', background: '#e2e8f0', color: '#475569', border: 'none', padding: '0.2rem 0.6rem', fontSize: '0.75rem', borderRadius: '4px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', transition: 'all 0.2s ease' }}
+                                        >
+                                            📋 Copy
+                                        </button>
+                                    )}
+                                </div>
                             )}
                         </div>
                     </div>
