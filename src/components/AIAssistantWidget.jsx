@@ -310,7 +310,7 @@ ${localFactsBlock ? `## CRITICAL PRE-COMPUTED FACTS (use these verbatim for accu
                                 <p style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{msg.text}</p>
                             ) : (
                                 <div style={{ position: 'relative' }}>
-                                    <div className="markdown-body" dangerouslySetInnerHTML={{ __html: marked.parse(msg.text) }} />
+                                    <div className="markdown-body" dangerouslySetInnerHTML={{ __html: marked.parse(msg.text || '') }} />
                                     {msg.text && (
                                         <button 
                                             onClick={(e) => {
