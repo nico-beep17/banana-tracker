@@ -9,8 +9,8 @@
  */
 
 const getApiKey = () => {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "AIzaSyB5JwwJYAKVOd_oSLecdAuwk6U58R21AxM";
-  if (!apiKey) throw new Error('Gemini API Key is missing. Set VITE_GEMINI_API_KEY in .env');
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  if (!apiKey) throw new Error('Gemini API Key is missing. Set VITE_GEMINI_API_KEY in .env or Vercel settings.');
   return apiKey;
 };
 

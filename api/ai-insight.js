@@ -19,9 +19,9 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Missing prompt in request body.' });
     }
 
-    const apiKey = process.env.VITE_GEMINI_API_KEY || "AIzaSyB5JwwJYAKVOd_oSLecdAuwk6U58R21AxM";
+    const apiKey = process.env.VITE_GEMINI_API_KEY;
     if (!apiKey) {
-        return res.status(500).json({ error: 'Gemini API key not configured on server.' });
+        return res.status(500).json({ error: 'Gemini API key not configured on server. Please add VITE_GEMINI_API_KEY to your environment variables.' });
     }
 
     const model = 'gemini-2.5-flash';
