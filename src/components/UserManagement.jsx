@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
+import { Toaster, toast } from 'sonner';
 import { CheckCircle2, AlertCircle, ChevronDown, ChevronUp, Shield, ToggleLeft, ToggleRight } from 'lucide-react';
 import './UserManagement.css';
 
@@ -98,15 +99,19 @@ export default function UserManagement({ userProfile }) {
         try {
             setUpdatingId(profileId);
             const defaultMods = DEFAULT_ACCESS[newRole] || [];
-            const { error } = await supabase
+            const { error, data } = await supabase
                 .from('profiles')
                 .update({ role: newRole, allowed_modules: defaultMods })
-                .eq('id', profileId);
+                .eq('id', profileId)
+                .select();
             if (error) throw error;
+            if (!data || data.length === 0) {
+                throw new Error("Updating another user's role is blocked by Supabase RLS policies. Run the 'fix_profiles_rls.sql' script in your Supabase SQL Editor.");
+            }
             setProfiles(prev => prev.map(p => p.id === profileId ? { ...p, role: newRole, allowed_modules: defaultMods } : p));
             setLocalPerms(prev => ({ ...prev, [profileId]: new Set(defaultMods) }));
         } catch (err) {
-            alert(`Failed to update role: ${err.message}`);
+            toast.error(`Failed to update role: ${err.message}`);
         } finally {
             setTimeout(() => setUpdatingId(null), 1500);
         }
@@ -125,14 +130,18 @@ export default function UserManagement({ userProfile }) {
         try {
             setSavingPermId(profileId);
             const mods = Array.from(localPerms[profileId] || []);
-            const { error } = await supabase
+            const { error, data } = await supabase
                 .from('profiles')
                 .update({ allowed_modules: mods })
-                .eq('id', profileId);
+                .eq('id', profileId)
+                .select();
             if (error) throw error;
+            if (!data || data.length === 0) {
+                throw new Error("Updating another user's modules is blocked by Supabase RLS policies. Run the 'fix_profiles_rls.sql' script in your Supabase SQL Editor.");
+            }
             setProfiles(prev => prev.map(p => p.id === profileId ? { ...p, allowed_modules: mods } : p));
         } catch (err) {
-            alert(`Failed to save permissions: ${err.message}`);
+            toast.error(`Failed to save permissions: ${err.message}`);
         } finally {
             setTimeout(() => setSavingPermId(null), 1500);
         }

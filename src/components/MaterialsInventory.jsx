@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { supabase } from "../supabaseClient";
 import { LAvcLogo } from "../assets/logoBase64";
+import { toast } from "sonner";
 import {
   Package,
   Search,
@@ -284,14 +285,14 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
   const handleBulkSubmit = async () => {
     try {
       if (!bulkFarm) {
-        alert("Please select a farm.");
+        toast.warning("Please select a farm.");
         return;
       }
       const validItems = bulkItems.filter(
         (it) => it.itemCode && it.quantity > 0
       );
       if (validItems.length === 0) {
-        alert("Add at least one item with qty > 0.");
+        toast.warning("Add at least one item with qty > 0.");
         return;
       }
 
@@ -310,7 +311,7 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
 
       if (error) {
         console.error("Insert error:", error);
-        alert(
+        toast.error(
           "Failed to save deliveries to database: " +
             error.message +
             " (Check if Fix Deliveries SQL was run if this is an RLS policy issue)"
@@ -330,7 +331,7 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
       setBulkItems([{ itemCode: "", quantity: "" }]);
     } catch (err) {
       console.error("Critical error in handleBulkSubmit:", err);
-      alert("A critical error prevented saving: " + err.message);
+      toast.error("A critical error prevented saving: " + err.message);
     }
   };
 
@@ -341,7 +342,7 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
       .delete()
       .eq("id", id);
     if (error) {
-      alert("Failed to delete: " + error.message);
+      toast.error("Failed to delete: " + error.message);
       return;
     }
     setDeliveries((prev) => prev.filter((d) => d.id !== id));
@@ -436,8 +437,8 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
 
   const handleAddItem = async (e) => {
     e.preventDefault();
-    // Strip computed/virtual fields that don't exist as DB columns
-    const { warehouseBalance, warehouseDelivered, ...cleanItem } = newItem;
+    // Strip computed/virtual fields and system-generated columns that don't exist as writable DB columns
+    const { warehouseBalance, warehouseDelivered, id, created_at, ...cleanItem } = newItem;
     const payload = { ...cleanItem, last_updated: new Date().toISOString() };
     if (editItemId) {
       const { data, error } = await supabase
@@ -528,7 +529,7 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
     );
 
     if (deliveredItems.length === 0) {
-      alert("No items found for this MIS Number.");
+      toast.warning("No items found for this MIS Number.");
       return;
     }
 

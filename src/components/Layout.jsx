@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { RefreshCw, Bell, Settings, LayoutDashboard, ClipboardEdit, TestTubes, Leaf, Handshake, Ship, Package, Globe, LineChart, Calculator, Users, LogOut, UserCog } from 'lucide-react';
+import { RefreshCw, Bell, Settings, LayoutDashboard, ClipboardEdit, TestTubes, Leaf, Handshake, Ship, Package, Globe, LineChart, Calculator, Users, LogOut, UserCog, FileText } from 'lucide-react';
 import offlineSync from '../utils/offlineSync';
 import './Layout.css';
 
@@ -58,7 +58,7 @@ const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notif
             'Accounting Staff': ['dashboard', 'consignees', 'accounting', 'reports'],
             'HR Manager': ['dashboard', 'payroll'],
             'Logistics Supervisor': ['dashboard', 'containers-list', 'shipment-tracker'],
-            'Shipping Documentation Supervisor': ['dashboard', 'consignees', 'containers-list', 'shipment-tracker'],
+            'Shipping Documentation Supervisor': ['dashboard', 'consignees', 'containers-list', 'shipment-tracker', 'shipping-docs'],
             'Hub Operations In-Charge': ['dashboard', 'containers-list', 'inventory', 'shipment-tracker'],
             'Guest': ['dashboard'],
             'Pending': [],
@@ -200,6 +200,13 @@ const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notif
                             <li className={`nav-item ${activeTab === 'shipment-tracker' ? 'active' : ''}`} onClick={() => onTabChange('shipment-tracker')}>
                                 <span className="nav-icon"><Globe size={20} /></span>
                                 <span className="nav-text">Shipment Tracker</span>
+                            </li>
+                        )}
+
+                        {canAccess('shipping-docs') && (
+                            <li className={`nav-item ${activeTab === 'shipping-docs' ? 'active' : ''}`} onClick={() => onTabChange('shipping-docs')}>
+                                <span className="nav-icon"><FileText size={20} /></span>
+                                <span className="nav-text">Shipping Docs</span>
                             </li>
                         )}
 

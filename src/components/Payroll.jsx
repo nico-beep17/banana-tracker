@@ -7,8 +7,15 @@ import {
 } from 'lucide-react';
 // QR and scanner loaded only when needed
 import './Accounting.css'; // Reusing ERP styles
+import { toast } from 'sonner';
 
-const Payroll = ({ showToast, employees = [], dtrRecords = [], attendanceLocations = [], fetchData, initialTab }) => {
+const Payroll = ({ employees = [], dtrRecords = [], attendanceLocations = [], fetchData, initialTab }) => {
+    const showToast = (msg, type) => {
+        if (type === 'error') toast.error(msg);
+        else if (type === 'warning') toast.warning(msg);
+        else toast.success(msg);
+    };
+
     const [activeTab, setActiveTab] = useState(initialTab || 'dashboard');
 
     useEffect(() => {
@@ -47,12 +54,13 @@ const Payroll = ({ showToast, employees = [], dtrRecords = [], attendanceLocatio
         }
 
         try {
+            const { id, created_at, ...safePayload } = empForm;
             if (isEditingEmp) {
-                const { error } = await supabase.from('employees').update(empForm).eq('id', editingEmpId);
+                const { error } = await supabase.from('employees').update(safePayload).eq('id', editingEmpId);
                 if (error) throw error;
                 showToast("Employee updated.", "success");
             } else {
-                const { error } = await supabase.from('employees').insert([empForm]);
+                const { error } = await supabase.from('employees').insert([safePayload]);
                 if (error) throw error;
                 showToast("Employee created successfully.", "success");
             }
@@ -609,7 +617,7 @@ const Payroll = ({ showToast, employees = [], dtrRecords = [], attendanceLocatio
                         </div>
                         <button className="btn-primary" onClick={async () => {
                             if (!payPeriodStart || !payPeriodEnd) {
-                                alert("Please select a date range."); return;
+                                toast.warning("Please select a date range."); return;
                             }
 
                             setIsLoadingLocal(true);
@@ -655,7 +663,7 @@ const Payroll = ({ showToast, employees = [], dtrRecords = [], attendanceLocatio
 
                                 setPayrollRegister({ entries: registerEntries, totals, start: payPeriodStart, end: payPeriodEnd });
                             } catch (err) {
-                                alert("Error generating payroll: " + err.message);
+                                toast.error("Error generating payroll: " + err.message);
                             } finally {
                                 setIsLoadingLocal(false);
                             }
@@ -830,7 +838,7 @@ const ScanComponent = ({ onScan }) => {
             } catch (err) {
                 console.error('QR scanner failed to start:', err);
                 if (window.Capacitor && window.Capacitor.isNativePlatform()) {
-                    alert('Camera could not start. Please ensure the app has permission in Android Settings.');
+                    toast.error('Camera could not start. Please ensure the app has permission in Android Settings.');
                 }
             }
         };

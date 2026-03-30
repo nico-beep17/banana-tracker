@@ -3,8 +3,17 @@ import { downloadCSV } from '../utils/exportUtils';
 import { LayoutDashboard, Receipt, BookOpen, Package, LineChart, Calendar, Save, Plus, BookMarked } from 'lucide-react';
 import './Accounting.css';
 import { supabase } from '../supabaseClient';
+import { toast } from 'sonner';
+import VouchersTab from './Accounting/VouchersTab';
+import LedgerTab from './Accounting/LedgerTab';
 
-const Accounting = ({ arrivals = [], samplings = [], containers = [], farms = [], weeklyRates = [], consignees = [], consigneeWeeklyRates = [], userProfile, exchangeRate, setExchangeRate, chartOfAccounts = [], journalEntries = [], journalLines = [], showToast, fetchData }) => {
+const Accounting = ({ arrivals = [], samplings = [], containers = [], farms = [], weeklyRates = [], consignees = [], consigneeWeeklyRates = [], userProfile, exchangeRate, setExchangeRate, chartOfAccounts = [], journalEntries = [], journalLines = [], fetchData }) => {
+    const showToast = (msg, type) => {
+        if (type === 'error') toast.error(msg);
+        else if (type === 'warning') toast.warning(msg);
+        else toast.success(msg);
+    };
+
     const [activeTab, setActiveTab] = useState('payables');
     const [subTab, setSubTab] = useState('overview');
 
@@ -45,160 +54,7 @@ const Accounting = ({ arrivals = [], samplings = [], containers = [], farms = []
         fetchPeriods();
     }, [chartOfAccounts]);
 
-    // Phase 12 Voucher Entry State
-    const [voucherType, setVoucherType] = useState('PAYABLE');
-    const [voucherForm, setVoucherForm] = useState({
-        entityId: '',
-        amount: '',
-        referenceNo: '',
-        description: '',
-        currency: 'PHP'
-    });
-
-    // Dynamic Journal Lines State
-    const [journalLinesForm, setJournalLinesForm] = useState([
-        { accountCode: '', accountName: '', debit: '', credit: '' },
-        { accountCode: '', accountName: '', debit: '', credit: '' }
-    ]);
-
-    const handlePostVoucher = async () => {
-        if (!voucherForm.referenceNo) {
-            showToast("Please enter a reference number.", "error");
-            return;
-        }
-
-        const dateInput = document.getElementById('voucher-date');
-        const date = dateInput ? dateInput.value : new Date().toISOString().split('T')[0];
-
-        // 🚨 Validate Accounting Period Lock
-        const activePeriod = accountingPeriods.find(p => date >= p.start_date && date <= p.end_date);
-        if (activePeriod && activePeriod.is_closed) {
-            showToast(`Blocked: Period "${activePeriod.period_name}" is closed.`, "error");
-            return;
-        }
-
-        const baseAmount = Number(voucherForm.amount || 0);
-
-        let phpAmount = baseAmount;
-        if (voucherForm.currency === 'USD') {
-            phpAmount = baseAmount * exchangeRate;
-        }
-
-        let linesToInsert = [];
-
-        const getAccountId = (code) => {
-            const acc = localChartOfAccounts.find(a => a.code === code);
-            if (!acc) {
-                console.error(`Account Code lookup failed for: ${code}`);
-                return null;
-            }
-            return acc.id;
-        };
-
-        if (voucherType === 'PAYABLE') {
-            if (!baseAmount) { showToast("Please enter an amount.", "error"); return; }
-            linesToInsert = [
-                { account_id: getAccountId('5010'), debit_amount: phpAmount, credit_amount: 0 },
-                { account_id: getAccountId('2010'), debit_amount: 0, credit_amount: phpAmount }
-            ];
-        } else if (voucherType === 'PAYMENT') {
-            if (!baseAmount) { showToast("Please enter an amount.", "error"); return; }
-            linesToInsert = [
-                { account_id: getAccountId('2010'), debit_amount: phpAmount, credit_amount: 0 },
-                { account_id: getAccountId('1010'), debit_amount: 0, credit_amount: phpAmount }
-            ];
-        } else if (voucherType === 'CASH_RECEIPT') {
-            if (!baseAmount) { showToast("Please enter an amount.", "error"); return; }
-            linesToInsert = [
-                { account_id: getAccountId('1010'), debit_amount: phpAmount, credit_amount: 0 },
-                { account_id: getAccountId('4010'), debit_amount: 0, credit_amount: phpAmount }
-            ];
-        } else if (voucherType === 'JOURNAL') {
-            const validLines = journalLinesForm.filter(l => l.accountCode && (Number(l.debit) > 0 || Number(l.credit) > 0));
-            if (validLines.length < 2) {
-                alert("Journal entries require at least two lines.");
-                return;
-            }
-            const totalDebit = validLines.reduce((sum, l) => sum + Number(l.debit || 0), 0);
-            const totalCredit = validLines.reduce((sum, l) => sum + Number(l.credit || 0), 0);
-
-            // Simple floating point check
-            if (Math.abs(totalDebit - totalCredit) > 0.01) {
-                alert(`Debits (${totalDebit.toFixed(2)}) must equal Credits (${totalCredit.toFixed(2)}).`);
-                return;
-            }
-
-            linesToInsert = validLines.map(l => ({
-                account_id: getAccountId(l.accountCode),
-                debit_amount: Number(l.debit || 0),
-                credit_amount: Number(l.credit || 0)
-            }));
-        }
-
-        // Validate that all lines resolved to a valid account ID
-        const missingAccounts = linesToInsert.filter(l => !l.account_id);
-        if (missingAccounts.length > 0) {
-            showToast("One or more accounts not found in COA. Please seed the Chart of Accounts first.", "error");
-            return;
-        }
-
-        try {
-            // 1. Create Journal Entry
-            const { data: jeData, error: jeError } = await supabase
-                .from('journal_entries')
-                .insert([{
-                    reference_no: voucherForm.referenceNo,
-                    date_posted: date,
-                    description: voucherForm.description,
-                    currency: voucherForm.currency,
-                    exchange_rate: voucherForm.currency === 'USD' ? exchangeRate : 1.00
-                }])
-                .select()
-                .single();
-
-            if (jeError) throw jeError;
-
-            // 2. Insert Journal Lines
-            const linesWithId = linesToInsert.map(l => ({
-                ...l,
-                entry_id: jeData.id
-            }));
-
-            const { error: jlError } = await supabase
-                .from('journal_lines')
-                .insert(linesWithId);
-
-            if (jlError) throw jlError;
-
-            // 3. Create Voucher Record
-            if (voucherType !== 'JOURNAL') {
-                const { error: vError } = await supabase
-                    .from('vouchers')
-                    .insert([{
-                        voucher_no: voucherForm.referenceNo,
-                        type: voucherType,
-                        entity_id: voucherForm.entityId || null,
-                        total_amount: baseAmount,
-                        currency: voucherForm.currency,
-                        entry_id: jeData.id,
-                        status: 'POSTED'
-                    }]);
-                if (vError) throw vError;
-            }
-
-            showToast("✅ Voucher posted to General Ledger!", "success");
-
-            // Reset form
-            setVoucherForm({ entityId: '', amount: '', referenceNo: '', description: '', currency: 'PHP' });
-            setJournalLinesForm([
-                { accountCode: '', accountName: '', debit: '', credit: '' },
-                { accountCode: '', accountName: '', debit: '', credit: '' }
-            ]);
-        } catch (error) {
-            console.error('Error posting voucher:', error);
-            showToast("Error posting voucher: " + error.message, "error");
-        }
-    };
+    // Dynamic Journal Lines State (Extracted to VouchersTab)   };
 
     // PAYABLES LOGIC (Expenses to Growers)
     const payablesData = useMemo(() => {
@@ -478,23 +334,7 @@ const Accounting = ({ arrivals = [], samplings = [], containers = [], farms = []
         return { accounts: sorted, totalDebit: totalDr, totalCredit: totalCr };
     }, [localChartOfAccounts, journalLines]);
 
-    // Map Journal Lines to Entries for Ledger display
-    const ledgerData = useMemo(() => {
-        return journalLines.map(line => {
-            const entry = journalEntries.find(je => je.id === line.entry_id) || {};
-            const account = localChartOfAccounts.find(coa => coa.id === line.account_id) || {};
-            return {
-                id: line.id,
-                date: entry.date_posted || new Date().toISOString(),
-                reference: entry.reference_no || 'N/A',
-                description: entry.description || '',
-                accountCode: account.code || '?',
-                accountName: account.name || 'Unknown Account',
-                debit: Number(line.debit_amount || 0),
-                credit: Number(line.credit_amount || 0)
-            };
-        }).sort((a, b) => new Date(b.date) - new Date(a.date) || b.reference.localeCompare(a.reference));
-    }, [journalLines, journalEntries, localChartOfAccounts]);
+    // Map Journal Lines to Entries for Ledger display (Extracted to LedgerTab)
 
     return (
         <div className="accounting-dashboard animation-fade-in">
@@ -762,328 +602,21 @@ const Accounting = ({ arrivals = [], samplings = [], containers = [], farms = []
 
 
             {subTab === 'vouchers' && (
-                <div className="erp-content-section slide-down text-left" style={{ padding: '2rem', background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', paddingBottom: '1rem', borderBottom: '1px solid #e2e8f0' }}>
-                        <div>
-                            <h3 style={{ margin: '0 0 0.5rem 0', color: 'var(--color-primary-dark)' }}>Voucher & Journal Entry</h3>
-                            <p style={{ margin: 0, color: 'var(--text-tertiary)', fontSize: '0.9rem' }}>Generate and post automated double-entry records to the General Ledger.</p>
-                        </div>
-                        <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '8px', border: '1px solid #cbd5e1', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                            <div>
-                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Global USD/PHP Rate</label>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                    <span style={{ fontWeight: 600 }}>$1.00 = ₱</span>
-                                    <input
-                                        type="number"
-                                        value={exchangeRate}
-                                        onChange={(e) => setExchangeRate(Number(e.target.value))}
-                                        style={{ width: '80px', padding: '0.25rem 0.5rem', border: '1px solid #cbd5e1', borderRadius: '4px', textAlign: 'right' }}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2rem' }}>
-                        {/* Left Side: Type Selection */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                            <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--text-secondary)' }}>1. Select Voucher Type</h4>
-
-                            <button
-                                className={`tab-btn ${voucherType === 'PAYABLE' ? 'active' : ''}`}
-                                onClick={() => setVoucherType('PAYABLE')}
-                                style={{ textAlign: 'left', margin: 0, borderRadius: '6px', border: voucherType === 'PAYABLE' ? '2px solid var(--color-primary-main)' : '1px solid #cbd5e1' }}
-                            >
-                                <strong>Payable Voucher (AP)</strong>
-                                <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: '4px', fontWeight: 'normal' }}>Record a liability owed to a Grower.</div>
-                            </button>
-
-                            <button
-                                className={`tab-btn ${voucherType === 'PAYMENT' ? 'active' : ''}`}
-                                onClick={() => setVoucherType('PAYMENT')}
-                                style={{ textAlign: 'left', margin: 0, borderRadius: '6px', border: voucherType === 'PAYMENT' ? '2px solid var(--color-primary-main)' : '1px solid #cbd5e1' }}
-                            >
-                                <strong>Payment Voucher</strong>
-                                <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: '4px', fontWeight: 'normal' }}>Record cash paid outwards (e.g. paying Growers).</div>
-                            </button>
-
-                            <button
-                                className={`tab-btn ${voucherType === 'CASH_RECEIPT' ? 'active' : ''}`}
-                                onClick={() => setVoucherType('CASH_RECEIPT')}
-                                style={{ textAlign: 'left', margin: 0, borderRadius: '6px', border: voucherType === 'CASH_RECEIPT' ? '2px solid var(--color-primary-main)' : '1px solid #cbd5e1' }}
-                            >
-                                <strong>Cash Receipt (CR)</strong>
-                                <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: '4px', fontWeight: 'normal' }}>Record cash received inwards (e.g. from Buyers).</div>
-                            </button>
-
-                            <button
-                                className={`tab-btn ${voucherType === 'JOURNAL' ? 'active' : ''}`}
-                                onClick={() => setVoucherType('JOURNAL')}
-                                style={{ textAlign: 'left', margin: 0, borderRadius: '6px', border: voucherType === 'JOURNAL' ? '2px solid var(--color-primary-main)' : '1px solid #cbd5e1' }}
-                            >
-                                <strong>General Journal (JV)</strong>
-                                <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: '4px', fontWeight: 'normal' }}>Manual multi-line adjusting entries.</div>
-                            </button>
-                        </div>
-
-                        {/* Right Side: Data Entry Form */}
-                        <div style={{ background: '#f8fafc', padding: '1.5rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                            <h4 style={{ margin: '0 0 1.5rem 0', color: 'var(--text-secondary)' }}>2. Enter Details</h4>
-
-                            <div className="input-group">
-                                <label>Date</label>
-                                <input type="date" id="voucher-date" className="input-field" defaultValue={new Date().toISOString().split('T')[0]} />
-                            </div>
-
-                            {voucherType === 'PAYABLE' && (
-                                <>
-                                    <div className="input-group">
-                                        <label>Select Grower (Creditor)</label>
-                                        <select className="input-field" value={voucherForm.entityId} onChange={e => setVoucherForm({ ...voucherForm, entityId: e.target.value })}>
-                                            <option value="">-- Select Farm --</option>
-                                            {farms.map(f => (
-                                                <option key={f.id} value={f.id}>{f.name} ({f.farmCode})</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div className="input-group" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1rem' }}>
-                                        <div>
-                                            <label>Currency</label>
-                                            <select className="input-field" value={voucherForm.currency} onChange={e => setVoucherForm({ ...voucherForm, currency: e.target.value })}>
-                                                <option value="PHP">PHP</option>
-                                                <option value="USD">USD</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label>Total Amount</label>
-                                            <input type="number" step="0.01" className="input-field" placeholder="0.00" value={voucherForm.amount} onChange={e => setVoucherForm({ ...voucherForm, amount: e.target.value })} />
-                                        </div>
-                                    </div>
-                                    {voucherForm.currency === 'USD' && (
-                                        <div style={{ padding: '0.75rem', background: '#dbeafe', color: '#1e40af', borderRadius: '4px', marginBottom: '1rem', fontSize: '0.85rem' }}>
-                                            <strong>Exchange Conversion:</strong> ${Number(voucherForm.amount || 0).toLocaleString()} USD x ₱{exchangeRate} = <strong>₱{(Number(voucherForm.amount || 0) * exchangeRate).toLocaleString()} PHP</strong>
-                                        </div>
-                                    )}
-                                    <div className="input-group">
-                                        <label>Reference No. / Particulars</label>
-                                        <input type="text" className="input-field" placeholder="e.g. Inv# 12345" value={voucherForm.referenceNo} onChange={e => setVoucherForm({ ...voucherForm, referenceNo: e.target.value })} />
-                                    </div>
-                                    <div className="input-group">
-                                        <label>Description / Notes</label>
-                                        <textarea className="input-field" rows="3" value={voucherForm.description} onChange={e => setVoucherForm({ ...voucherForm, description: e.target.value })}></textarea>
-                                    </div>
-
-                                    <div style={{ marginTop: '2rem', padding: '1rem', background: '#f1f5f9', borderLeft: '4px solid var(--color-primary-main)', borderRadius: '4px' }}>
-                                        <h5 style={{ margin: '0 0 0.5rem 0', color: 'var(--text-secondary)' }}>Automated GL Posting Preview</h5>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.25rem' }}>
-                                            <span>Dr. Cost of Goods - Grower Payments (5010)</span>
-                                            <span>₱{(Number(voucherForm.amount || 0) * (voucherForm.currency === 'USD' ? exchangeRate : 1)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                        </div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                                            <span style={{ paddingLeft: '2rem' }}>Cr. Accounts Payable - Growers (2010)</span>
-                                            <span>₱{(Number(voucherForm.amount || 0) * (voucherForm.currency === 'USD' ? exchangeRate : 1)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                        </div>
-                                    </div>
-                                </>
-                            )}
-
-                            {voucherType === 'PAYMENT' && (
-                                <>
-                                    <div className="input-group">
-                                        <label>Pay To (Grower / Vendor)</label>
-                                        <select className="input-field" value={voucherForm.entityId} onChange={e => setVoucherForm({ ...voucherForm, entityId: e.target.value })}>
-                                            <option value="">-- Select Farm --</option>
-                                            {farms.map(f => (
-                                                <option key={f.id} value={f.id}>{f.name} ({f.farmCode})</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div className="input-group">
-                                        <label>Amount Paid (PHP)</label>
-                                        <input type="number" step="0.01" className="input-field" placeholder="0.00" value={voucherForm.amount} onChange={e => setVoucherForm({ ...voucherForm, amount: e.target.value })} />
-                                    </div>
-                                    <div className="input-group">
-                                        <label>Check No. / Reference</label>
-                                        <input type="text" className="input-field" placeholder="e.g. Check# 000123" value={voucherForm.referenceNo} onChange={e => setVoucherForm({ ...voucherForm, referenceNo: e.target.value })} />
-                                    </div>
-                                    <div className="input-group">
-                                        <label>Description</label>
-                                        <textarea className="input-field" rows="3" value={voucherForm.description} onChange={e => setVoucherForm({ ...voucherForm, description: e.target.value })}></textarea>
-                                    </div>
-                                    <div style={{ marginTop: '2rem', padding: '1rem', background: '#f1f5f9', borderLeft: '4px solid var(--color-primary-main)', borderRadius: '4px' }}>
-                                        <h5 style={{ margin: '0 0 0.5rem 0', color: 'var(--text-secondary)' }}>Automated GL Posting Preview</h5>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.25rem' }}>
-                                            <span>Dr. Accounts Payable - Growers (2010)</span>
-                                            <span>₱{Number(voucherForm.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                        </div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                                            <span style={{ paddingLeft: '2rem' }}>Cr. Cash in Bank - PHP (1010)</span>
-                                            <span>₱{Number(voucherForm.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                        </div>
-                                    </div>
-                                </>
-                            )}
-
-                            {voucherType === 'CASH_RECEIPT' && (
-                                <>
-                                    <div className="input-group">
-                                        <label>Received From (Buyer)</label>
-                                        <input type="text" className="input-field" placeholder="e.g. Kawasaki Trading" value={voucherForm.entityId} onChange={e => setVoucherForm({ ...voucherForm, entityId: e.target.value })} />
-                                    </div>
-                                    <div className="input-group" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1rem' }}>
-                                        <div>
-                                            <label>Currency Received</label>
-                                            <select className="input-field" value={voucherForm.currency} onChange={e => setVoucherForm({ ...voucherForm, currency: e.target.value })}>
-                                                <option value="USD">USD</option>
-                                                <option value="PHP">PHP</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label>Amount Received</label>
-                                            <input type="number" step="0.01" className="input-field" placeholder="0.00" value={voucherForm.amount} onChange={e => setVoucherForm({ ...voucherForm, amount: e.target.value })} />
-                                        </div>
-                                    </div>
-                                    {voucherForm.currency === 'USD' && (
-                                        <div style={{ padding: '0.75rem', background: '#dcfce7', color: '#166534', borderRadius: '4px', marginBottom: '1rem', fontSize: '0.85rem' }}>
-                                            <strong>Exchange Conversion:</strong> ${Number(voucherForm.amount || 0).toLocaleString()} USD x ₱{exchangeRate} = <strong>₱{(Number(voucherForm.amount || 0) * exchangeRate).toLocaleString()} PHP</strong>
-                                        </div>
-                                    )}
-                                    <div className="input-group">
-                                        <label>Wire Transfer Ref / Particulars</label>
-                                        <input type="text" className="input-field" placeholder="e.g. TT# 987654" value={voucherForm.referenceNo} onChange={e => setVoucherForm({ ...voucherForm, referenceNo: e.target.value })} />
-                                    </div>
-                                    <div className="input-group">
-                                        <label>Description</label>
-                                        <textarea className="input-field" rows="3" value={voucherForm.description} onChange={e => setVoucherForm({ ...voucherForm, description: e.target.value })}></textarea>
-                                    </div>
-                                    <div style={{ marginTop: '2rem', padding: '1rem', background: '#f1f5f9', borderLeft: '4px solid #10b981', borderRadius: '4px' }}>
-                                        <h5 style={{ margin: '0 0 0.5rem 0', color: 'var(--text-secondary)' }}>Automated GL Posting Preview</h5>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.25rem' }}>
-                                            <span>Dr. Cash in Bank - {voucherForm.currency === 'USD' ? 'USD (1011)' : 'PHP (1010)'}</span>
-                                            <span>₱{(Number(voucherForm.amount || 0) * (voucherForm.currency === 'USD' ? exchangeRate : 1)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                        </div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                                            <span style={{ paddingLeft: '2rem' }}>Cr. Export Sales Revenue - Banana (4010)</span>
-                                            <span>₱{(Number(voucherForm.amount || 0) * (voucherForm.currency === 'USD' ? exchangeRate : 1)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                        </div>
-                                    </div>
-                                </>
-                            )}
-
-                            {voucherType === 'JOURNAL' && (
-                                <>
-                                    <div className="input-group">
-                                        <label>Reference No.</label>
-                                        <input type="text" className="input-field" placeholder="e.g. JV-2026-001" value={voucherForm.referenceNo} onChange={e => setVoucherForm({ ...voucherForm, referenceNo: e.target.value })} />
-                                    </div>
-                                    <div className="input-group">
-                                        <label>Description / Reason</label>
-                                        <textarea className="input-field" rows="2" value={voucherForm.description} onChange={e => setVoucherForm({ ...voucherForm, description: e.target.value })}></textarea>
-                                    </div>
-
-                                    <div style={{ marginTop: '1.5rem' }}>
-                                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Journal Lines</label>
-                                        <table className="banana-table" style={{ fontSize: '0.85rem' }}>
-                                            <thead>
-                                                <tr>
-                                                    <th>Account</th>
-                                                    <th className="text-right">Debit</th>
-                                                    <th className="text-right">Credit</th>
-                                                    <th className="text-center">Action</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {journalLinesForm.map((line, idx) => (
-                                                    <tr key={idx}>
-                                                        <td>
-                                                            <select
-                                                                className="input-field"
-                                                                style={{ padding: '0.2rem', height: 'auto', fontSize: '0.8rem' }}
-                                                                value={line.accountCode}
-                                                                onChange={(e) => {
-                                                                    const code = e.target.value;
-                                                                    const acc = localChartOfAccounts.find(a => a.code === code);
-                                                                    const newLines = [...journalLinesForm];
-                                                                    newLines[idx].accountCode = code;
-                                                                    newLines[idx].accountName = acc ? acc.name : '';
-                                                                    setJournalLinesForm(newLines);
-                                                                }}
-                                                            >
-                                                                <option value="">Select Account</option>
-                                                                {localChartOfAccounts.map(acc => (
-                                                                    <option key={acc.id} value={acc.code}>{acc.code} - {acc.name}</option>
-                                                                ))}
-                                                            </select>
-                                                        </td>
-                                                        <td>
-                                                            <input
-                                                                type="number"
-                                                                className="input-field"
-                                                                style={{ padding: '0.2rem', height: 'auto', textAlign: 'right', fontSize: '0.8rem' }}
-                                                                placeholder="0.00"
-                                                                value={line.debit}
-                                                                onChange={e => {
-                                                                    const newLines = [...journalLinesForm];
-                                                                    newLines[idx].debit = e.target.value;
-                                                                    newLines[idx].credit = ''; // Clear other side
-                                                                    setJournalLinesForm(newLines);
-                                                                }}
-                                                            />
-                                                        </td>
-                                                        <td>
-                                                            <input
-                                                                type="number"
-                                                                className="input-field"
-                                                                style={{ padding: '0.2rem', height: 'auto', textAlign: 'right', fontSize: '0.8rem' }}
-                                                                placeholder="0.00"
-                                                                value={line.credit}
-                                                                onChange={e => {
-                                                                    const newLines = [...journalLinesForm];
-                                                                    newLines[idx].credit = e.target.value;
-                                                                    newLines[idx].debit = ''; // Clear other side
-                                                                    setJournalLinesForm(newLines);
-                                                                }}
-                                                            />
-                                                        </td>
-                                                        <td className="text-center">
-                                                            {journalLinesForm.length > 2 && (
-                                                                <button style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontWeight: 'bold' }} onClick={() => {
-                                                                    setJournalLinesForm(journalLinesForm.filter((_, i) => i !== idx));
-                                                                }}>X</button>
-                                                            )}
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                        <button
-                                            className="btn-secondary"
-                                            style={{ width: '100%', marginTop: '0.5rem', padding: '0.25rem', fontSize: '0.75rem' }}
-                                            onClick={() => setJournalLinesForm([...journalLinesForm, { accountCode: '', accountName: '', debit: '', credit: '' }])}
-                                        >
-                                            + Add Row
-                                        </button>
-                                    </div>
-                                </>
-                            )}
-
-                            <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
-                                <button className="btn-secondary" onClick={() => setVoucherForm({ entityId: '', amount: '', referenceNo: '', description: '', currency: 'PHP' })}>Clear</button>
-                                <button className="btn-primary" onClick={handlePostVoucher}>
-                                    Generate & Post Voucher
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <VouchersTab 
+                    exchangeRate={exchangeRate}
+                    setExchangeRate={setExchangeRate}
+                    accountingPeriods={accountingPeriods}
+                    localChartOfAccounts={localChartOfAccounts}
+                    farms={farms}
+                />
             )}
 
             {subTab === 'ledger' && (
-                <div className="erp-content-section slide-down text-left" style={{ padding: '2rem', background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' }}>
-                    <h3 style={{ margin: '0 0 0.25rem 0', color: 'var(--color-primary-dark)' }}>General Ledger Transactions</h3>
-                    <p style={{ margin: '0 0 1.5rem 0', color: 'var(--text-tertiary)', fontSize: '0.9rem' }}>Comprehensive log of all posted double-entry journal lines.</p>
-                    <LedgerTable ledgerData={ledgerData} />
-                </div>
+                <LedgerTab 
+                    journalLines={journalLines}
+                    journalEntries={journalEntries}
+                    localChartOfAccounts={localChartOfAccounts}
+                />
             )}
 
             {subTab === 'inventory' && (
@@ -1607,13 +1140,13 @@ const Accounting = ({ arrivals = [], samplings = [], containers = [], farms = []
                             const name = document.getElementById('new-period-name').value;
                             const start = document.getElementById('new-period-start').value;
                             const end = document.getElementById('new-period-end').value;
-                            if (!name || !start || !end) { alert("Please complete all fields."); return; }
+                            if (!name || !start || !end) { toast.warning("Please complete all fields."); return; }
 
                             const { data, error } = await supabase.from('accounting_periods').insert([{
                                 period_name: name, start_date: start, end_date: end, is_closed: false
                             }]).select();
 
-                            if (error) alert(error.message);
+                            if (error) toast.error(error.message);
                             else {
                                 setAccountingPeriods([...accountingPeriods, data[0]].sort((a, b) => new Date(b.start_date) - new Date(a.start_date)));
                                 document.getElementById('new-period-name').value = '';
@@ -1651,7 +1184,7 @@ const Accounting = ({ arrivals = [], samplings = [], containers = [], farms = []
                                             <button className="btn-secondary" style={{ color: '#dc2626', borderColor: '#fca5a5' }} onClick={async () => {
                                                 if (confirm(`Are you sure you want to lock the period "${period.period_name}"? New entries will be blocked.`)) {
                                                     const { error } = await supabase.from('accounting_periods').update({ is_closed: true }).eq('id', period.id);
-                                                    if (error) alert(error.message);
+                                                    if (error) toast.error(error.message);
                                                     else setAccountingPeriods(accountingPeriods.map(p => p.id === period.id ? { ...p, is_closed: true } : p));
                                                 }
                                             }}>🔒 Lock Period</button>
@@ -1733,24 +1266,24 @@ function ChartOfAccountsTab({ localChartOfAccounts, setLocalChartOfAccounts }) {
     }, [localChartOfAccounts]);
 
     const handleSeedPresets = async () => {
-        if (presetsToAdd.length === 0) { alert('All preset accounts are already in your Chart of Accounts!'); return; }
+        if (presetsToAdd.length === 0) { toast.warning('All preset accounts are already in your Chart of Accounts!'); return; }
         if (!window.confirm(`This will add ${presetsToAdd.length} standard banana-export accounts to your COA. Proceed?`)) return;
         setSeeding(true);
         try {
             const { data, error } = await supabase.from('chart_of_accounts').insert(presetsToAdd).select();
             if (error) throw error;
             setLocalChartOfAccounts(prev => [...(prev || []), ...(data || [])]);
-            alert(`✅ ${data.length} accounts added successfully!`);
+            toast.success(`${data.length} accounts added successfully!`);
         } catch (e) {
-            alert('Error seeding accounts: ' + e.message);
+            toast.error('Error seeding accounts: ' + e.message);
         } finally {
             setSeeding(false);
         }
     };
 
     const handleAddAccount = async () => {
-        if (!newAcc.code || !newAcc.name) return alert('Code and Name are required.');
-        if (existingCodes.has(newAcc.code)) return alert(`Account code ${newAcc.code} already exists.`);
+        if (!newAcc.code || !newAcc.name) return toast.warning('Code and Name are required.');
+        if (existingCodes.has(newAcc.code)) return toast.warning(`Account code ${newAcc.code} already exists.`);
         setSaving(true);
         try {
             const { data, error } = await supabase.from('chart_of_accounts').insert([newAcc]).select();
@@ -1759,7 +1292,7 @@ function ChartOfAccountsTab({ localChartOfAccounts, setLocalChartOfAccounts }) {
             setNewAcc({ code: '', name: '', type: 'Asset', normal_balance: 'Debit' });
             setShowForm(false);
         } catch (e) {
-            alert('Error adding account: ' + e.message);
+            toast.error('Error adding account: ' + e.message);
         } finally {
             setSaving(false);
         }
@@ -1850,150 +1383,6 @@ function ChartOfAccountsTab({ localChartOfAccounts, setLocalChartOfAccounts }) {
                     <p>No accounts yet. Click <strong>"Seed Preset Accounts"</strong> to get started with the standard banana-export COA.</p>
                 </div>
             )}
-        </div>
-    );
-}
-// ============================================================
-// Ledger Filter & Table Sub-Components
-// ============================================================
-function LedgerAccountFilter({ ledgerData }) {
-    return (
-        <select
-            id="ledger-account-filter"
-            className="input-field"
-            style={{ fontSize: '0.82rem', padding: '0.35rem 0.5rem' }}
-            defaultValue=""
-        >
-            <option value="">All Accounts</option>
-            {[...new Map(ledgerData.map(r => [r.accountCode, r])).values()]
-                .sort((a, b) => a.accountCode.localeCompare(b.accountCode))
-                .map(r => (
-                    <option key={r.accountCode} value={r.accountCode}>{r.accountCode} - {r.accountName}</option>
-                ))}
-        </select>
-    );
-}
-
-function LedgerDateFilter({ id }) {
-    return (
-        <input
-            type="date"
-            id={id}
-            className="input-field"
-            style={{ fontSize: '0.82rem', padding: '0.35rem 0.5rem' }}
-        />
-    );
-}
-
-function LedgerTable({ ledgerData }) {
-    const [accountFilter, setAccountFilter] = useState('');
-    const [dateFrom, setDateFrom] = useState('');
-    const [dateTo, setDateTo] = useState('');
-
-    const filtered = useMemo(() => {
-        return ledgerData.filter(row => {
-            if (accountFilter && row.accountCode !== accountFilter) return false;
-            if (dateFrom && row.date < dateFrom) return false;
-            if (dateTo && row.date > dateTo) return false;
-            return true;
-        });
-    }, [ledgerData, accountFilter, dateFrom, dateTo]);
-
-    const totalDebit = filtered.reduce((s, r) => s + r.debit, 0);
-    const totalCredit = filtered.reduce((s, r) => s + r.credit, 0);
-
-    const uniqueAccounts = useMemo(() => {
-        return [...new Map(ledgerData.map(r => [r.accountCode, r])).values()]
-            .sort((a, b) => a.accountCode.localeCompare(b.accountCode));
-    }, [ledgerData]);
-
-    return (
-        <div>
-            {/* Inline filters (self-contained) */}
-            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.25rem', padding: '1rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                <div style={{ flex: '1 1 200px' }}>
-                    <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.3rem' }}>Filter by Account</label>
-                    <select className="input-field" style={{ fontSize: '0.82rem' }} value={accountFilter} onChange={e => setAccountFilter(e.target.value)}>
-                        <option value="">All Accounts</option>
-                        {uniqueAccounts.map(r => (
-                            <option key={r.accountCode} value={r.accountCode}>{r.accountCode} - {r.accountName}</option>
-                        ))}
-                    </select>
-                </div>
-                <div style={{ flex: '1 1 140px' }}>
-                    <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.3rem' }}>From Date</label>
-                    <input type="date" className="input-field" style={{ fontSize: '0.82rem' }} value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
-                </div>
-                <div style={{ flex: '1 1 140px' }}>
-                    <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.3rem' }}>To Date</label>
-                    <input type="date" className="input-field" style={{ fontSize: '0.82rem' }} value={dateTo} onChange={e => setDateTo(e.target.value)} />
-                </div>
-                {(accountFilter || dateFrom || dateTo) && (
-                    <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'flex-end' }}>
-                        <button className="btn-secondary" style={{ fontSize: '0.78rem', padding: '0.35rem 0.75rem' }}
-                            onClick={() => { setAccountFilter(''); setDateFrom(''); setDateTo(''); }}>
-                            ✕ Clear Filters
-                        </button>
-                    </div>
-                )}
-            </div>
-
-            <div style={{ overflowX: 'auto' }}>
-                <table className="banana-table" style={{ fontSize: '0.85rem' }}>
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Reference</th>
-                            <th>Description</th>
-                            <th>Account</th>
-                            <th className="text-right">Debit (PHP)</th>
-                            <th className="text-right">Credit (PHP)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {filtered.length === 0 ? (
-                            <tr><td colSpan="6" className="text-center" style={{ padding: '2rem', color: 'var(--text-tertiary)' }}>No journal lines match the current filters.</td></tr>
-                        ) : (
-                            filtered.map((row, idx) => (
-                                <tr key={row.id} style={{
-                                    background: row.credit > 0 ? '#fafafa' : 'transparent',
-                                    borderBottom: (idx < filtered.length - 1 && filtered[idx + 1]?.reference !== row.reference) ? '2px solid #e2e8f0' : undefined
-                                }}>
-                                    <td style={{ whiteSpace: 'nowrap', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{new Date(row.date).toLocaleDateString()}</td>
-                                    <td style={{ fontWeight: 700, color: 'var(--color-primary-main)', fontSize: '0.82rem' }}>{row.reference}</td>
-                                    <td style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.description || '—'}</td>
-                                    <td>
-                                        <span style={{ color: 'var(--text-tertiary)', marginRight: '0.4rem', fontSize: '0.78rem' }}>{row.accountCode}</span>
-                                        <strong style={{ fontSize: '0.83rem' }}>{row.accountName}</strong>
-                                    </td>
-                                    <td className="text-right" style={{ fontWeight: row.debit > 0 ? 700 : 400, color: row.debit > 0 ? '#0f4c26' : '#cbd5e1' }}>
-                                        {row.debit > 0 ? row.debit.toLocaleString(undefined, { minimumFractionDigits: 2 }) : '–'}
-                                    </td>
-                                    <td className="text-right" style={{ fontWeight: row.credit > 0 ? 700 : 400, color: row.credit > 0 ? '#b45309' : '#cbd5e1' }}>
-                                        {row.credit > 0 ? row.credit.toLocaleString(undefined, { minimumFractionDigits: 2 }) : '–'}
-                                    </td>
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                    {filtered.length > 0 && (
-                        <tfoot>
-                            <tr style={{ background: '#f1f5f9', fontWeight: 700 }}>
-                                <td colSpan="4" style={{ padding: '0.6rem 1rem', fontSize: '0.83rem', color: 'var(--text-secondary)' }}>TOTALS ({filtered.length} lines)</td>
-                                <td className="text-right" style={{ color: '#0f4c26', padding: '0.6rem 1rem' }}>{totalDebit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                                <td className="text-right" style={{ color: '#b45309', padding: '0.6rem 1rem' }}>{totalCredit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                            </tr>
-                            <tr style={{ background: Math.abs(totalDebit - totalCredit) < 0.01 ? '#dcfce7' : '#fef2f2' }}>
-                                <td colSpan="6" style={{ padding: '0.4rem 1rem', fontSize: '0.78rem', fontWeight: 600, color: Math.abs(totalDebit - totalCredit) < 0.01 ? '#166534' : '#dc2626', textAlign: 'right' }}>
-                                    {Math.abs(totalDebit - totalCredit) < 0.01
-                                        ? '✓ Balanced — Debits equal Credits'
-                                        : `⚠ Out of Balance by ₱${Math.abs(totalDebit - totalCredit).toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
-                                </td>
-                            </tr>
-                        </tfoot>
-                    )}
-                </table>
-            </div>
         </div>
     );
 }

@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import './ArrivalForm.css';
 import { supabase } from '../supabaseClient';
 import { exportXlsx } from '../utils/exportXlsx';
+import { toast } from 'sonner';
 
 const isNative = window.Capacitor && window.Capacitor.isNativePlatform();
 
@@ -18,7 +19,7 @@ async function pickDefectImage(fileInputRef, onPicked) {
             onPicked(photo.dataUrl, null);
         } catch (e) {
             if (!String(e).includes('cancelled')) {
-                alert('Could not open gallery: ' + e);
+                toast.error('Could not open gallery: ' + e);
             }
         }
     } else {
@@ -111,7 +112,7 @@ const Sampling = ({ farms = [], samplings = [], setSamplings, onNavigate, initia
         e.preventDefault();
 
         if (!formData.farmCode) {
-            alert("Please select a farm first.");
+            toast.warning("Please select a farm first.");
             return;
         }
 
@@ -135,13 +136,13 @@ const Sampling = ({ farms = [], samplings = [], setSamplings, onNavigate, initia
 
         if (error) {
             console.error("Supabase error (Sampling):", error);
-            alert(`Failed to save daily sampling: ${error.message || 'Unknown error'}`);
+            toast.error(`Failed to save daily sampling: ${error.message || 'Unknown error'}`);
             return;
         }
 
         if (data && data.length > 0) {
             setSamplings(prev => [...prev, data[0]]);
-            alert("Sampling logged successfully.");
+            toast.success("Sampling logged successfully.");
 
             if (onNavigate) {
                 onNavigate('log-arrival');
@@ -363,7 +364,7 @@ const Sampling = ({ farms = [], samplings = [], setSamplings, onNavigate, initia
                                         overallDecision: s.overallDecision || s.decision
                                     }));
                                     await exportXlsx(wb, `SamplingResults_${new Date().toISOString().split('T')[0]}.xlsx`);
-                                } catch (err) { alert('Export failed: ' + err.message); }
+                                } catch (err) { toast.error('Export failed: ' + err.message); }
                             }}
                         >
                             ⬇️ Export Excel

@@ -7,6 +7,7 @@ import {
     Building2, Mail, Phone, MapPin,
     AlertCircle, Briefcase
 } from 'lucide-react';
+import { toast } from 'sonner';
 import './Consignees.css';
 import { supabase } from '../supabaseClient';
 import { exportXlsx } from '../utils/exportXlsx';
@@ -97,7 +98,7 @@ const Consignees = ({ consignees = [], setConsignees, consigneeWeeklyRates = [],
 
         if (error) {
             console.error("Supabase error (Consignee Weekly Rate):", error);
-            alert(`⚠️ Database Insert Failed: ${error.message || error.details || 'Unknown constraint error.'}`);
+            toast.error(`⚠️ Database Insert Failed: ${error.message || error.details || 'Unknown constraint error.'}`);
             return;
         }
 
@@ -118,15 +119,16 @@ const Consignees = ({ consignees = [], setConsignees, consigneeWeeklyRates = [],
         };
 
         if (editId) {
+            const { id, created_at, ...updatePayload } = consigneeData;
             const { data, error } = await supabase
                 .from('consignees')
-                .update(consigneeData)
+                .update(updatePayload)
                 .eq('id', editId)
                 .select();
 
             if (error) {
                 console.error("Supabase error (Edit Consignee):", error);
-                alert("Failed to update consignee.");
+                toast.error("Failed to update consignee.");
                 return;
             }
             if (data && data.length > 0) {
@@ -142,7 +144,7 @@ const Consignees = ({ consignees = [], setConsignees, consigneeWeeklyRates = [],
 
             if (error) {
                 console.error("Supabase error (New Consignee):", error);
-                alert("Failed to register new consignee.");
+                toast.error("Failed to register new consignee.");
                 return;
             }
             if (data && data.length > 0) {
@@ -174,7 +176,7 @@ const Consignees = ({ consignees = [], setConsignees, consigneeWeeklyRates = [],
 
         if (error) {
             console.error("Supabase error (Delete Consignee):", error);
-            alert("Failed to delete consignee.");
+            toast.error("Failed to delete consignee.");
             return;
         }
 
@@ -210,7 +212,7 @@ const Consignees = ({ consignees = [], setConsignees, consigneeWeeklyRates = [],
                 rates_matrix: { ...prev.rates_matrix, ...previousRates.rates_matrix }
             }));
         } else {
-            alert("No previous rates found to copy.");
+            toast.warning("No previous rates found to copy.");
         }
     };
 
@@ -554,7 +556,7 @@ const Consignees = ({ consignees = [], setConsignees, consigneeWeeklyRates = [],
                                     });
                                     consignees.forEach(c => ws.addRow(c));
                                     await exportXlsx(wb, `Consignees_${new Date().toISOString().split('T')[0]}.xlsx`);
-                                } catch (err) { alert('Export failed: ' + err.message); }
+                                } catch (err) { toast.error('Export failed: ' + err.message); }
                             }}
                         >
                             <Download size={15} /> Export Excel

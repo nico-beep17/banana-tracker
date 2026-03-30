@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import './NewContainerForm.css';
+import { toast } from 'sonner';
 
 const ContainerStuffingGrid = ({ containerId, containers, remainingInventory, onSavePayload, onCancel }) => {
     const container = containers.find(c => c.id === containerId);
@@ -73,13 +74,13 @@ const ContainerStuffingGrid = ({ containerId, containers, remainingInventory, on
 
     const handleSave = () => {
         if (totals.grandTotal === 0) {
-            alert("Please input at least one box to stuff.");
+            toast.warning("Please input at least one box to stuff.");
             return;
         }
 
         const currentTotal = container.totalBoxes || 0;
         if (currentTotal + totals.grandTotal > 1540) {
-            alert(`Cannot stuff ${totals.grandTotal} boxes. Container only has ${1540 - currentTotal} capacity remaining.`);
+            toast.warning(`Cannot stuff ${totals.grandTotal} boxes. Container only has ${1540 - currentTotal} capacity remaining.`);
             return;
         }
 

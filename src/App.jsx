@@ -13,6 +13,15 @@ import { supabase } from './supabaseClient';
 import { BotMessageSquare } from 'lucide-react';
 import { logAudit } from './utils/auditLog';
 import { offlineSync } from './utils/offlineSync';
+import { Toaster, toast } from 'sonner';
+import useAppStore from './store/useAppStore';
+import { useQueryClient } from '@tanstack/react-query';
+import {
+  useFarmsQuery, useArrivalsQuery, useSamplingsQuery, useContainersQuery,
+  useWeeklyRatesQuery, useConsigneesQuery, useConsigneeWeeklyRatesQuery,
+  useChartOfAccountsQuery, useJournalEntriesQuery, useJournalLinesQuery,
+  useMaterialsInventoryQuery, useEmployeesQuery, useDtrRecordsQuery, useAttendanceLocationsQuery
+} from './queries/hooks';
 
 // Lazy-loaded heavy modules — only downloaded when user navigates to the tab
 const ArrivalForm = lazy(() => import('./components/ArrivalForm'));
@@ -28,6 +37,7 @@ const Payroll = lazy(() => import('./components/Payroll'));
 const ShipmentTracker = lazy(() => import('./components/ShipmentTracker'));
 const MaterialsInventory = lazy(() => import('./components/MaterialsInventory'));
 const Consignees = lazy(() => import('./components/Consignees'));
+const ShippingDocs = lazy(() => import('./components/ShippingDocs'));
 
 // Loading fallback for lazy modules
 const LazyFallback = () => (
@@ -56,59 +66,18 @@ class ErrorBoundary extends React.Component {
 }
 
 function App() {
-  // Restore active tab from localStorage so refreshing keeps the user on the same module
-  const [activeTab, setActiveTab] = useState(() => {
-    const saved = localStorage.getItem('lavc_active_tab');
-    // Don't restore transient sub-views that require prior state
-    const nonRestorableTabs = ['new-container', 'edit-container', 'container-stuffing-grid'];
-    if (saved && !nonRestorableTabs.includes(saved)) return saved;
-    return 'dashboard';
-  });
-  const [tabState, setTabState] = useState(null); // Used to pass context like pre-selected farmCode
-  const [arrivals, setArrivals] = useState([]);
-  const [farms, setFarms] = useState([]);
-  const [samplings, setSamplings] = useState([]);
-  const [containers, setContainers] = useState([]);
-  const [weeklyRates, setWeeklyRates] = useState([]);
-
-  // Consignee (Buyer) State
-  const [consignees, setConsignees] = useState([]);
-  const [consigneeWeeklyRates, setConsigneeWeeklyRates] = useState([]);
-
-  // Phase 12 Accounting State
-  const [chartOfAccounts, setChartOfAccounts] = useState([]);
-  const [journalEntries, setJournalEntries] = useState([]);
-  const [journalLines, setJournalLines] = useState([]);
-
-  // Materials Inventory State
-  const [inventoryItems, setInventoryItems] = useState([]);
-
-  // Phase 12 Global Context
-  const [exchangeRate, setExchangeRate] = useState(56.50); // Default USD to PHP Rate
-  const [employees, setEmployees] = useState([]);
-  const [dtrRecords, setDtrRecords] = useState([]);
-  const [attendanceLocations, setAttendanceLocations] = useState([]);
-
-  // Auth State
-  const [user, setUser] = useState(null);
-  const [userProfile, setUserProfile] = useState(null);
-  const [authLoading, setAuthLoading] = useState(true);
-
-  // AI Assistant State
-  const [isAIOpen, setIsAIOpen] = useState(false);
-
-  // Toast System
-  const [toasts, setToasts] = useState([]);
-  const showToast = (message, type = 'info') => {
-    const id = Date.now();
-    setToasts(prev => [...prev, { id, message, type }]);
-    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 5000);
-  };
-
-  // Notification Read State
-  const [lastReadNotifTime, setLastReadNotifTime] = useState(
-    parseInt(localStorage.getItem('lavc_notif_last_read') || '0', 10)
-  );
+  const {
+    activeTab, setActiveTab, tabState, setTabState,
+    arrivals, setArrivals, farms, setFarms, samplings, setSamplings,
+    containers, setContainers, weeklyRates, setWeeklyRates,
+    consignees, setConsignees, consigneeWeeklyRates, setConsigneeWeeklyRates,
+    chartOfAccounts, setChartOfAccounts, journalEntries, setJournalEntries,
+    journalLines, setJournalLines, inventoryItems, setInventoryItems,
+    exchangeRate, setExchangeRate, employees, setEmployees,
+    dtrRecords, setDtrRecords, attendanceLocations, setAttendanceLocations,
+    user, setUser, userProfile, setUserProfile, authLoading, setAuthLoading,
+    isAIOpen, setIsAIOpen, lastReadNotifTime, setLastReadNotifTime
+  } = useAppStore();
 
   const handleNotificationsOpen = () => {
     const now = Date.now();
@@ -116,81 +85,28 @@ function App() {
     localStorage.setItem('lavc_notif_last_read', now.toString());
   };
 
-  // fetchData is defined outside useEffect so it can be passed to child components
+  const isAuth = !!user;
+  useFarmsQuery(isAuth);
+  useArrivalsQuery(isAuth);
+  useSamplingsQuery(isAuth);
+  useContainersQuery(isAuth);
+  useWeeklyRatesQuery(isAuth);
+  useConsigneesQuery(isAuth);
+  useConsigneeWeeklyRatesQuery(isAuth);
+  useChartOfAccountsQuery(isAuth);
+  useJournalEntriesQuery(isAuth);
+  useJournalLinesQuery(isAuth);
+  useMaterialsInventoryQuery(isAuth);
+  useEmployeesQuery(isAuth);
+  useDtrRecordsQuery(isAuth);
+  useAttendanceLocationsQuery(isAuth);
+
+  const queryClient = useQueryClient();
+
+  // Replaced with React Query. Exposing invalidateQueries for backward compatibility.
   const fetchData = useCallback(async () => {
-    try {
-      // Farms — simple unordered query for maximum compatibility
-      const { data: farmsData, error: farmsErr } = await supabase.from('farms').select('*');
-      if (farmsErr) {
-        if (Capacitor.isNativePlatform()) alert(`[Fetch] Farms failed: ${farmsErr.message}`);
-        console.error('[Fetch] Farms failed:', farmsErr.code, farmsErr.message, farmsErr.hint);
-      } else {
-        console.log('[Fetch] Farms loaded:', farmsData?.length ?? 0);
-        if (Capacitor.isNativePlatform() && (!farmsData || farmsData.length === 0)) {
-           alert('Farms loaded but returned 0 rows. Is RLS still blocking or DB empty?');
-        }
-        setFarms(farmsData || []);
-      }
-
-      const { data: arrivalsData } = await supabase.from('arrivals').select('*').order('dateTimeEncoded', { ascending: false });
-      if (arrivalsData) setArrivals(arrivalsData);
-
-      const { data: samplingsData } = await supabase.from('samplings').select('*').order('encodedAt', { ascending: false });
-      if (samplingsData) setSamplings(samplingsData);
-
-      const { data: containersData } = await supabase.from('containers').select('*').order('dateCreated', { ascending: false });
-      if (containersData) setContainers(containersData);
-
-      const { data: ratesData } = await supabase.from('weekly_rates').select('*').order('created_at', { ascending: false });
-      if (ratesData) setWeeklyRates(ratesData);
-
-      const { data: invData } = await supabase.from('materials_inventory').select('*').order('item_code', { ascending: true });
-      if (invData) setInventoryItems(invData);
-
-      const { data: coaData } = await supabase.from('chart_of_accounts').select('*').order('code', { ascending: true });
-      if (coaData) setChartOfAccounts(coaData);
-
-      const { data: jeData } = await supabase.from('journal_entries').select('*').order('date_posted', { ascending: false });
-      if (jeData) setJournalEntries(jeData);
-
-      const { data: jlData } = await supabase.from('journal_lines').select('*');
-      if (jlData) setJournalLines(jlData);
-
-      // HR/Payroll tables may not yet exist - catch individually
-      try {
-        const { data: empData, error: empErr } = await supabase.from('employees').select('*').order('last_name', { ascending: true });
-        if (!empErr && empData) setEmployees(empData);
-      } catch { /* table may not exist yet */ }
-
-      try {
-        const { data: dtrData, error: dtrErr } = await supabase.from('dtr_records').select('*');
-        if (!dtrErr && dtrData) setDtrRecords(dtrData);
-      } catch { /* table may not exist yet */ }
-
-      try {
-        const { data: locData, error: locErr } = await supabase.from('attendance_locations').select('*');
-        if (!locErr && locData) setAttendanceLocations(locData);
-      } catch { /* table may not exist yet */ }
-
-      try {
-        await supabase.from('accounting_periods').select('*');
-      } catch { /* table may not exist yet */ }
-
-      // Consignees
-      try {
-        const { data: consData, error: consErr } = await supabase.from('consignees').select('*').order('last_modified', { ascending: false });
-        if (!consErr && consData) setConsignees(consData);
-      } catch { /* table may not exist yet */ }
-
-      try {
-        const { data: cwrData, error: cwrErr } = await supabase.from('consignee_weekly_rates').select('*').order('created_at', { ascending: false });
-        if (!cwrErr && cwrData) setConsigneeWeeklyRates(cwrData);
-      } catch { /* table may not exist yet */ }
-
-    } catch (err) {
-      console.error('Error fetching data from Supabase:', err);
-    }
-  }, []);
+    queryClient.invalidateQueries();
+  }, [queryClient]);
 
   // Fetch initial data & handle Auth
   useEffect(() => {
@@ -342,7 +258,7 @@ function App() {
       // When a push notification arrives while app is in foreground
       const receivedListener = PushNotifications.addListener('pushNotificationReceived', (notification) => {
         console.log('[Push] Received:', notification);
-        showToast(notification.body || notification.title || 'New notification', 'success');
+        toast.info(notification.body || notification.title || 'New notification');
       });
 
       // When user taps a push notification
@@ -468,7 +384,7 @@ function App() {
         if (queued) {
           // Optimistic local state rendering for offline PWA
           setArrivals(prev => [...newArrivalsBatch, ...prev]);
-          alert('📱 Offline Mode: Arrival logged securely and queued for background syncing when internet returns.');
+          toast.info('📱 Offline Mode: Arrival logged securely and queued for background syncing when internet returns.');
           return true;
         } else if (data) {
           setArrivals(prev => [...data, ...prev]);
@@ -477,7 +393,7 @@ function App() {
       }
     } catch (error) {
       console.error("Offline Sync error (Arrivals):", error);
-      alert(`⚠️ Database Insert Failed: ${error.message || error.details || 'Unknown constraint error.'}`);
+      toast.error(`⚠️ Database Insert Failed: ${error.message || error.details || 'Unknown constraint error.'}`);
       return false;
     }
   };
@@ -500,12 +416,12 @@ function App() {
         if (success) {
           const updatedContainer = { ...dbPayload, ...(data ? data[0] : {}), vesselVoyage, driverName };
           setContainers(prev => prev.map(c => c.id === containerData.id ? { ...c, ...updatedContainer } : c));
-          if (queued) alert('📱 Offline Mode: Container modifications saved safely locally.');
+          if (queued) toast.info('📱 Offline Mode: Container modifications saved safely locally.');
           handleNavigate('containers-list');
         }
       } catch (error) {
         console.error("Supabase error (Update Container):", error);
-        alert(`Failed to update container registry in database. Error: ${error.message}`);
+        toast.error(`Failed to update container registry in database. Error: ${error.message}`);
       }
     } else {
       try {
@@ -513,12 +429,12 @@ function App() {
         if (success) {
           const newContainer = { ...dbPayload, ...(data ? data[0] : {}), vesselVoyage, driverName };
           setContainers(prev => [newContainer, ...prev]);
-          if (queued) alert('📱 Offline Mode: New Container correctly registered locally.');
+          if (queued) toast.info('📱 Offline Mode: New Container correctly registered locally.');
           handleNavigate('containers-list');
         }
       } catch (error) {
         console.error("Supabase error (Create Container):", error);
-        alert(`Failed to create container registry in database. Error: ${error.message}`);
+        toast.error(`Failed to create container registry in database. Error: ${error.message}`);
       }
     }
   };
@@ -549,7 +465,7 @@ function App() {
 
     if (error) {
       console.error("Supabase error (Stuffed Items):", error);
-      alert("Failed to save stuffing payload data.");
+      toast.error("Failed to save stuffing payload data.");
       return;
     }
 
@@ -573,7 +489,7 @@ function App() {
 
     if (error) {
       console.error("Supabase error (Seal Container):", error);
-      alert("Failed to seal container.");
+      toast.error("Failed to seal container.");
       return;
     }
 
@@ -594,7 +510,7 @@ function App() {
 
     if (error) {
       console.error("Supabase error (Depart Container):", error);
-      alert("Failed to run departure dispatch command.");
+      toast.error("Failed to run departure dispatch command.");
       return;
     }
 
@@ -614,7 +530,7 @@ function App() {
 
     if (error) {
       console.error("Supabase error (Update Transit):", error);
-      alert("Failed to update transit status.");
+      toast.error("Failed to update transit status.");
       return;
     }
 
@@ -629,7 +545,7 @@ function App() {
     if (!targetContainer || !targetContainer.stuffedItems) return;
 
     const oldPayload = targetContainer.stuffedItems.find(p => p.id === payloadId);
-    if (!oldPayload) { alert('Payload not found.'); return; }
+    if (!oldPayload) { toast.error('Payload not found.'); return; }
 
     // Write audit log
     await supabase.from('override_audit_logs').insert({
@@ -657,7 +573,7 @@ function App() {
 
     if (error) {
       console.error('Supabase error (Edit Payload):', error);
-      alert(`Failed to update payload: ${error.message}`);
+      toast.error(`Failed to update payload: ${error.message}`);
       return;
     }
     if (data && data[0]) {
@@ -670,7 +586,7 @@ function App() {
     if (!targetContainer || !targetContainer.stuffedItems) return;
 
     const oldPayload = targetContainer.stuffedItems.find(p => p.id === payloadId);
-    if (!oldPayload) { alert('Payload not found.'); return; }
+    if (!oldPayload) { toast.error('Payload not found.'); return; }
 
     if (!window.confirm(`Delete payload ${payloadId} (${oldPayload.total} boxes)? This cannot be undone.`)) return;
 
@@ -698,7 +614,7 @@ function App() {
 
     if (error) {
       console.error('Supabase error (Delete Payload):', error);
-      alert(`Failed to delete payload: ${error.message}`);
+      toast.error(`Failed to delete payload: ${error.message}`);
       return;
     }
     if (data && data[0]) {
@@ -773,7 +689,7 @@ function App() {
     else fetchQuery = fetchQuery.eq('id', arrivalId);
     const { data: rowsToApprove, error: fetchErr } = await fetchQuery;
     if (fetchErr || !rowsToApprove?.length) {
-      alert(`Failed to fetch arrival rows: ${fetchErr?.message || 'Unknown error'}`);
+      toast.error(`Failed to fetch arrival rows: ${fetchErr?.message || 'Unknown error'}`);
       return;
     }
 
@@ -1160,6 +1076,13 @@ function App() {
           />
         )}
 
+        {activeTab === 'shipping-docs' && (
+          <ShippingDocs
+            containers={containers}
+            setContainers={setContainers}
+          />
+        )}
+
         {activeTab === 'user-management' && (
           <UserManagement userProfile={userProfile} />
         )}
@@ -1209,22 +1132,8 @@ function App() {
           />
         )}
 
-        {/* Toast Notification Overlay */}
-        <div className="toast-container" style={{ position: 'fixed', top: '1rem', right: '1rem', zIndex: 10001, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          {toasts.map(t => (
-            <div key={t.id} className={`toast toast-${t.type} animation-slide-in`} style={{
-              padding: '1rem 1.5rem',
-              borderRadius: '8px',
-              background: t.type === 'success' ? '#059669' : (t.type === 'error' ? '#dc2626' : '#1f2937'),
-              color: 'white',
-              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-              minWidth: '250px',
-              fontSize: '0.9rem'
-            }}>
-              {t.message}
-            </div>
-          ))}
-        </div>
+        {/* Toast Notification Overlay - Powered by Sonner */}
+        <Toaster position="top-right" richColors />
         </Suspense>
       </Layout>
     </ErrorBoundary>
