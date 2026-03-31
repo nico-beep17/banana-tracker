@@ -1054,13 +1054,11 @@ function App() {
             chartOfAccounts={Array.isArray(chartOfAccounts) ? chartOfAccounts : []}
             journalEntries={Array.isArray(journalEntries) ? journalEntries : []}
             journalLines={Array.isArray(journalLines) ? journalLines : []}
-            showToast={showToast}
           />
         )}
 
         {activeTab === 'payroll' && (
           <Payroll
-            showToast={showToast}
             employees={Array.isArray(employees) ? employees : []}
             dtrRecords={Array.isArray(dtrRecords) ? dtrRecords : []}
             attendanceLocations={Array.isArray(attendanceLocations) ? attendanceLocations : []}
