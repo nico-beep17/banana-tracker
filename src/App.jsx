@@ -1046,14 +1046,14 @@ function App() {
             containers={containers}
             farms={farms}
             weeklyRates={weeklyRates}
-            consignees={consignees}
-            consigneeWeeklyRates={consigneeWeeklyRates}
+            consignees={Array.isArray(consignees) ? consignees : []}
+            consigneeWeeklyRates={Array.isArray(consigneeWeeklyRates) ? consigneeWeeklyRates : []}
             userProfile={userProfile}
             exchangeRate={exchangeRate}
             setExchangeRate={setExchangeRate}
-            chartOfAccounts={chartOfAccounts}
-            journalEntries={journalEntries}
-            journalLines={journalLines}
+            chartOfAccounts={Array.isArray(chartOfAccounts) ? chartOfAccounts : []}
+            journalEntries={Array.isArray(journalEntries) ? journalEntries : []}
+            journalLines={Array.isArray(journalLines) ? journalLines : []}
             showToast={showToast}
           />
         )}
@@ -1061,9 +1061,9 @@ function App() {
         {activeTab === 'payroll' && (
           <Payroll
             showToast={showToast}
-            employees={employees}
-            dtrRecords={dtrRecords}
-            attendanceLocations={attendanceLocations}
+            employees={Array.isArray(employees) ? employees : []}
+            dtrRecords={Array.isArray(dtrRecords) ? dtrRecords : []}
+            attendanceLocations={Array.isArray(attendanceLocations) ? attendanceLocations : []}
             fetchData={fetchData}
             initialTab={tabState?.tab}
           />
