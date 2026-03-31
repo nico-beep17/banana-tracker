@@ -218,7 +218,7 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
   // Total physically delivered per item (deducts from Global)
   const totalDeliveredPerItem = useMemo(() => {
     const result = {};
-    deliveries.forEach((d) => {
+    (deliveries || []).forEach((d) => {
       if (!result[d.itemCode]) result[d.itemCode] = 0;
       result[d.itemCode] += Number(d.quantity) || 0;
     });
@@ -227,7 +227,7 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
 
   // Global Stock = stock_in - stock_out - physical deliveries
   const warehouseStock = useMemo(() => {
-    return inventoryItems.map((item) => {
+    return (inventoryItems || []).map((item) => {
       const delivered = totalDeliveredPerItem[item.item_code] || 0;
       const balance = (item.stock_in || 0) - (item.stock_out || 0) - delivered;
       return { ...item, warehouseBalance: balance };
@@ -237,7 +237,7 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
   // Per-farm balance
   const farmData = useMemo(() => {
     const result = {};
-    deliveries.forEach((d) => {
+    (deliveries || []).forEach((d) => {
       if (!result[d.farmCode])
         result[d.farmCode] = { history: [], delivered: {} };
       if (!result[d.farmCode].delivered[d.itemCode])
@@ -249,14 +249,14 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
   }, [deliveries]);
 
   const farmsWithActivity = useMemo(() => {
-    const set = new Set([...deliveries.map((d) => d.farmCode)]);
+    const set = new Set([...(deliveries || []).map((d) => d.farmCode)]);
     return [...set];
   }, [deliveries]);
 
   const handleOpenBulkDelivery = () => {
     let nextNumber = 1;
 
-    deliveries.forEach((d) => {
+    (deliveries || []).forEach((d) => {
       if (d.referenceNo && d.referenceNo.startsWith("MIS-")) {
         const parts = d.referenceNo.split("-");
         if (parts.length > 1) {
