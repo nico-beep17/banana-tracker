@@ -444,6 +444,18 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
 
   const handleAddItem = async (e) => {
     e.preventDefault();
+
+    // Validate uniqueness of item_code
+    const code = (newItem.item_code || "").toString().trim().toLowerCase();
+    const duplicate = inventoryItems.find(
+      (i) => (i.item_code || "").toString().trim().toLowerCase() === code && i.id !== editItemId
+    );
+
+    if (duplicate) {
+      setErrorMsg("⚠️ Item Code already exists. Please use a unique item code or update the existing item.");
+      return;
+    }
+
     // Strip computed/virtual fields and system-generated columns that don't exist as writable DB columns
     const { warehouseBalance, warehouseDelivered, id, created_at, ...cleanItem } = newItem;
     const payload = { ...cleanItem, last_updated: new Date().toISOString() };
