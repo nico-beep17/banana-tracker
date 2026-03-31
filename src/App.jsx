@@ -1064,6 +1064,7 @@ function App() {
             attendanceLocations={Array.isArray(attendanceLocations) ? attendanceLocations : []}
             fetchData={fetchData}
             initialTab={tabState?.tab}
+            userProfile={userProfile}
           />
         )}
 

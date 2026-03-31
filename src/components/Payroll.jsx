@@ -9,7 +9,7 @@ import {
 import './Accounting.css'; // Reusing ERP styles
 import { toast } from 'sonner';
 
-const Payroll = ({ employees = [], dtrRecords = [], attendanceLocations = [], fetchData, initialTab }) => {
+const Payroll = ({ employees = [], dtrRecords = [], attendanceLocations = [], fetchData, initialTab, userProfile }) => {
     const showToast = (msg, type) => {
         if (type === 'error') toast.error(msg);
         else if (type === 'warning') toast.warning(msg);
