@@ -162,10 +162,13 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
       if (error) throw new Error(error.message);
       if (data) {
         const ids = data.map((d) => d.id);
-        setInventoryItems((prev) => [
-          ...data,
-          ...prev.filter((p) => !ids.includes(p.id)),
-        ]);
+        setInventoryItems((prev) => {
+          const safePrev = Array.isArray(prev) ? prev : [];
+          return [
+            ...data,
+            ...safePrev.filter((p) => !ids.includes(p.id)),
+          ];
+        });
       }
       setScanState("done");
     } catch (err) {
@@ -327,7 +330,10 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
       }
 
       if (data) {
-        setDeliveries((prev) => [...data, ...prev]);
+        setDeliveries((prev) => {
+          const safePrev = Array.isArray(prev) ? prev : [];
+          return [...data, ...safePrev];
+        });
       }
 
       setIsBulkDeliveryOpen(false);
@@ -352,7 +358,10 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
       toast.error("Failed to delete: " + error.message);
       return;
     }
-    setDeliveries((prev) => prev.filter((d) => d.id !== id));
+    setDeliveries((prev) => {
+      const safePrev = Array.isArray(prev) ? prev : [];
+      return safePrev.filter((d) => d.id !== id);
+    });
   };
 
   // ITEM MANAGEMENT (SUPABASE)
@@ -425,10 +434,13 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
     }
     if (data) {
       const ids = data.map((d) => d.id);
-      setInventoryItems((prev) => [
-        ...data,
-        ...prev.filter((p) => !ids.includes(p.id)),
-      ]);
+      setInventoryItems((prev) => {
+        const safePrev = Array.isArray(prev) ? prev : [];
+        return [
+          ...data,
+          ...safePrev.filter((p) => !ids.includes(p.id)),
+        ];
+      });
       setIsBatchFormOpen(false);
       setBatchItems([{ ...initialItemState }]);
     }
@@ -470,9 +482,10 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
         return;
       }
       if (data?.[0]) {
-        setInventoryItems((prev) =>
-          prev.map((i) => (i.id === editItemId ? data[0] : i))
-        );
+        setInventoryItems((prev) => {
+          const safePrev = Array.isArray(prev) ? prev : [];
+          return safePrev.map((i) => (i.id === editItemId ? data[0] : i));
+        });
         closeModal();
       }
     } else {
@@ -485,7 +498,10 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
         return;
       }
       if (data?.[0]) {
-        setInventoryItems((prev) => [data[0], ...prev]);
+        setInventoryItems((prev) => {
+          const safePrev = Array.isArray(prev) ? prev : [];
+          return [data[0], ...safePrev];
+        });
         closeModal();
       }
     }
@@ -503,7 +519,10 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
     if (error) {
       setErrorMsg(`⚠️ Error deleting item: ${error.message}`);
     } else {
-      setInventoryItems((prev) => prev.filter((i) => i.id !== id));
+      setInventoryItems((prev) => {
+        const safePrev = Array.isArray(prev) ? prev : [];
+        return safePrev.filter((i) => i.id !== id);
+      });
     }
   };
 
