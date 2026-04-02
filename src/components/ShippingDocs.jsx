@@ -1,14 +1,15 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { toast } from 'sonner';
 import { 
     CalendarClock, Clock, CheckCircle2, Circle, AlertCircle, FileText, 
     Ship, BookOpen, FileCheck, CheckSquare, Search, ChevronDown, ChevronUp, Anchor,
-    Mails, CheckCircle
+    Mails, CheckCircle, Printer, Mail, Loader2, Sparkles, ExternalLink
 } from 'lucide-react';
 import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
 import { useContainersQuery } from '../queries/hooks';
 import { useQueryClient } from '@tanstack/react-query';
+import { searchGmailForContainer, getEmailHtmlForPrint } from '../utils/gmailScanner';
 import './ShippingDocs.css';
 
 const DEFAULT_DOCS_STATE = {
@@ -88,9 +89,13 @@ const ShippingDocs = () => {
     const [expandedIds, setExpandedIds] = useState(new Set());
     const [updating, setUpdating] = useState(false);
     
-    // Auto-load company Gmail token from sessionStorage (persists across tab switches)
+    // Auto-load company Gmail token from sessionStorage
     const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
     const [gmailToken, setGmailToken] = useState(() => sessionStorage.getItem('lavc_company_gmail_token') || null);
+
+    // Gmail scan results cache: { [containerId]: { matchedDocs, vesselInfo, messages, scanning, error } }
+    const [scanResults, setScanResults] = useState({});
+    const scanningRef = useRef(new Set()); // track in-flight scans
 
     // Only show active containers (not arrived)
     const activeContainers = useMemo(() => {
@@ -109,10 +114,83 @@ const ShippingDocs = () => {
         );
     }, [activeContainers, searchQuery]);
 
+    // Scan Gmail for a specific container
+    const scanContainerEmails = useCallback(async (containerId, reeferNo) => {
+        if (!gmailToken || !reeferNo || scanningRef.current.has(containerId)) return;
+        
+        scanningRef.current.add(containerId);
+        setScanResults(prev => ({ ...prev, [containerId]: { ...prev[containerId], scanning: true, error: null } }));
+        
+        const result = await searchGmailForContainer(gmailToken, reeferNo);
+        
+        if (result.error === 'TOKEN_EXPIRED') {
+            sessionStorage.removeItem('lavc_company_gmail_token');
+            setGmailToken(null);
+            toast.error('Gmail token expired. Please reconnect.');
+            scanningRef.current.delete(containerId);
+            return;
+        }
+        
+        setScanResults(prev => ({
+            ...prev,
+            [containerId]: {
+                matchedDocs: result.matchedDocs || {},
+                vesselInfo: result.vesselInfo || {},
+                messages: result.messages || [],
+                totalFound: result.totalFound || 0,
+                scanning: false,
+                error: result.error || null,
+                scannedAt: new Date().toISOString(),
+            }
+        }));
+        
+        // Auto-fill vessel info if found
+        if (result.vesselInfo && Object.keys(result.vesselInfo).length > 0) {
+            await autoFillVesselInfo(containerId, result.vesselInfo);
+        }
+        
+        scanningRef.current.delete(containerId);
+    }, [gmailToken]);
+
+    // Auto-fill vessel/shipping info from scanned emails into the container record
+    const autoFillVesselInfo = async (containerId, vesselInfo) => {
+        const container = containers.find(c => c.id === containerId);
+        if (!container) return;
+
+        const updates = {};
+        if (vesselInfo.vesselName && !container.reeferName) updates.reeferName = vesselInfo.vesselName;
+        if (vesselInfo.voyageNo && !container.voyageNo) updates.voyageNo = vesselInfo.voyageNo;
+        if (vesselInfo.eta && !container.eta) updates.eta = vesselInfo.eta;
+        if (vesselInfo.etd && !container.etd) updates.etd = vesselInfo.etd;
+        if (vesselInfo.shippingLine && !container.shippingLine) updates.shippingLine = vesselInfo.shippingLine;
+        if (vesselInfo.sealNo && !container.sealNo) updates.sealNo = vesselInfo.sealNo;
+
+        if (Object.keys(updates).length === 0) return; // Nothing new to fill
+
+        const { error } = await supabase
+            .from('containers')
+            .update(updates)
+            .eq('id', containerId);
+
+        if (!error) {
+            queryClient.invalidateQueries({ queryKey: ['containers'] });
+            const fields = Object.keys(updates).join(', ');
+            toast.success(`Auto-filled from email: ${fields}`, { duration: 4000 });
+        }
+    };
+
     const toggleExpand = (id) => {
         const newSet = new Set(expandedIds);
-        if (newSet.has(id)) newSet.delete(id);
-        else newSet.add(id);
+        if (newSet.has(id)) {
+            newSet.delete(id);
+        } else {
+            newSet.add(id);
+            // Auto-scan when expanding if we have a Gmail token and no cached result
+            const container = containers.find(c => c.id === id);
+            if (gmailToken && container?.reeferNo && !scanResults[id]) {
+                scanContainerEmails(id, container.reeferNo);
+            }
+        }
         setExpandedIds(newSet);
     };
 
@@ -155,11 +233,91 @@ const ShippingDocs = () => {
         setUpdating(false);
     };
 
+    // Print a specific email
+    const handlePrintEmail = async (emailId) => {
+        if (!gmailToken) return;
+        toast.loading('Loading email for print...', { id: 'print-loading' });
+        
+        const html = await getEmailHtmlForPrint(gmailToken, emailId);
+        toast.dismiss('print-loading');
+        
+        const printWindow = window.open('', '_blank', 'width=800,height=600');
+        if (printWindow) {
+            printWindow.document.write(html);
+            printWindow.document.close();
+            setTimeout(() => printWindow.print(), 500);
+        }
+    };
+
     const getProgress = (containerCategoryState, checklist) => {
         if (!containerCategoryState) return 0;
         const total = checklist.length;
         const completed = checklist.filter(item => containerCategoryState[item.key]).length;
         return total > 0 ? (completed / total) * 100 : 0;
+    };
+
+    // Render a checklist item with Gmail detection badge
+    const renderChecklistItem = (item, category, docsState, containerId) => {
+        const isChecked = docsState[category]?.[item.key];
+        const scan = scanResults[containerId];
+        const detected = scan?.matchedDocs?.[item.key];
+        const isScanning = scan?.scanning;
+
+        return (
+            <li 
+                key={item.key} 
+                className={`sd-checkbox-item ${isChecked ? 'checked' : ''} ${detected ? 'sd-gmail-detected' : ''}`}
+            >
+                <div 
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, cursor: 'pointer' }}
+                    onClick={() => handleToggleChecklist(containerId, category, item.key, isChecked)}
+                >
+                    <span className="sd-checkbox-icon">
+                        {isChecked ? <CheckSquare size={18} /> : <Circle size={18} />}
+                    </span>
+                    <span className="sd-checkbox-label">
+                        {item.label}
+                    </span>
+                </div>
+
+                {/* Gmail detection indicator */}
+                {isScanning && !detected && (
+                    <span style={{ opacity: 0.4 }}>
+                        <Loader2 size={14} className="sd-spin" />
+                    </span>
+                )}
+
+                {detected && (
+                    <div className="sd-detected-badge">
+                        <span className="sd-detected-tag" title={`Found in: ${detected.emails[0]?.subject || 'email'}`}>
+                            <Mail size={12} />
+                            <span className="sd-detected-count">{detected.emails.length}</span>
+                        </span>
+                        <button 
+                            className="sd-print-btn"
+                            onClick={(e) => { e.stopPropagation(); handlePrintEmail(detected.emails[0].id); }}
+                            title={`Print: ${detected.emails[0]?.subject}`}
+                        >
+                            <Printer size={13} />
+                        </button>
+                        {detected.emails.length > 1 && (
+                            <button 
+                                className="sd-print-btn"
+                                onClick={(e) => { 
+                                    e.stopPropagation(); 
+                                    // Open all in new tabs
+                                    detected.emails.forEach(em => handlePrintEmail(em.id));
+                                }}
+                                title="Print all related emails"
+                                style={{ fontSize: '0.65rem', padding: '0.15rem 0.3rem' }}
+                            >
+                                All
+                            </button>
+                        )}
+                    </div>
+                )}
+            </li>
+        );
     };
 
     return (
@@ -181,7 +339,7 @@ const ShippingDocs = () => {
                         <div>
                             <span style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)' }}>LFJ Google Workspace</span>
                             <span style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', marginLeft: '0.5rem' }}>
-                                {gmailToken ? '• Gmail API active' : '• Not connected'}
+                                {gmailToken ? '• Gmail API active — auto-scanning inboxes' : '• Not connected'}
                             </span>
                         </div>
                     </div>
@@ -240,6 +398,7 @@ const ShippingDocs = () => {
                     ) : (
                         filteredContainers.map(container => {
                             const isExpanded = expandedIds.has(container.id);
+                            const scan = scanResults[container.id];
                             
                             // Initialize state safely
                             let docsState = container.shippingDocs;
@@ -253,6 +412,7 @@ const ShippingDocs = () => {
                             const preDepProgress = getProgress(docsState.preDeparture, PRE_DEPARTURE_LIST);
                             const certOriginProgress = getProgress(docsState.certOfOrigin, CERT_OF_ORIGIN_LIST);
                             const overallCompleted = preDepProgress === 100 && certOriginProgress === 100;
+                            const detectedCount = scan?.matchedDocs ? Object.keys(scan.matchedDocs).length : 0;
 
                             return (
                                 <div key={container.id} className={`sd-container-card shadow-sm ${overallCompleted ? 'sd-completed' : ''}`}>
@@ -265,10 +425,29 @@ const ShippingDocs = () => {
                                             <h4>{container.destination || 'Unassigned Destination'} | {container.brand}</h4>
                                             <span style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>
                                                 {container.transit_status || 'HUB'}
+                                                {scan?.vesselInfo?.vesselName && (
+                                                    <span style={{ marginLeft: '0.5rem', color: '#7c3aed', fontWeight: 600 }}>
+                                                        • MV {scan.vesselInfo.vesselName}
+                                                        {scan.vesselInfo.voyageNo && ` V.${scan.vesselInfo.voyageNo}`}
+                                                    </span>
+                                                )}
                                             </span>
                                         </div>
 
                                         <div className="sd-progress-overview">
+                                            {/* Gmail scan indicator */}
+                                            {scan && !scan.scanning && scan.totalFound > 0 && (
+                                                <div className="sd-email-count" title={`${scan.totalFound} emails found, ${detectedCount} docs matched`}>
+                                                    <Mail size={14} />
+                                                    <span>{detectedCount}</span>
+                                                </div>
+                                            )}
+                                            {scan?.scanning && (
+                                                <div className="sd-email-count sd-scanning">
+                                                    <Loader2 size={14} className="sd-spin" />
+                                                </div>
+                                            )}
+
                                             <div className="sd-progress-bars">
                                                 <div className="sd-mini-progress" title={`Pre-Departure: ${Math.round(preDepProgress)}%`}>
                                                     <div className="sd-mini-bar" style={{ width: `${preDepProgress}%`, backgroundColor: preDepProgress === 100 ? '#10b981' : '#3b82f6' }}></div>
@@ -285,8 +464,69 @@ const ShippingDocs = () => {
 
                                     {isExpanded && (
                                         <div className="sd-card-body animation-fade-in">
+                                            {/* Vessel info auto-filled banner */}
+                                            {scan?.vesselInfo && Object.keys(scan.vesselInfo).length > 0 && (
+                                                <div className="sd-vessel-banner">
+                                                    <Sparkles size={16} />
+                                                    <span>Auto-detected from emails:</span>
+                                                    {scan.vesselInfo.vesselName && <span className="sd-vessel-tag">🚢 {scan.vesselInfo.vesselName}</span>}
+                                                    {scan.vesselInfo.voyageNo && <span className="sd-vessel-tag">📋 VOY {scan.vesselInfo.voyageNo}</span>}
+                                                    {scan.vesselInfo.eta && <span className="sd-vessel-tag">📅 ETA {scan.vesselInfo.eta}</span>}
+                                                    {scan.vesselInfo.etd && <span className="sd-vessel-tag">🚀 ETD {scan.vesselInfo.etd}</span>}
+                                                    {scan.vesselInfo.shippingLine && <span className="sd-vessel-tag">🏢 {scan.vesselInfo.shippingLine}</span>}
+                                                    {scan.vesselInfo.sealNo && <span className="sd-vessel-tag">🔒 Seal {scan.vesselInfo.sealNo}</span>}
+                                                </div>
+                                            )}
+
+                                            {/* Scan status banner */}
+                                            {scan?.scanning && (
+                                                <div className="sd-scan-banner">
+                                                    <Loader2 size={16} className="sd-spin" />
+                                                    <span>Scanning company inbox for documents related to <strong>{container.reeferNo}</strong>…</span>
+                                                </div>
+                                            )}
+
+                                            {gmailToken && !scan && container.reeferNo && (
+                                                <div className="sd-scan-banner" style={{ cursor: 'pointer' }}
+                                                    onClick={() => scanContainerEmails(container.id, container.reeferNo)}>
+                                                    <Mail size={16} />
+                                                    <span>Click to scan Gmail for <strong>{container.reeferNo}</strong> documents</span>
+                                                </div>
+                                            )}
+
+                                            {scan && !scan.scanning && scan.totalFound > 0 && (
+                                                <div className="sd-scan-summary">
+                                                    <CheckCircle2 size={14} />
+                                                    <span>{scan.totalFound} email{scan.totalFound !== 1 ? 's' : ''} found • {detectedCount} document{detectedCount !== 1 ? 's' : ''} matched</span>
+                                                    <button 
+                                                        className="sd-rescan-btn"
+                                                        onClick={() => { 
+                                                            setScanResults(prev => { const n = {...prev}; delete n[container.id]; return n; });
+                                                            scanContainerEmails(container.id, container.reeferNo);
+                                                        }}
+                                                    >
+                                                        ↻ Rescan
+                                                    </button>
+                                                </div>
+                                            )}
+
+                                            {scan && !scan.scanning && scan.totalFound === 0 && !scan.error && (
+                                                <div className="sd-scan-summary" style={{ color: '#94a3b8' }}>
+                                                    <AlertCircle size={14} />
+                                                    <span>No emails found for <strong>{container.reeferNo}</strong> in company inbox</span>
+                                                    <button 
+                                                        className="sd-rescan-btn"
+                                                        onClick={() => { 
+                                                            setScanResults(prev => { const n = {...prev}; delete n[container.id]; return n; });
+                                                            scanContainerEmails(container.id, container.reeferNo);
+                                                        }}
+                                                    >
+                                                        ↻ Retry
+                                                    </button>
+                                                </div>
+                                            )}
+
                                             <div className="sd-checklists-grid">
-                                                
                                                 {/* Pre-departure */}
                                                 <div className="sd-checklist-column">
                                                     <div className="sd-checklist-title">
@@ -294,20 +534,9 @@ const ShippingDocs = () => {
                                                         <h5>PREDEPARTURE Documents</h5>
                                                     </div>
                                                     <ul className="sd-checkbox-list">
-                                                        {PRE_DEPARTURE_LIST.map(item => (
-                                                            <li 
-                                                                key={item.key} 
-                                                                className={`sd-checkbox-item ${docsState.preDeparture[item.key] ? 'checked' : ''}`}
-                                                                onClick={() => handleToggleChecklist(container.id, 'preDeparture', item.key, docsState.preDeparture[item.key])}
-                                                            >
-                                                                <span className="sd-checkbox-icon">
-                                                                    {docsState.preDeparture[item.key] ? <CheckSquare size={18} /> : <Circle size={18} />}
-                                                                </span>
-                                                                <span className="sd-checkbox-label">
-                                                                    {item.label}
-                                                                </span>
-                                                            </li>
-                                                        ))}
+                                                        {PRE_DEPARTURE_LIST.map(item => 
+                                                            renderChecklistItem(item, 'preDeparture', docsState, container.id)
+                                                        )}
                                                     </ul>
                                                 </div>
 
@@ -318,23 +547,11 @@ const ShippingDocs = () => {
                                                         <h5>Attachment for Certificate of Origin (BOC)</h5>
                                                     </div>
                                                     <ul className="sd-checkbox-list">
-                                                        {CERT_OF_ORIGIN_LIST.map(item => (
-                                                            <li 
-                                                                key={item.key} 
-                                                                className={`sd-checkbox-item ${docsState.certOfOrigin[item.key] ? 'checked' : ''}`}
-                                                                onClick={() => handleToggleChecklist(container.id, 'certOfOrigin', item.key, docsState.certOfOrigin[item.key])}
-                                                            >
-                                                                <span className="sd-checkbox-icon">
-                                                                    {docsState.certOfOrigin[item.key] ? <CheckSquare size={18} /> : <Circle size={18} />}
-                                                                </span>
-                                                                <span className="sd-checkbox-label">
-                                                                    {item.label}
-                                                                </span>
-                                                            </li>
-                                                        ))}
+                                                        {CERT_OF_ORIGIN_LIST.map(item => 
+                                                            renderChecklistItem(item, 'certOfOrigin', docsState, container.id)
+                                                        )}
                                                     </ul>
                                                 </div>
-
                                             </div>
                                         </div>
                                     )}
