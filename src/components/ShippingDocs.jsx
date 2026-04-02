@@ -291,29 +291,20 @@ const ShippingDocs = () => {
 
                 {detected && (
                     <div className="sd-detected-badge">
-                        <span className="sd-detected-tag" title={`Found in: ${detected.emails[0]?.subject || 'email'}`}>
-                            <Mail size={12} />
-                            <span className="sd-detected-count">{detected.emails.length}</span>
-                        </span>
-                        <button 
-                            className="sd-print-btn"
-                            onClick={(e) => { e.stopPropagation(); handlePrintEmail(detected.emails[0].id); }}
-                            title={`Print: ${detected.emails[0]?.subject}`}
+                        <span 
+                            className={`sd-detected-tag sd-confidence-${detected.confidence || 'medium'}`} 
+                            title={`${detected.reason || 'Found in email'} (${detected.confidence} confidence)`}
                         >
-                            <Printer size={13} />
-                        </button>
-                        {detected.emails.length > 1 && (
+                            <Mail size={12} />
+                            {detected.confidence === 'high' ? '✓' : '?'}
+                        </span>
+                        {detected.emails?.[0] && (
                             <button 
                                 className="sd-print-btn"
-                                onClick={(e) => { 
-                                    e.stopPropagation(); 
-                                    // Open all in new tabs
-                                    detected.emails.forEach(em => handlePrintEmail(em.id));
-                                }}
-                                title="Print all related emails"
-                                style={{ fontSize: '0.65rem', padding: '0.15rem 0.3rem' }}
+                                onClick={(e) => { e.stopPropagation(); handlePrintEmail(detected.emails[0].id); }}
+                                title={`Print: ${detected.emails[0]?.subject}`}
                             >
-                                All
+                                <Printer size={13} />
                             </button>
                         )}
                     </div>
@@ -484,22 +475,25 @@ const ShippingDocs = () => {
                                             {scan?.scanning && (
                                                 <div className="sd-scan-banner">
                                                     <Loader2 size={16} className="sd-spin" />
-                                                    <span>Scanning company inbox for documents related to <strong>{container.reeferNo}</strong>…</span>
+                                                    <span>AI scanning company inbox for <strong>{container.reeferNo}</strong> — analyzing emails{scan?.imagesAnalyzed > 0 ? ` & ${scan.imagesAnalyzed} images` : ''}…</span>
                                                 </div>
                                             )}
 
                                             {gmailToken && !scan && container.reeferNo && (
                                                 <div className="sd-scan-banner" style={{ cursor: 'pointer' }}
                                                     onClick={() => scanContainerEmails(container.id, container.reeferNo)}>
-                                                    <Mail size={16} />
-                                                    <span>Click to scan Gmail for <strong>{container.reeferNo}</strong> documents</span>
+                                                    <Sparkles size={16} />
+                                                    <span>Click to AI-scan Gmail for <strong>{container.reeferNo}</strong> documents & images</span>
                                                 </div>
                                             )}
 
                                             {scan && !scan.scanning && scan.totalFound > 0 && (
                                                 <div className="sd-scan-summary">
-                                                    <CheckCircle2 size={14} />
-                                                    <span>{scan.totalFound} email{scan.totalFound !== 1 ? 's' : ''} found • {detectedCount} document{detectedCount !== 1 ? 's' : ''} matched</span>
+                                                    <Sparkles size={14} />
+                                                    <span>
+                                                        <strong>Gemini 3.1 Pro:</strong> {scan.totalFound} email{scan.totalFound !== 1 ? 's' : ''} analyzed • {detectedCount} doc{detectedCount !== 1 ? 's' : ''} found
+                                                        {scan.imagesAnalyzed > 0 && ` • ${scan.imagesAnalyzed} image${scan.imagesAnalyzed !== 1 ? 's' : ''} scanned`}
+                                                    </span>
                                                     <button 
                                                         className="sd-rescan-btn"
                                                         onClick={() => { 
@@ -509,6 +503,14 @@ const ShippingDocs = () => {
                                                     >
                                                         ↻ Rescan
                                                     </button>
+                                                </div>
+                                            )}
+
+                                            {/* AI Summary */}
+                                            {scan?.aiSummary && !scan.scanning && (
+                                                <div className="sd-ai-summary">
+                                                    <Sparkles size={14} />
+                                                    <span>{scan.aiSummary}</span>
                                                 </div>
                                             )}
 

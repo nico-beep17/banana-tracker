@@ -1,84 +1,16 @@
 /**
  * Gmail Scanner Utility for Shipping Docs
- * Scans the company Gmail inbox for emails related to container/reefer numbers
- * and maps them to shipping document checklist items.
+ * Uses Gemini 3.1 Pro with vision to intelligently analyze emails and image attachments
+ * for shipping document detection and vessel info extraction.
  */
 
 const GMAIL_API_BASE = 'https://gmail.googleapis.com/gmail/v1/users/me';
 
-// Keyword patterns that map email content to checklist items
-// Each entry: { checklistKey, category, searchTerms[], subjectPatterns[] }
-const DOC_KEYWORD_MAP = [
-  // Pre-Departure Documents
-  { key: 'atwObtained', category: 'preDeparture', 
-    searchTerms: ['ATW', 'authority to withdraw', 'withdraw container'],
-    subjectPatterns: [/\batw\b/i, /authority.*withdraw/i] },
-  
-  { key: 'atwUsed', category: 'preDeparture',
-    searchTerms: ['container yard', 'CY release', 'pick up container', 'container release'],
-    subjectPatterns: [/\bcy\b.*release/i, /pick.*up.*container/i, /container.*release/i] },
-  
-  { key: 'etradeRegistered', category: 'preDeparture',
-    searchTerms: ['eTrade', 'etrade.net.ph', 'export declaration registration'],
-    subjectPatterns: [/etrade/i, /export.*registration/i] },
-  
-  { key: 'ciDone', category: 'preDeparture',
-    searchTerms: ['commercial invoice', 'CI BIR', 'invoice'],
-    subjectPatterns: [/commercial\s*invoice/i, /\bCI\b/] },
-  
-  { key: 'plDone', category: 'preDeparture',
-    searchTerms: ['packing list', 'packing-list'],
-    subjectPatterns: [/packing\s*list/i, /\bPL\b/] },
-  
-  { key: 'lcuDone', category: 'preDeparture',
-    searchTerms: ['letter of commitment', 'LCU', 'undertaking'],
-    subjectPatterns: [/letter.*commitment/i, /\blcu\b/i, /undertaking/i] },
-  
-  { key: 'phytoDone', category: 'preDeparture',
-    searchTerms: ['phytosanitary', 'phyto certificate', 'plant quarantine'],
-    subjectPatterns: [/phyto/i, /plant.*quarantine/i] },
-
-  // Certificate of Origin (BOC) Attachments
-  { key: 'closedTicket', category: 'certOfOrigin',
-    searchTerms: ['closed ticket', 'booking confirmation', 'booking confirmed'],
-    subjectPatterns: [/closed\s*ticket/i, /booking\s*(confirm|close)/i] },
-  
-  { key: 'ed', category: 'certOfOrigin',
-    searchTerms: ['export declaration', 'ED approved', 'customs declaration'],
-    subjectPatterns: [/export\s*declaration/i, /\bED\b.*approv/i] },
-  
-  { key: 'bl', category: 'certOfOrigin',
-    searchTerms: ['bill of lading', 'B/L', 'BL draft', 'ocean bill'],
-    subjectPatterns: [/bill.*lading/i, /\bB\/L\b/i, /\bBL\b.*draft/i] },
-  
-  { key: 'ci', category: 'certOfOrigin',
-    searchTerms: ['commercial invoice', 'CI final'],
-    subjectPatterns: [/commercial\s*invoice/i, /\bCI\b.*final/i] },
-  
-  { key: 'pl', category: 'certOfOrigin',
-    searchTerms: ['packing list', 'PL final'],
-    subjectPatterns: [/packing\s*list/i, /\bPL\b.*final/i] },
-  
-  { key: 'ctcPhyto', category: 'certOfOrigin',
-    searchTerms: ['CTC phyto', 'certified true copy', 'CTC PHYTO'],
-    subjectPatterns: [/ctc.*phyto/i, /certified.*true.*copy/i] },
-];
-
-// Vessel/container info patterns to extract from email bodies
-const VESSEL_PATTERNS = {
-  vesselName: [/vessel\s*(?:name)?\s*[:=]?\s*([A-Z][A-Z\s\-\.]{2,30})/i, /(?:MV|M\/V|VS|V\.)\s+([A-Z][A-Z\s\-\.]{2,30})/i],
-  voyageNo: [/voyage\s*(?:no|number|#)?\s*[:=]?\s*([A-Z0-9\-\/]{3,20})/i, /voy(?:age)?\.?\s*[:=]?\s*([A-Z0-9\-\/]{3,20})/i],
-  eta: [/eta\s*[:=]?\s*(\d{1,2}[\-\/]\w{3,9}[\-\/]\d{2,4})/i, /arrival\s*(?:date)?\s*[:=]?\s*(\d{1,2}[\-\/]\w{3,9}[\-\/]\d{2,4})/i],
-  etd: [/etd\s*[:=]?\s*(\d{1,2}[\-\/]\w{3,9}[\-\/]\d{2,4})/i, /departure\s*(?:date)?\s*[:=]?\s*(\d{1,2}[\-\/]\w{3,9}[\-\/]\d{2,4})/i],
-  shippingLine: [/(?:shipping\s*line|carrier|line)\s*[:=]?\s*([A-Z][A-Za-z\s]{2,25})/i],
-  sealNo: [/seal\s*(?:no|number|#)?\s*[:=]?\s*([A-Z0-9]{5,20})/i],
-};
-
 /**
- * Search Gmail for emails related to a specific container
+ * Search Gmail for emails related to a specific container, then analyze with AI
  * @param {string} token - Gmail OAuth access token
  * @param {string} reeferNo - Container/reefer number to search for
- * @returns {Promise<{messages: Array, error?: string}>}
+ * @returns {Promise<{messages: Array, matchedDocs: Object, vesselInfo: Object}>}
  */
 export async function searchGmailForContainer(token, reeferNo) {
   if (!token || !reeferNo) return { messages: [], error: 'Missing token or reefer number' };
@@ -103,10 +35,10 @@ export async function searchGmailForContainer(token, reeferNo) {
     
     const data = await res.json();
     if (!data.messages || data.messages.length === 0) {
-      return { messages: [], matchedDocs: {}, vesselInfo: {} };
+      return { messages: [], matchedDocs: {}, vesselInfo: {}, totalFound: 0 };
     }
     
-    // Fetch each message's metadata (subject, from, date, snippet)
+    // Fetch each message's full content
     const messageDetails = await Promise.all(
       data.messages.slice(0, 20).map(async (msg) => {
         try {
@@ -125,35 +57,60 @@ export async function searchGmailForContainer(token, reeferNo) {
     
     const validMessages = messageDetails.filter(Boolean);
     
-    // Sort newest first — corrections/updates in later emails take priority
-    const processedMessages = validMessages.map(msg => {
+    // Process messages — extract text, metadata, and identify image attachments
+    const processedMessages = [];
+    const imageAttachments = [];
+    
+    for (const msg of validMessages) {
       const headers = msg.payload?.headers || [];
       const getHeader = (name) => headers.find(h => h.name.toLowerCase() === name.toLowerCase())?.value || '';
       
       // Decode body text (handle multipart)
       let bodyText = '';
-      try {
-        if (msg.payload?.body?.data) {
-          bodyText = atob(msg.payload.body.data.replace(/-/g, '+').replace(/_/g, '/'));
-        } else if (msg.payload?.parts) {
-          const textPart = msg.payload.parts.find(p => p.mimeType === 'text/plain') ||
-                           msg.payload.parts.find(p => p.mimeType === 'text/html');
-          if (textPart?.body?.data) {
-            bodyText = atob(textPart.body.data.replace(/-/g, '+').replace(/_/g, '/'));
+      const attachmentRefs = [];
+      
+      const extractParts = (part) => {
+        if (part.mimeType === 'text/plain' && part.body?.data) {
+          try {
+            bodyText += atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/'));
+          } catch(e) {}
+        }
+        if (part.mimeType === 'text/html' && !bodyText && part.body?.data) {
+          try {
+            let html = atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/'));
+            bodyText += html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+          } catch(e) {}
+        }
+        
+        // Track image attachments for AI vision analysis
+        if (part.filename && part.body?.attachmentId) {
+          const isImage = /\.(jpg|jpeg|png|gif|webp|bmp|tiff?)$/i.test(part.filename) ||
+                         (part.mimeType || '').startsWith('image/');
+          const isPdf = part.mimeType === 'application/pdf' || /\.pdf$/i.test(part.filename);
+          
+          if (isImage || isPdf) {
+            attachmentRefs.push({
+              attachmentId: part.body.attachmentId,
+              messageId: msg.id,
+              filename: part.filename,
+              mimeType: part.mimeType,
+              isImage,
+              isPdf,
+            });
           }
         }
-      } catch (e) {
-        bodyText = msg.snippet || '';
-      }
+        
+        if (part.parts) part.parts.forEach(extractParts);
+      };
       
-      // Strip HTML tags for pattern matching
-      bodyText = bodyText.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+      extractParts(msg.payload || {});
+      if (!bodyText) bodyText = msg.snippet || '';
       
       const dateStr = getHeader('Date');
       let timestamp = 0;
       try { timestamp = new Date(dateStr).getTime() || 0; } catch(e) {}
       
-      return {
+      processedMessages.push({
         id: msg.id,
         threadId: msg.threadId,
         subject: getHeader('Subject'),
@@ -161,74 +118,91 @@ export async function searchGmailForContainer(token, reeferNo) {
         date: dateStr,
         timestamp,
         snippet: msg.snippet || '',
-        bodyText,
-        hasAttachments: (msg.payload?.parts || []).some(p => p.filename && p.filename.length > 0),
-      };
-    }).sort((a, b) => b.timestamp - a.timestamp); // Newest first
+        bodyText: bodyText.slice(0, 4000), // Limit for AI context
+        hasAttachments: attachmentRefs.length > 0,
+        attachmentCount: attachmentRefs.length,
+        attachmentRefs,
+      });
+    }
     
-    // Match emails to checklist items
-    const matchedDocs = {};
-    for (const docDef of DOC_KEYWORD_MAP) {
-      for (const email of processedMessages) {
-        const textToSearch = `${email.subject} ${email.snippet} ${email.bodyText}`.toLowerCase();
-        const subjectText = email.subject || '';
-        
-        // Check keyword terms
-        const keywordMatch = docDef.searchTerms.some(term => 
-          textToSearch.includes(term.toLowerCase())
+    // Sort newest first — corrections/delays take priority
+    processedMessages.sort((a, b) => b.timestamp - a.timestamp);
+    
+    // Fetch image attachments for AI vision (limit to 8 to stay within API limits)
+    const allAttachmentRefs = processedMessages.flatMap(m => 
+      m.attachmentRefs.filter(a => a.isImage).map(a => ({ ...a, fromEmail: m.subject }))
+    ).slice(0, 8);
+    
+    for (const ref of allAttachmentRefs) {
+      try {
+        const attRes = await fetch(
+          `${GMAIL_API_BASE}/messages/${ref.messageId}/attachments/${ref.attachmentId}`,
+          { headers: { Authorization: `Bearer ${token}` } }
         );
-        
-        // Check subject regex patterns
-        const patternMatch = docDef.subjectPatterns.some(pattern => 
-          pattern.test(subjectText) || pattern.test(email.bodyText)
-        );
-        
-        if (keywordMatch || patternMatch) {
-          if (!matchedDocs[docDef.key]) {
-            matchedDocs[docDef.key] = {
-              category: docDef.category,
-              emails: []
-            };
-          }
-          // Avoid duplicates
-          if (!matchedDocs[docDef.key].emails.find(e => e.id === email.id)) {
-            matchedDocs[docDef.key].emails.push({
-              id: email.id,
-              subject: email.subject,
-              from: email.from,
-              date: email.date,
-              snippet: email.snippet,
-              hasAttachments: email.hasAttachments,
+        if (attRes.ok) {
+          const attData = await attRes.json();
+          if (attData.data) {
+            imageAttachments.push({
+              base64Data: attData.data.replace(/-/g, '+').replace(/_/g, '/'),
+              mimeType: ref.mimeType || 'image/jpeg',
+              filename: ref.filename,
+              fromEmail: ref.fromEmail,
             });
           }
+        }
+      } catch (e) {
+        console.warn('[GmailScan] Failed to fetch attachment:', ref.filename, e);
+      }
+    }
+    
+    // Send to Gemini 3.1 Pro for AI analysis
+    const aiResult = await analyzeWithAI(processedMessages, reeferNo, imageAttachments);
+    
+    // Format results for the UI
+    const matchedDocs = {};
+    if (aiResult?.matchedDocs) {
+      for (const [key, doc] of Object.entries(aiResult.matchedDocs)) {
+        if (doc.found) {
+          const emailIdx = doc.emailIndex ?? 0;
+          const sourceEmail = processedMessages[emailIdx] || processedMessages[0];
+          matchedDocs[key] = {
+            category: getCategoryForKey(key),
+            confidence: doc.confidence || 'medium',
+            reason: doc.reason || '',
+            emails: sourceEmail ? [{
+              id: sourceEmail.id,
+              subject: sourceEmail.subject,
+              from: sourceEmail.from,
+              date: sourceEmail.date,
+              snippet: sourceEmail.snippet,
+              hasAttachments: sourceEmail.hasAttachments,
+            }] : [],
+          };
         }
       }
     }
     
-    // Extract vessel/container info — newest email first, so latest corrections win
-    // Since processedMessages is already sorted newest-first, the first match is the most recent
+    // Format vessel info
     const vesselInfo = {};
-    for (const email of processedMessages) {
-      const fullText = `${email.subject} ${email.bodyText}`;
-      for (const [field, patterns] of Object.entries(VESSEL_PATTERNS)) {
-        for (const pattern of patterns) {
-          const match = fullText.match(pattern);
-          if (match && match[1]) {
-            // Always take the first (newest) match found — don't overwrite with older emails
-            if (!vesselInfo[field]) {
-              vesselInfo[field] = { value: match[1].trim(), source: email.subject, date: email.date };
-            }
-            break;
-          }
+    if (aiResult?.vesselInfo) {
+      for (const [key, value] of Object.entries(aiResult.vesselInfo)) {
+        if (value && value !== 'null' && value !== null) {
+          vesselInfo[key] = { value, source: 'AI analysis', date: 'latest' };
         }
       }
     }
     
     return {
-      messages: processedMessages,
+      messages: processedMessages.map(m => ({
+        id: m.id, threadId: m.threadId, subject: m.subject,
+        from: m.from, date: m.date, snippet: m.snippet,
+        hasAttachments: m.hasAttachments,
+      })),
       matchedDocs,
       vesselInfo,
       totalFound: data.resultSizeEstimate || processedMessages.length,
+      aiSummary: aiResult?.summary || null,
+      imagesAnalyzed: imageAttachments.length,
     };
     
   } catch (err) {
@@ -238,10 +212,63 @@ export async function searchGmailForContainer(token, reeferNo) {
 }
 
 /**
+ * Send emails + images to Gemini 3.1 Pro via the serverless API endpoint
+ */
+async function analyzeWithAI(emails, reeferNo, imageAttachments) {
+  try {
+    // Determine API base URL
+    const baseUrl = window.location.hostname === 'localhost' 
+      ? 'http://localhost:5173' 
+      : window.location.origin;
+    
+    const payload = {
+      reeferNo,
+      emails: emails.map(e => ({
+        subject: e.subject,
+        from: e.from,
+        date: e.date,
+        bodyText: e.bodyText,
+        snippet: e.snippet,
+        hasAttachments: e.hasAttachments,
+        attachmentCount: e.attachmentCount,
+      })),
+      imageAttachments: imageAttachments.map(img => ({
+        base64Data: img.base64Data,
+        mimeType: img.mimeType,
+        filename: img.filename,
+        fromEmail: img.fromEmail,
+      })),
+    };
+    
+    const res = await fetch(`${baseUrl}/api/scan-emails`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.error('[AI Scan] Server error:', err);
+      return null;
+    }
+    
+    return await res.json();
+  } catch (err) {
+    console.error('[AI Scan] Failed to analyze:', err);
+    return null;
+  }
+}
+
+/**
+ * Map a document key to its category
+ */
+function getCategoryForKey(key) {
+  const preDep = ['atwObtained', 'atwUsed', 'etradeRegistered', 'ciDone', 'plDone', 'lcuDone', 'phytoDone'];
+  return preDep.includes(key) ? 'preDeparture' : 'certOfOrigin';
+}
+
+/**
  * Get a printable version of a specific Gmail message
- * @param {string} token - Gmail OAuth access token
- * @param {string} messageId - Gmail message ID
- * @returns {Promise<string>} - HTML content of the email
  */
 export async function getEmailHtmlForPrint(token, messageId) {
   try {
@@ -255,7 +282,6 @@ export async function getEmailHtmlForPrint(token, messageId) {
     const headers = msg.payload?.headers || [];
     const getHeader = (name) => headers.find(h => h.name.toLowerCase() === name.toLowerCase())?.value || '';
     
-    // Try to get HTML body
     let htmlBody = '';
     let plainBody = '';
     
