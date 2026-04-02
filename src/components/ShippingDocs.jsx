@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { 
     CalendarClock, Clock, CheckCircle2, Circle, AlertCircle, FileText, 
     Ship, BookOpen, FileCheck, CheckSquare, Search, ChevronDown, ChevronUp, Anchor,
-    Mails, KeyRound, CheckCircle
+    Mails, CheckCircle
 } from 'lucide-react';
 import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
 import { useContainersQuery } from '../queries/hooks';
@@ -87,13 +87,11 @@ const ShippingDocs = () => {
     const [expandedIds, setExpandedIds] = useState(new Set());
     const [updating, setUpdating] = useState(false);
     
-    // Workspace Integration States
-    const [googleClientId, setGoogleClientId] = useState(() => localStorage.getItem('lavc_google_client_id') || import.meta.env.VITE_GOOGLE_CLIENT_ID || '');
-    const [isEditingKeys, setIsEditingKeys] = useState(false);
+    // Google Client ID auto-loaded from env
+    const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
     const [gmailToken, setGmailToken] = useState(null);
 
-    // Only show active containers (not arrived or recently arrived ones, typically ones that are being shipped)
-    // Here we show all containers that haven't explicitly cleared the system or arrived long ago.
+    // Only show active containers (not arrived)
     const activeContainers = useMemo(() => {
         return containers
             .filter(c => c.transit_status !== 'ARRIVED')
@@ -123,13 +121,11 @@ const ShippingDocs = () => {
 
         const container = containers.find(c => c.id === containerId);
         
-        // Safety initialization 
         let currentDocs = container.shippingDocs || JSON.parse(JSON.stringify(DEFAULT_DOCS_STATE));
         if (typeof currentDocs === 'string') {
             try { currentDocs = JSON.parse(currentDocs); } catch (e) { currentDocs = JSON.parse(JSON.stringify(DEFAULT_DOCS_STATE)); }
         }
         
-        // Ensure category exists
         if (!currentDocs[category]) {
             currentDocs[category] = {};
         }
@@ -158,7 +154,6 @@ const ShippingDocs = () => {
         setUpdating(false);
     };
 
-    // Helper to calculate progress percentage safely comparing against missing keys
     const getProgress = (containerCategoryState, checklist) => {
         if (!containerCategoryState) return 0;
         const total = checklist.length;
@@ -175,9 +170,9 @@ const ShippingDocs = () => {
                 </div>
             </header>
 
-            {/* Google Workspace Integration Panel */}
+            {/* Google Workspace Integration Panel — Simplified */}
             <section className="sd-workspace-panel shadow-sm">
-                <div className="sd-workspace-header" onClick={() => setIsEditingKeys(!isEditingKeys)} style={{ cursor: 'pointer' }}>
+                <div className="sd-workspace-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.5rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
                         <div style={{ background: '#eff6ff', padding: '0.5rem', borderRadius: '8px', color: '#3b82f6' }}>
                             <Mails size={24} />
@@ -187,73 +182,32 @@ const ShippingDocs = () => {
                             <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Connect LFJ Gmail to automate Packplan & Shipping Instructions</p>
                         </div>
                     </div>
-                    <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                         {gmailToken ? (
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#10b981', fontSize: '0.85rem', fontWeight: 600 }}>
-                                <CheckCircle size={16} /> Connected
-                            </span>
+                            <>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#10b981', fontSize: '0.85rem', fontWeight: 600 }}>
+                                    <CheckCircle size={16} /> Connected
+                                </span>
+                                <button 
+                                    className="btn-secondary" 
+                                    style={{ padding: '0.35rem 0.8rem', fontSize: '0.8rem', color: '#ef4444', borderColor: '#fca5a5' }}
+                                    onClick={() => { setGmailToken(null); toast.info('Disconnected from Google Workspace.'); }}
+                                >
+                                    Disconnect
+                                </button>
+                            </>
+                        ) : googleClientId ? (
+                            <GoogleOAuthProvider clientId={googleClientId}>
+                                <GoogleAuthButton setGmailToken={setGmailToken} />
+                            </GoogleOAuthProvider>
                         ) : (
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#f59e0b', fontSize: '0.85rem', fontWeight: 600 }}>
-                                <AlertCircle size={16} /> Not Connected
+                            <span style={{ fontSize: '0.85rem', color: '#ef4444', fontWeight: 600 }}>
+                                <AlertCircle size={16} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
+                                Missing VITE_GOOGLE_CLIENT_ID
                             </span>
                         )}
                     </div>
                 </div>
-
-                {isEditingKeys && (
-                    <div className="sd-workspace-body animation-fade-in" style={{ padding: '1.5rem', borderTop: '1px solid #e2e8f0', background: '#f8fafc', borderBottomLeftRadius: '16px', borderBottomRightRadius: '16px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: '600px' }}>
-                            <div className="form-group">
-                                <label style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    <KeyRound size={16} /> Google OAuth Client ID
-                                </label>
-                                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                    <input 
-                                        type="text" 
-                                        className="input-field" 
-                                        placeholder="e.g. 123456789-abc.apps.googleusercontent.com" 
-                                        value={googleClientId}
-                                        onChange={(e) => setGoogleClientId(e.target.value)}
-                                        style={{ flex: 1 }}
-                                    />
-                                    <button 
-                                        className="btn-secondary"
-                                        onClick={() => {
-                                            localStorage.setItem('lavc_google_client_id', googleClientId);
-                                            toast.success('Client ID saved safely to local device.');
-                                        }}
-                                    >
-                                        Save Key
-                                    </button>
-                                </div>
-                                <small style={{ color: 'var(--text-tertiary)', marginTop: '0.4rem', display: 'block' }}>
-                                    You can obtain this from Google Cloud Console. Needed to authenticate requests.
-                                </small>
-                            </div>
-
-                            {googleClientId && !gmailToken && (
-                                <div style={{ marginTop: '1rem' }}>
-                                    <GoogleOAuthProvider clientId={googleClientId}>
-                                        <GoogleAuthButton setGmailToken={setGmailToken} />
-                                    </GoogleOAuthProvider>
-                                </div>
-                            )}
-
-                            {gmailToken && (
-                                <div style={{ marginTop: '1rem', padding: '1rem', background: '#ecfdf5', border: '1px solid #10b981', borderRadius: '8px', color: '#065f46' }}>
-                                    <strong>Access Token Active:</strong> You can now use the automated AI features to draft and send documents via LFJ Gmail! We will add the send buttons shortly.
-                                    <button 
-                                        className="btn-secondary" 
-                                        style={{ display: 'block', marginTop: '0.5rem', background: '#fff', color: '#ef4444', borderColor: '#ef4444' }}
-                                        onClick={() => setGmailToken(null)}
-                                    >
-                                        Disconnect
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
             </section>
 
             {/* Weekly Schedule & Reminders Widget */}
