@@ -2,8 +2,14 @@ import React, { useMemo } from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import './Dashboard.css';
 import AIInsightCarousel from './AIInsightCarousel';
+import { useFarmsQuery, useWeeklyRatesQuery, useContainersQuery, useArrivalsQuery, useSamplingsQuery } from '../queries/hooks';
 
-const Dashboard = ({ metrics, userProfile, onNavigate, arrivals = [], containers = [], samplings = [], farms = [], weeklyRates = [] }) => {
+const Dashboard = ({ metrics, userProfile, onNavigate }) => {
+    const { data: farms = [] } = useFarmsQuery();
+    const { data: weeklyRates = [] } = useWeeklyRatesQuery();
+    const { data: containers = [] } = useContainersQuery();
+    const { data: arrivals = [] } = useArrivalsQuery();
+    const { data: samplings = [] } = useSamplingsQuery();
 
     const role = userProfile?.role || 'Guest';
     const isAdmin = role === 'Administrator' || role === 'Admin / Developer';
@@ -256,9 +262,6 @@ const Dashboard = ({ metrics, userProfile, onNavigate, arrivals = [], containers
             {/* AI Insight Carousel */}
             <AIInsightCarousel
                 metrics={metrics}
-                arrivals={arrivals}
-                containers={containers}
-                samplings={samplings}
             />
 
             {/* Quick Actions */}

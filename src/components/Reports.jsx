@@ -4,6 +4,7 @@ import {
     PieChart, Pie, Cell
 } from 'recharts';
 import './Reports.css';
+import { useArrivalsQuery, useContainersQuery, useSamplingsQuery } from '../queries/hooks';
 
 const COLORS = ['#14b8a6', '#f59e0b', '#3b82f6', '#ef4444', '#8b5cf6'];
 
@@ -101,7 +102,10 @@ function hexToRgb(hex) {
     return `${r}, ${g}, ${b}`;
 }
 
-const Reports = ({ arrivals = [], containers = [], samplings = [] }) => {
+const Reports = () => {
+    const { data: arrivals = [] } = useArrivalsQuery();
+    const { data: containers = [] } = useContainersQuery();
+    const { data: samplings = [] } = useSamplingsQuery();
 
     const [aiInsight, setAiInsight] = useState('');
     const [aiLoading, setAiLoading] = useState(false);

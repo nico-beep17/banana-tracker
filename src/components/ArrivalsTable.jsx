@@ -5,8 +5,10 @@ import ArrivalManifest from './ArrivalManifest';
 import PinVerifyModal from './PinVerifyModal';
 import { supabase } from '../supabaseClient';
 import './ArrivalsTable.css';
+import { useQueryClient } from '@tanstack/react-query';
 
-const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, setArrivals, userProfile, samplings = [] }) => {
+const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, userProfile, samplings = [] }) => {
+    const queryClient = useQueryClient();
     const componentRef = useRef(null);
     const [selectedArrival, setSelectedArrival] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
@@ -130,7 +132,7 @@ const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, setAr
 
     const handleEditSave = async () => {
         try {
-            if (!editingArrival || !setArrivals) return;
+            if (!editingArrival) return;
 
             const batchId = editingArrival.batchId;
 
@@ -219,20 +221,8 @@ const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, setAr
             setOverrideOperator(null);
         }
 
-        // 4. Reload batch from DB to get fresh state
-        let reloadQuery = supabase.from('arrivals').select('*');
-        if (batchId) {
-            reloadQuery = reloadQuery.eq('batchId', batchId);
-        } else {
-            reloadQuery = reloadQuery.eq('id', editingArrival.id);
-        }
-        const { data: freshData } = await reloadQuery;
-        if (freshData && freshData.length > 0) {
-            setArrivals(prev => {
-                const withoutOldBatch = prev.filter(a => batchId ? a.batchId !== batchId : a.id !== editingArrival.id);
-                return [...withoutOldBatch, ...freshData];
-            });
-        }
+        // 4. Invalidate React Query to seamlessly fetch fresh data
+        queryClient.invalidateQueries({ queryKey: ['arrivals'] });
 
             setEditingArrival(null);
         } catch (err) {

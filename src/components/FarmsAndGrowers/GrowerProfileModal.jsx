@@ -4,11 +4,13 @@ import { supabase } from '../../supabaseClient';
 import { ArrowLeft, Plus, Edit, Settings, FileSpreadsheet, Save, X, CheckCircle, AlertTriangle, Download, TrendingUp, TrendingDown, Minus, BarChart2, Printer } from 'lucide-react';
 import { toast } from 'sonner';
 import { LAvcLogo } from '../../assets/logoBase64';
+import { useQueryClient } from '@tanstack/react-query';
 
 // ============================================================
 // Grower Profile Modal — Tabbed, Detail-Rich
 // ============================================================
-function GrowerProfileModal({ farm, weeklyRates, arrivals, samplings = [], setWeeklyRates, onClose }) {
+function GrowerProfileModal({ farm, weeklyRates, arrivals, samplings = [], onClose }) {
+    const queryClient = useQueryClient();
     const [activeTab, setActiveTab] = useState('overview');
     const [saving, setSaving] = useState(false);
     const [expandedClass, setExpandedClass] = useState(null); // 'A' | 'B' | null
@@ -312,16 +314,7 @@ function GrowerProfileModal({ farm, weeklyRates, arrivals, samplings = [], setWe
             const { data, error } = await supabase.from('weekly_rates')
                 .upsert(payloads, { onConflict: 'farm_id,year,week_number' }).select();
             if (error) throw error;
-            if (setWeeklyRates && data) {
-                setWeeklyRates(prev => {
-                    let updated = [...prev];
-                    data.forEach(d => {
-                        const idx = updated.findIndex(r => r.farm_id === d.farm_id && r.year === d.year && r.week_number === d.week_number);
-                        if (idx >= 0) updated[idx] = d; else updated.unshift(d);
-                    });
-                    return updated;
-                });
-            }
+            queryClient.invalidateQueries({ queryKey: ['weekly_rates'] });
             setGrid(prev => prev.map(r => r.dirty ? { ...r, dirty: false, saved: true } : r));
             setBulkResult({ type: 'success', msg: `✅ Saved ${dirtyRows.length} week${dirtyRows.length > 1 ? 's' : ''} successfully.` });
         } catch (err) {

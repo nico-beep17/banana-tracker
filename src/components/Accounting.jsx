@@ -6,8 +6,21 @@ import { supabase } from '../supabaseClient';
 import { toast } from 'sonner';
 import VouchersTab from './Accounting/VouchersTab';
 import LedgerTab from './Accounting/LedgerTab';
+import { useQueryClient } from '@tanstack/react-query';
+import { useArrivalsQuery, useSamplingsQuery, useContainersQuery, useFarmsQuery, useWeeklyRatesQuery, useConsigneesQuery, useConsigneeWeeklyRatesQuery, useChartOfAccountsQuery, useJournalEntriesQuery, useJournalLinesQuery } from '../queries/hooks';
 
-const Accounting = ({ arrivals = [], samplings = [], containers = [], farms = [], weeklyRates = [], consignees = [], consigneeWeeklyRates = [], userProfile, exchangeRate, setExchangeRate, chartOfAccounts = [], journalEntries = [], journalLines = [], fetchData }) => {
+const Accounting = ({ userProfile, exchangeRate, setExchangeRate }) => {
+    const queryClient = useQueryClient();
+    const { data: arrivals = [] } = useArrivalsQuery();
+    const { data: samplings = [] } = useSamplingsQuery();
+    const { data: containers = [] } = useContainersQuery();
+    const { data: farms = [] } = useFarmsQuery();
+    const { data: weeklyRates = [] } = useWeeklyRatesQuery();
+    const { data: consignees = [] } = useConsigneesQuery();
+    const { data: consigneeWeeklyRates = [] } = useConsigneeWeeklyRatesQuery();
+    const { data: chartOfAccounts = [] } = useChartOfAccountsQuery();
+    const { data: journalEntries = [] } = useJournalEntriesQuery();
+    const { data: journalLines = [] } = useJournalLinesQuery();
     const showToast = (msg, type) => {
         if (type === 'error') toast.error(msg);
         else if (type === 'warning') toast.warning(msg);
@@ -277,7 +290,7 @@ const Accounting = ({ arrivals = [], samplings = [], containers = [], farms = []
             showToast("Failed to update payment status.", "error");
         } else {
             showToast("Payment recorded successfully.", "success");
-            if (fetchData) fetchData();
+            queryClient.invalidateQueries({ queryKey: ['arrivals'] });
         }
     };
 
@@ -296,7 +309,7 @@ const Accounting = ({ arrivals = [], samplings = [], containers = [], farms = []
         } else {
             showToast('Billing updated successfully.', 'success');
             setEditingReceivable(null);
-            if (fetchData) fetchData();
+            queryClient.invalidateQueries({ queryKey: ['containers'] });
         }
     };
 

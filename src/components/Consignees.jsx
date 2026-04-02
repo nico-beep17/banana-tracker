@@ -12,8 +12,15 @@ import './Consignees.css';
 import { supabase } from '../supabaseClient';
 import { exportXlsx } from '../utils/exportXlsx';
 import emptyIllustration from '../assets/consignee_registry_empty_illustration.png';
+import ConsigneeForm from './Consignees/ConsigneeForm';
+import PricingModal from './Consignees/PricingModal';
+import { useQueryClient } from '@tanstack/react-query';
+import { useConsigneesQuery, useConsigneeWeeklyRatesQuery } from '../queries/hooks';
 
-const Consignees = ({ consignees = [], setConsignees, consigneeWeeklyRates = [], setConsigneeWeeklyRates }) => {
+const Consignees = () => {
+    const queryClient = useQueryClient();
+    const { data: consignees = [] } = useConsigneesQuery();
+    const { data: consigneeWeeklyRates = [] } = useConsigneeWeeklyRatesQuery();
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editId, setEditId] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
@@ -102,11 +109,7 @@ const Consignees = ({ consignees = [], setConsignees, consigneeWeeklyRates = [],
             return;
         }
 
-        const savedRate = (data && data.length > 0) ? data[0] : { ...payload, id: `local-${Date.now()}`, created_at: new Date().toISOString() };
-        setConsigneeWeeklyRates(prev => {
-            const filtered = prev.filter(r => !(r.consignee_id === payload.consignee_id && r.year === payload.year && r.week_number === payload.week_number));
-            return [savedRate, ...filtered];
-        });
+        queryClient.invalidateQueries({ queryKey: ['consignee_weekly_rates'] });
         setShowRatesModal(false);
     };
 
@@ -131,9 +134,7 @@ const Consignees = ({ consignees = [], setConsignees, consigneeWeeklyRates = [],
                 toast.error("Failed to update consignee.");
                 return;
             }
-            if (data && data.length > 0) {
-                setConsignees(prev => prev.map(c => c.id === editId ? data[0] : c));
-            }
+            queryClient.invalidateQueries({ queryKey: ['consignees'] });
             resetForm();
         } else {
             const { id, ...dataWithoutId } = consigneeData;
@@ -148,9 +149,9 @@ const Consignees = ({ consignees = [], setConsignees, consigneeWeeklyRates = [],
                 return;
             }
             if (data && data.length > 0) {
-                setConsignees(prev => [...prev, data[0]]);
+                queryClient.invalidateQueries({ queryKey: ['consignees'] });
                 resetForm();
-                
+
                 // Immediately prompt to set weekly pricing
                 setTimeout(() => {
                     handleManageRates(data[0]);
@@ -180,7 +181,7 @@ const Consignees = ({ consignees = [], setConsignees, consigneeWeeklyRates = [],
             return;
         }
 
-        setConsignees(prev => prev.filter(c => c.id !== editId));
+        queryClient.invalidateQueries({ queryKey: ['consignees'] });
         resetForm();
     };
 
@@ -314,207 +315,16 @@ const Consignees = ({ consignees = [], setConsignees, consigneeWeeklyRates = [],
             </div>
 
             {/* Registration Form (Glassmorphic) */}
-            <AnimatePresence>
-                {isFormOpen && (
-                    <motion.div 
-                        initial={{ opacity: 0, height: 0, y: -20 }}
-                        animate={{ opacity: 1, height: 'auto', y: 0 }}
-                        exit={{ opacity: 0, height: 0, y: -20 }}
-                        style={{ overflow: 'hidden' }}
-                    >
-                        <div className="form-section-premium" style={{ borderTop: '4px solid var(--brand-blue)' }}>
-                            <h3 style={{ fontSize: '1.5rem', fontWeight: '800', marginBottom: '1.5rem', color: 'var(--brand-dark)' }}>
-                                {editId ? 'Update Buyer Profile' : 'New Buyer Initialization'}
-                            </h3>
-                            
-                            <form onSubmit={handleSaveConsignee}>
-                                <div className="form-section-premium" style={{ boxShadow: 'none', border: '1px solid #f1f5f9', background: '#f8fafc' }}>
-                                    <h4><Briefcase size={20} color="var(--brand-blue)" /> Corporate Identity</h4>
-                                    <div className="registration-grid">
-                                        <div>
-                                            <label className="label-premium">Company Name *</label>
-                                            <input type="text" name="company_name" className="input-premium" required value={newConsignee.company_name} onChange={handleInputChange} placeholder="Tokyo Fresh Trading Co." />
-                                        </div>
-                                        <div>
-                                            <label className="label-premium">Primary Contact</label>
-                                            <input type="text" name="contact_person" className="input-premium" value={newConsignee.contact_person} onChange={handleInputChange} placeholder="Mr. Tanaka" />
-                                        </div>
-                                        <div>
-                                            <label className="label-premium">Country of Operation</label>
-                                            <select name="country" className="input-premium" value={newConsignee.country} onChange={handleInputChange}>
-                                                <option value="">Select Country...</option>
-                                                <option value="Japan">Japan</option>
-                                                <option value="China">China</option>
-                                                <option value="South Korea">South Korea</option>
-                                                <option value="Saudi Arabia">Saudi Arabia</option>
-                                                <option value="UAE">UAE</option>
-                                                <option value="Qatar">Qatar</option>
-                                                <option value="Singapore">Singapore</option>
-                                                <option value="Philippines">Philippines</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="label-premium">Corporate Email</label>
-                                            <input type="email" name="email" className="input-premium" value={newConsignee.email} onChange={handleInputChange} placeholder="procurement@example.com" />
-                                        </div>
-                                        <div>
-                                            <label className="label-premium">Direct Phone</label>
-                                            <input type="text" name="phone" className="input-premium" value={newConsignee.phone} onChange={handleInputChange} placeholder="+81 3 1234 5678" />
-                                        </div>
-                                        <div>
-                                            <label className="label-premium">Partnership Status</label>
-                                            <select name="status" className="input-premium" value={newConsignee.status} onChange={handleInputChange} style={{ fontWeight: '700' }}>
-                                                <option value="ACTIVE">● ACTIVE</option>
-                                                <option value="INACTIVE">○ INACTIVE</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="form-section-premium" style={{ boxShadow: 'none', border: '1px solid #f1f5f9', background: '#f8fafc', marginTop: '1.5rem' }}>
-                                    <h4><Globe size={20} color="var(--brand-blue)" /> Logistics & Financials</h4>
-                                    <div className="registration-grid">
-                                        <div>
-                                            <label className="label-premium">Default Destination Port</label>
-                                            <select name="default_port" className="input-premium" value={newConsignee.default_port} onChange={handleInputChange}>
-                                                <option value="">Select Port...</option>
-                                                <option value="Dalian">Dalian, China</option>
-                                                <option value="Hakata">Hakata, Japan</option>
-                                                <option value="Kawasaki">Kawasaki, Japan</option>
-                                                <option value="Kobe">Kobe, Japan</option>
-                                                <option value="Yokohama">Yokohama, Japan</option>
-                                                <option value="Nagoya">Nagoya, Japan</option>
-                                                <option value="Qingdao">Qingdao, China</option>
-                                                <option value="Shanghai">Shanghai, China</option>
-                                                <option value="Shekou">Shekou, China</option>
-                                                <option value="Xingang">Xingang, China</option>
-                                                <option value="Damman, Saudi Arabia">Damman, Saudi Arabia</option>
-                                                <option value="Jebbel Ali">Jebbel Ali</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="label-premium">Payment Agreement</label>
-                                            <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                                <select name="payment_terms" className="input-premium" value={newConsignee.payment_terms} onChange={handleInputChange} style={{ flex: 1 }}>
-                                                    <option value="TT">TT (Telegraphic Transfer)</option>
-                                                    <option value="LC">LC (Letter of Credit)</option>
-                                                    <option value="NET-30">NET-30 Terms</option>
-                                                    <option value="NET-60">NET-60 Terms</option>
-                                                    <option value="100% advance">100% Advance</option>
-                                                    <option value="Percentage Agreed upon">Percentage Agreed upon</option>
-                                                    <option value="Payment Upon Arrival">Payment Upon Arrival</option>
-                                                </select>
-                                                
-                                                {newConsignee.payment_terms === 'Percentage Agreed upon' && (
-                                                    <input 
-                                                        type="number" 
-                                                        step="0.01" 
-                                                        min="1" 
-                                                        max="100" 
-                                                        name="payment_percentage" 
-                                                        className="input-premium" 
-                                                        value={newConsignee.payment_percentage || ''} 
-                                                        onChange={handleInputChange} 
-                                                        placeholder="e.g., 50" 
-                                                        style={{ width: '120px' }}
-                                                        required
-                                                    />
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <label className="label-premium">Settlement Currency</label>
-                                            <select name="currency" className="input-premium" value={newConsignee.currency} onChange={handleInputChange}>
-                                                <option value="USD">USD - US Dollar</option>
-                                                <option value="JPY">JPY - Japanese Yen</option>
-                                                <option value="CNY">CNY - Chinese Yuan</option>
-                                            </select>
-                                        </div>
-                                        <div style={{ gridColumn: '1 / -1' }}>
-                                            <label className="label-premium">Strategic Notes</label>
-                                            <textarea name="notes" className="input-premium" value={newConsignee.notes} onChange={handleInputChange} rows="2" placeholder="Private internal notes regarding this buyer..." />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="form-section-premium" style={{ boxShadow: 'none', border: '1px solid #f1f5f9', background: '#f8fafc', marginTop: '1.5rem' }}>
-                                    <h4><AlertCircle size={20} color="var(--brand-blue)" /> Contract & Product Specs</h4>
-                                    <div className="registration-grid">
-                                        <div style={{ gridColumn: '1 / -1' }}>
-                                            <label className="label-premium">Preferred Produce Types (Multi-select)</label>
-                                            <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
-                                                {['Cavendish', 'Cardava', 'Senorita', 'Pineapple'].map(type => (
-                                                    <label key={type} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', background: 'white', padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                                                        <input 
-                                                            type="checkbox" 
-                                                            checked={(newConsignee.preferred_banana_types || []).includes(type)}
-                                                            onChange={() => handleBananaTypeToggle(type)}
-                                                            style={{ width: '16px', height: '16px', accentColor: 'var(--brand-blue)' }}
-                                                        />
-                                                        <span style={{ fontSize: '0.9rem', fontWeight: '500', color: '#334155' }}>{type}</span>
-                                                    </label>
-                                                ))}
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <label className="label-premium">Packed In Weight (PIW)</label>
-                                            <input type="number" step="0.1" name="spec_piw" className="input-premium" value={newConsignee.spec_piw || ''} onChange={handleInputChange} placeholder="e.g., 13.5" />
-                                        </div>
-                                        <div>
-                                            <label className="label-premium">Packaging Type</label>
-                                            <select name="spec_packaging" className="input-premium" value={newConsignee.spec_packaging || ''} onChange={handleInputChange}>
-                                                <option value="">Select Packaging...</option>
-                                                <option value="Vacuum Packed (VP)">Vacuum Packed (VP)</option>
-                                                <option value="Polybag (PB)">Polybag (PB)</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="label-premium">Target Market Requirement</label>
-                                            <select name="spec_requirement" className="input-premium" value={newConsignee.spec_requirement || ''} onChange={handleInputChange}>
-                                                <option value="">Select Requirement...</option>
-                                                <option value="Japan Specification">Japan Specification</option>
-                                                <option value="Middle East Specification">Middle East Specification</option>
-                                                <option value="Korea Specification">Korea Specification</option>
-                                                <option value="China Specification">China Specification</option>
-                                                <option value="Local Market">Local Market</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="label-premium">SGRT Tolerance</label>
-                                            <input type="text" name="sgrt_tolerance" className="input-premium" value={newConsignee.sgrt_tolerance || '3%'} onChange={handleInputChange} placeholder="3%" />
-                                        </div>
-                                        <div>
-                                            <label className="label-premium">Reefer Temperature (°C)</label>
-                                            <input type="text" name="spec_temperature" className="input-premium" value={newConsignee.spec_temperature || ''} onChange={handleInputChange} placeholder="e.g. 14.0" />
-                                        </div>
-                                        <div>
-                                            <label className="label-premium">Ventilation Status</label>
-                                            <select name="spec_ventilation" className="input-premium" value={newConsignee.spec_ventilation || ''} onChange={handleInputChange}>
-                                                <option value="">Select Status...</option>
-                                                <option value="CLOSED">CLOSED</option>
-                                                <option value="15% OPEN">15% OPEN</option>
-                                                <option value="25% OPEN">25% OPEN</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem' }}>
-                                    {editId && (
-                                        <button type="button" className="btn-secondary" onClick={handleDeleteConsignee} style={{ padding: '0.8rem 2rem', borderRadius: '999px', color: '#ef4444', borderColor: '#fee2e2', background: '#fef2f2', marginRight: 'auto', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                            <Trash2 size={20} /> Delete Profile
-                                        </button>
-                                    )}
-                                    <button type="button" className="btn-secondary" onClick={resetForm} style={{ padding: '0.8rem 2rem', borderRadius: '999px' }}>Discard Details</button>
-                                    <button type="submit" className="btn-primary" style={{ padding: '0.8rem 2.5rem', borderRadius: '999px', fontSize: '1rem' }}>
-                                        {editId ? <><Edit3 size={20} /> Update Profile</> : <><CheckCircle2 size={20} /> Finalize Registration</>}
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+            <ConsigneeForm
+                isFormOpen={isFormOpen}
+                editId={editId}
+                newConsignee={newConsignee}
+                handleInputChange={handleInputChange}
+                handleBananaTypeToggle={handleBananaTypeToggle}
+                handleSaveConsignee={handleSaveConsignee}
+                handleDeleteConsignee={handleDeleteConsignee}
+                resetForm={resetForm}
+            />
 
             {/* Premium Action Bar */}
             <div className="consignees-action-bar">
@@ -632,131 +442,15 @@ const Consignees = ({ consignees = [], setConsignees, consigneeWeeklyRates = [],
             </div>
 
             {/* Ultra-Glass Pricing Modal */}
-            <AnimatePresence>
-                {showRatesModal && activeConsigneeForRates && (
-                    <motion.div 
-                        className="modal-backdrop-premium" 
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                    >
-                        <motion.div 
-                            className="modal-glass-premium"
-                            initial={{ scale: 0.95, y: 20, opacity: 0 }}
-                            animate={{ scale: 1, y: 0, opacity: 1 }}
-                            exit={{ scale: 0.95, y: 20, opacity: 0 }}
-                            transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                        >
-                            <div className="modal-header-premium">
-                                <div>
-                                    <h2 style={{ fontSize: '1.75rem', fontWeight: '800', color: 'var(--brand-dark)', display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem', letterSpacing: '-0.02em' }}>
-                                        <div style={{ padding: '8px', background: 'rgba(37,99,235,0.1)', borderRadius: '12px', color: 'var(--brand-blue)' }}>
-                                            <DollarSign size={28} />
-                                        </div>
-                                        Dynamic Pricing Matrix
-                                    </h2>
-                                    <p style={{ color: '#64748b', fontSize: '1.05rem', margin: 0 }}>
-                                        <strong style={{ color: 'var(--brand-blue)' }}>{activeConsigneeForRates.company_name}</strong> • Week {newWeeklyRate.week_number}, {newWeeklyRate.year}
-                                    </p>
-                                </div>
-                                <button onClick={() => setShowRatesModal(false)} style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s', color: '#64748b' }}>
-                                    <span style={{ fontSize: '1.5rem', lineHeight: 1 }}>×</span>
-                                </button>
-                            </div>
-
-                            <div className="modal-body-premium">
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', background: 'white', padding: '1.25rem 2rem', borderRadius: '20px', boxShadow: 'var(--shadow-soft)', border: '1px solid var(--border-subtle)' }}>
-                                    <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                            <label className="label-premium" style={{ margin: 0 }}>Fiscal Year</label>
-                                            <input type="number" name="year" className="input-premium" value={newWeeklyRate.year} onChange={handleWeeklyRateChange} style={{ width: '100px', padding: '0.5rem 1rem' }} />
-                                        </div>
-                                        <div style={{ width: '1px', height: '24px', background: '#e2e8f0' }}></div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                            <label className="label-premium" style={{ margin: 0 }}>Week Sequence No.</label>
-                                            <input type="number" name="week_number" className="input-premium" value={newWeeklyRate.week_number} onChange={handleWeeklyRateChange} style={{ width: '100px', padding: '0.5rem 1rem' }} />
-                                        </div>
-                                    </div>
-                                    <button className="btn-secondary" onClick={handleCopyPreviousWeek} style={{ background: 'white', border: '1px solid var(--border-input)', color: 'var(--brand-dark)', padding: '0.75rem 1.5rem', borderRadius: '999px', fontSize: '0.9rem' }}>
-                                        <Copy size={16} color="var(--brand-blue)" /> Auto-Fill Previous Week
-                                    </button>
-                                </div>
-
-                                <div className="price-matrix-grid-premium">
-                                    {/* Class A Section */}
-                                    <div className="price-card-v2" style={{ '--card-accent': '#2563eb' }}>
-                                        <h5 style={{ fontSize: '1.3rem', fontWeight: '800', color: 'var(--brand-dark)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                            <CheckCircle2 size={22} color="#2563eb" /> Class A <span style={{ fontWeight: '500', color: '#64748b', fontSize: '1rem' }}>(Premium Export)</span>
-                                        </h5>
-                                        
-                                        <div style={{ marginBottom: '1.5rem', background: '#f8fafc', padding: '1.25rem', borderRadius: '16px' }}>
-                                            <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '0.75rem' }}>Regular Hands</span>
-                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
-                                                <div><label className="label-premium">4H</label><input type="number" step="0.01" name="rates_matrix.classA.rha4" className="input-premium" style={{ background: 'white' }} value={newWeeklyRate.rates_matrix['classA.rha4']} onChange={handleWeeklyRateChange} placeholder="0.00" /></div>
-                                                <div><label className="label-premium">5H</label><input type="number" step="0.01" name="rates_matrix.classA.rha5" className="input-premium" style={{ background: 'white' }} value={newWeeklyRate.rates_matrix['classA.rha5']} onChange={handleWeeklyRateChange} placeholder="0.00" /></div>
-                                                <div><label className="label-premium">6H</label><input type="number" step="0.01" name="rates_matrix.classA.rha6" className="input-premium" style={{ background: 'white' }} value={newWeeklyRate.rates_matrix['classA.rha6']} onChange={handleWeeklyRateChange} placeholder="0.00" /></div>
-                                            </div>
-                                        </div>
-                                        
-                                        <div style={{ marginBottom: '1.5rem', background: '#f8fafc', padding: '1.25rem', borderRadius: '16px' }}>
-                                            <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '0.75rem' }}>Small Hands</span>
-                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
-                                                <div><label className="label-premium">7H</label><input type="number" step="0.01" name="rates_matrix.classA.sha7" className="input-premium" style={{ background: 'white' }} value={newWeeklyRate.rates_matrix['classA.sha7']} onChange={handleWeeklyRateChange} placeholder="0.00" /></div>
-                                                <div><label className="label-premium">8H</label><input type="number" step="0.01" name="rates_matrix.classA.sha8" className="input-premium" style={{ background: 'white' }} value={newWeeklyRate.rates_matrix['classA.sha8']} onChange={handleWeeklyRateChange} placeholder="0.00" /></div>
-                                                <div><label className="label-premium">9H</label><input type="number" step="0.01" name="rates_matrix.classA.sha9" className="input-premium" style={{ background: 'white' }} value={newWeeklyRate.rates_matrix['classA.sha9']} onChange={handleWeeklyRateChange} placeholder="0.00" /></div>
-                                            </div>
-                                        </div>
-                                        
-                                        <div style={{ background: '#f0f9ff', padding: '1.25rem', borderRadius: '16px', border: '1px solid #bae6fd' }}>
-                                            <div><label className="label-premium" style={{ color: '#0369a1' }}>CLA (Special Class A)</label><input type="number" step="0.01" name="rates_matrix.classA.cla" className="input-premium" style={{ background: 'white', borderColor: '#7dd3fc' }} value={newWeeklyRate.rates_matrix['classA.cla']} onChange={handleWeeklyRateChange} placeholder="0.00" /></div>
-                                        </div>
-                                    </div>
-
-                                    {/* Class B Section */}
-                                    <div className="price-card-v2" style={{ '--card-accent': '#f59e0b' }}>
-                                        <h5 style={{ fontSize: '1.3rem', fontWeight: '800', color: 'var(--brand-dark)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                            <AlertCircle size={22} color="#f59e0b" /> Class B & Cluster
-                                        </h5>
-                                        
-                                        <div style={{ marginBottom: '1.5rem', background: '#f8fafc', padding: '1.25rem', borderRadius: '16px' }}>
-                                            <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '0.75rem' }}>Regular Hands</span>
-                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
-                                                <div><label className="label-premium">RHB4</label><input type="number" step="0.01" name="rates_matrix.classB.rhb4" className="input-premium" style={{ background: 'white' }} value={newWeeklyRate.rates_matrix['classB.rhb4']} onChange={handleWeeklyRateChange} placeholder="0.00" /></div>
-                                                <div><label className="label-premium">RHB5</label><input type="number" step="0.01" name="rates_matrix.classB.rhb5" className="input-premium" style={{ background: 'white' }} value={newWeeklyRate.rates_matrix['classB.rhb5']} onChange={handleWeeklyRateChange} placeholder="0.00" /></div>
-                                                <div><label className="label-premium">RHB6</label><input type="number" step="0.01" name="rates_matrix.classB.rhb6" className="input-premium" style={{ background: 'white' }} value={newWeeklyRate.rates_matrix['classB.rhb6']} onChange={handleWeeklyRateChange} placeholder="0.00" /></div>
-                                            </div>
-                                        </div>
-                                        
-                                        <div style={{ marginBottom: '1.5rem', background: '#f8fafc', padding: '1.25rem', borderRadius: '16px' }}>
-                                            <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '0.75rem' }}>Small Hands</span>
-                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                                                <div><label className="label-premium">SHB7</label><input type="number" step="0.01" name="rates_matrix.classB.shb7" className="input-premium" style={{ background: 'white' }} value={newWeeklyRate.rates_matrix['classB.shb7']} onChange={handleWeeklyRateChange} placeholder="0.00" /></div>
-                                                <div><label className="label-premium">SHB8/9</label><input type="number" step="0.01" name="rates_matrix.classB.shb8" className="input-premium" style={{ background: 'white' }} value={newWeeklyRate.rates_matrix['classB.shb8']} onChange={handleWeeklyRateChange} placeholder="0.00" /></div>
-                                            </div>
-                                        </div>
-                                        
-                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                                            <div style={{ background: '#fef3c7', padding: '1.25rem', borderRadius: '16px', border: '1px solid #fde68a' }}>
-                                                <div><label className="label-premium" style={{ color: '#b45309' }}>CLB</label><input type="number" step="0.01" name="rates_matrix.classB.clb" className="input-premium" style={{ background: 'white', borderColor: '#fcd34d' }} value={newWeeklyRate.rates_matrix['classB.clb']} onChange={handleWeeklyRateChange} placeholder="0.00" /></div>
-                                            </div>
-                                            <div style={{ background: '#fef3c7', padding: '1.25rem', borderRadius: '16px', border: '1px solid #fde68a' }}>
-                                                <div><label className="label-premium" style={{ color: '#b45309' }}>FP (Cluster)</label><input type="number" step="0.01" name="rates_matrix.classB.fp" className="input-premium" style={{ background: 'white', borderColor: '#fcd34d' }} value={newWeeklyRate.rates_matrix['classB.fp']} onChange={handleWeeklyRateChange} placeholder="0.00" /></div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="modal-footer-premium">
-                                <button className="btn-secondary" onClick={() => setShowRatesModal(false)} style={{ padding: '0.8rem 2.5rem', borderRadius: '999px', background: '#f1f5f9', border: 'none' }}>Cancel</button>
-                                <button className="btn-primary" onClick={handleAddWeeklyRate} style={{ padding: '0.8rem 3rem', borderRadius: '999px', fontSize: '1rem', background: 'linear-gradient(135deg, #2563eb, #1e40af)', border: 'none', boxShadow: '0 10px 20px -5px rgba(37,99,235,0.4)', color: 'white' }}>
-                                    <CheckCircle2 size={20} /> Deploy Contract Pricing
-                                </button>
-                            </div>
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+            <PricingModal
+                showRatesModal={showRatesModal}
+                setShowRatesModal={setShowRatesModal}
+                activeConsigneeForRates={activeConsigneeForRates}
+                newWeeklyRate={newWeeklyRate}
+                handleWeeklyRateChange={handleWeeklyRateChange}
+                handleAddWeeklyRate={handleAddWeeklyRate}
+                handleCopyPreviousWeek={handleCopyPreviousWeek}
+            />
         </motion.div>
     );
 };

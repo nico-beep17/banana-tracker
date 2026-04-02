@@ -5,8 +5,16 @@ import { ArrowLeft, Plus, Edit, Settings, FileSpreadsheet, Save, X, CheckCircle,
 import { exportXlsx } from '../utils/exportXlsx';
 import { LAvcLogo } from '../assets/logoBase64';
 import { toast } from 'sonner';
+import GrowerProfileModal from './FarmsAndGrowers/GrowerProfileModal';
+import { useQueryClient } from '@tanstack/react-query';
+import { useFarmsQuery, useWeeklyRatesQuery, useArrivalsQuery, useSamplingsQuery } from '../queries/hooks';
 
-const FarmsAndGrowers = ({ farms, setFarms, weeklyRates, setWeeklyRates, arrivals = [], samplings = [] }) => {
+const FarmsAndGrowers = () => {
+    const queryClient = useQueryClient();
+    const { data: farms = [] } = useFarmsQuery();
+    const { data: weeklyRates = [] } = useWeeklyRatesQuery();
+    const { data: arrivals = [] } = useArrivalsQuery();
+    const { data: samplings = [] } = useSamplingsQuery();
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editGrowerId, setEditGrowerId] = useState(null);
 
@@ -99,12 +107,8 @@ const FarmsAndGrowers = ({ farms, setFarms, weeklyRates, setWeeklyRates, arrival
             return;
         }
 
-        // Upsert may return empty data on conflict updates in some Supabase versions
-        const savedRate = (data && data.length > 0) ? data[0] : { ...payload, id: `local-${Date.now()}`, created_at: new Date().toISOString() };
-        setWeeklyRates(prev => {
-            const filtered = prev.filter(r => !(r.farm_id === payload.farm_id && r.year === payload.year && r.week_number === payload.week_number));
-            return [savedRate, ...filtered];
-        });
+        // Sync fresh data via React Query cache invalidation
+        queryClient.invalidateQueries({ queryKey: ['weekly_rates'] });
         setShowRatesModal(false);
     };
 
@@ -132,11 +136,10 @@ const FarmsAndGrowers = ({ farms, setFarms, weeklyRates, setWeeklyRates, arrival
                 toast.error("Failed to update grower.");
                 return;
             }
-            if (data && data.length > 0) {
-                setFarms(prev => prev.map(farm => farm.id === editGrowerId ? data[0] : farm));
-            }
+            queryClient.invalidateQueries({ queryKey: ['farms'] });
+            toast.success('Grower updated successfully.');
         } else {
-            // Add new grower. We purposefully EXCLUDE 'id' property 
+            // Add new grower. We purposefully EXCLUDE 'id' property
             // from growerData because Supabase handles UUID creation.
             // eslint-disable-next-line no-unused-vars
             const { id, ...newGrowerDataWithoutId } = growerData;
@@ -150,9 +153,8 @@ const FarmsAndGrowers = ({ farms, setFarms, weeklyRates, setWeeklyRates, arrival
                 toast.error("Failed to register new grower.");
                 return;
             }
-            if (data && data.length > 0) {
-                setFarms(prev => [...prev, data[0]]);
-            }
+            queryClient.invalidateQueries({ queryKey: ['farms'] });
+            toast.success('New grower registered.');
         }
 
         // Reset form to clear inputs right after saving
@@ -726,7 +728,6 @@ const FarmsAndGrowers = ({ farms, setFarms, weeklyRates, setWeeklyRates, arrival
                     weeklyRates={weeklyRates}
                     arrivals={arrivals}
                     samplings={samplings}
-                    setWeeklyRates={setWeeklyRates}
                     onClose={() => setGrowerProfile(null)}
                 />
             )}

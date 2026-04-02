@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './NewContainerForm.css';
 import './ContainersList.css'; // Reusing the css for the form styles
 import { supabase } from '../supabaseClient';
+import { useConsigneesQuery } from '../queries/hooks';
 
 const getISOWeek = (date) => {
     const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
@@ -11,7 +12,8 @@ const getISOWeek = (date) => {
     return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
 };
 
-const NewContainerForm = ({ onSaveContainer, initialData = null, onCancel, consignees = [] }) => {
+const NewContainerForm = ({ onSaveContainer, initialData = null, onCancel }) => {
+    const { data: consignees = [] } = useConsigneesQuery();
     const getLocalDate = () => {
         const d = new Date();
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;

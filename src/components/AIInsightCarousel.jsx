@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './AIInsightCarousel.css';
+import { useArrivalsQuery, useContainersQuery, useSamplingsQuery } from '../queries/hooks';
 
 // On native (APK), relative URLs don't resolve to the Vercel server.
 // Always use the absolute production URL for the AI API.
@@ -21,7 +22,10 @@ const PLACEHOLDER_CARDS = [
     { title: 'Recommendations',     icon: '✨', status: 'info', headline: 'Building action plan…', detail: 'Personalized recommendations are being generated.' },
 ];
 
-export default function AIInsightCarousel({ metrics, arrivals = [], containers = [], samplings = [] }) {
+export default function AIInsightCarousel({ metrics }) {
+    const { data: arrivals = [] } = useArrivalsQuery();
+    const { data: containers = [] } = useContainersQuery();
+    const { data: samplings = [] } = useSamplingsQuery();
     const [cards, setCards] = useState(PLACEHOLDER_CARDS);
     const [active, setActive] = useState(0);
     const [loading, setLoading] = useState(true);

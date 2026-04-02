@@ -66,9 +66,12 @@ const STEPS = ['HUB', 'PORT_OF_LOADING', 'IN_TRANSIT', 'ARRIVED'];
 const LABELS = ['Hub', 'Port', 'Ocean', 'Destination'];
 const ICONS = ['🏢', '⚓', '🌊', '🏁'];
 
+import { useContainersQuery } from '../queries/hooks';
+
 const DEFAULT_ETA_OFFSET = 7 * 24 * 60 * 60 * 1000; // 7 days in ms
 
-const ShipmentTracker = ({ containers, onUpdateTransitStatus }) => {
+const ShipmentTracker = ({ onUpdateTransitStatus }) => {
+    const { data: containers = [] } = useContainersQuery();
     // Only show dispatched containers
     const activeShipments = useMemo(() => {
         const fallbackEta = new Date(Date.now() + DEFAULT_ETA_OFFSET).toISOString();

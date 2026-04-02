@@ -26,13 +26,18 @@ import {
   CheckCircle,
   XCircle,
 } from "lucide-react";
+import BulkDeliveryModal from "./MaterialsInventory/BulkDeliveryModal";
+import SingleItemModal from "./MaterialsInventory/SingleItemModal";
+import BatchModal from "./MaterialsInventory/BatchModal";
+import AIReceiptScannerModal from "./MaterialsInventory/AIReceiptScannerModal";
 import "./MaterialsInventory.css";
+import { useQueryClient } from "@tanstack/react-query";
+import { useMaterialsInventoryQuery, useFarmsQuery } from "../queries/hooks";
 
-const MaterialsInventory = ({
-  inventoryItems = [],
-  setInventoryItems,
-  farms = [],
-}) => {
+const MaterialsInventory = ({ userProfile }) => {
+  const queryClient = useQueryClient();
+  const { data: inventoryItems = [] } = useMaterialsInventoryQuery();
+  const { data: farms = [] } = useFarmsQuery();
   const [activeView, setActiveView] = useState("global");
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isBatchFormOpen, setIsBatchFormOpen] = useState(false);
@@ -160,16 +165,7 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
         .upsert(payloads)
         .select();
       if (error) throw new Error(error.message);
-      if (data) {
-        const ids = data.map((d) => d.id);
-        setInventoryItems((prev) => {
-          const safePrev = Array.isArray(prev) ? prev : [];
-          return [
-            ...data,
-            ...safePrev.filter((p) => !ids.includes(p.id)),
-          ];
-        });
-      }
+      queryClient.invalidateQueries({ queryKey: ['materials_inventory'] });
       setScanState("done");
     } catch (err) {
       setScanError(err.message);
@@ -432,18 +428,9 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
       setErrorMsg(`⚠️ ${error.message}`);
       return;
     }
-    if (data) {
-      const ids = data.map((d) => d.id);
-      setInventoryItems((prev) => {
-        const safePrev = Array.isArray(prev) ? prev : [];
-        return [
-          ...data,
-          ...safePrev.filter((p) => !ids.includes(p.id)),
-        ];
-      });
-      setIsBatchFormOpen(false);
-      setBatchItems([{ ...initialItemState }]);
-    }
+    queryClient.invalidateQueries({ queryKey: ['materials_inventory'] });
+    setIsBatchFormOpen(false);
+    setBatchItems([{ ...initialItemState }]);
   };
 
   const handleInputChange = (e) => {
@@ -482,10 +469,7 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
         return;
       }
       if (data?.[0]) {
-        setInventoryItems((prev) => {
-          const safePrev = Array.isArray(prev) ? prev : [];
-          return safePrev.map((i) => (i.id === editItemId ? data[0] : i));
-        });
+        queryClient.invalidateQueries({ queryKey: ['materials_inventory'] });
         closeModal();
       }
     } else {
@@ -498,10 +482,7 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
         return;
       }
       if (data?.[0]) {
-        setInventoryItems((prev) => {
-          const safePrev = Array.isArray(prev) ? prev : [];
-          return [data[0], ...safePrev];
-        });
+        queryClient.invalidateQueries({ queryKey: ['materials_inventory'] });
         closeModal();
       }
     }
@@ -519,10 +500,7 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
     if (error) {
       setErrorMsg(`⚠️ Error deleting item: ${error.message}`);
     } else {
-      setInventoryItems((prev) => {
-        const safePrev = Array.isArray(prev) ? prev : [];
-        return safePrev.filter((i) => i.id !== id);
-      });
+      queryClient.invalidateQueries({ queryKey: ['materials_inventory'] });
     }
   };
 
@@ -1120,919 +1098,58 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
       </div>
 
       {/* MODALS */}
-      {isBulkDeliveryOpen && (
-        <div
-          className="inventory-form-overlay"
-          onClick={() => setIsBulkDeliveryOpen(false)}
-        >
-          <div
-            className="inventory-form-modal"
-            onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: "700px" }}
-          >
-            <div className="form-modal-header">
-              <h3>Record Physical Delivery</h3>
-              <button onClick={() => setIsBulkDeliveryOpen(false)}>×</button>
-            </div>
-            <div className="form-modal-body">
-              <div className="grid-2" style={{ marginBottom: "1.5rem" }}>
-                <div className="form-group" style={{ gridColumn: "1/-1" }}>
-                  <label className="label">Select Target Farm</label>
-                  <select
-                    className="input-field"
-                    value={bulkFarm}
-                    onChange={(e) => setBulkFarm(e.target.value)}
-                  >
-                    <option value="">-- Select Farm --</option>
-                    {farms.map((f) => (
-                      <option key={f.id} value={f.farmCode || f.code}>
-                        {f.farmCode || f.code} — {f.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="label">Date</label>
-                  <input
-                    type="date"
-                    className="input-field"
-                    value={bulkDate}
-                    onChange={(e) => setBulkDate(e.target.value)}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="label">MIS Number</label>
-                  <input
-                    type="text"
-                    className="input-field"
-                    value={bulkRef}
-                    onChange={(e) => setBulkRef(e.target.value)}
-                    placeholder="e.g. MIS-0007"
-                  />
-                </div>
-              </div>
+      <BulkDeliveryModal 
+        isBulkDeliveryOpen={isBulkDeliveryOpen}
+        setIsBulkDeliveryOpen={setIsBulkDeliveryOpen}
+        farms={farms}
+        bulkFarm={bulkFarm}
+        setBulkFarm={setBulkFarm}
+        bulkDate={bulkDate}
+        setBulkDate={setBulkDate}
+        bulkRef={bulkRef}
+        setBulkRef={setBulkRef}
+        bulkItems={bulkItems}
+        inventoryItems={inventoryItems}
+        updateBulkRow={updateBulkRow}
+        removeBulkRow={removeBulkRow}
+        addBulkRow={addBulkRow}
+        handleBulkSubmit={handleBulkSubmit}
+      />
 
-              <h4 style={{ fontSize: "0.9rem", marginBottom: "1rem" }}>
-                Items List
-              </h4>
-              {bulkItems.map((it, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 100px auto",
-                    gap: "0.5rem",
-                    marginBottom: "0.5rem",
-                    alignItems: "center",
-                  }}
-                >
-                  <select
-                    className="input-field"
-                    value={it.itemCode}
-                    onChange={(e) =>
-                      updateBulkRow(idx, "itemCode", e.target.value)
-                    }
-                    style={{ margin: 0 }}
-                  >
-                    <option value="">-- Material --</option>
-                    {inventoryItems.map((inv) => (
-                      <option key={inv.id} value={inv.item_code}>
-                        {inv.item_code} — {inv.item_name}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    type="number"
-                    className="input-field"
-                    value={it.quantity}
-                    onChange={(e) =>
-                      updateBulkRow(idx, "quantity", e.target.value)
-                    }
-                    placeholder="Qty"
-                    style={{ margin: 0 }}
-                  />
-                  <button
-                    onClick={() => removeBulkRow(idx)}
-                    style={{
-                      background: "#fee2e2",
-                      border: "none",
-                      borderRadius: "4px",
-                      padding: "0.5rem",
-                    }}
-                  >
-                    <Trash2 size={14} color="#ef4444" />
-                  </button>
-                </div>
-              ))}
-              <button
-                onClick={addBulkRow}
-                style={{
-                  width: "100%",
-                  background: "#f8fafc",
-                  border: "1px dashed #cbd5e1",
-                  padding: "0.5rem",
-                  borderRadius: "8px",
-                  cursor: "pointer",
-                  marginTop: "0.5rem",
-                }}
-              >
-                + Add Item
-              </button>
+      <SingleItemModal 
+        isFormOpen={isFormOpen}
+        closeModal={closeModal}
+        editItemId={editItemId}
+        errorMsg={errorMsg}
+        handleAddItem={handleAddItem}
+        newItem={newItem}
+        handleInputChange={handleInputChange}
+      />
 
-              <div
-                className="form-modal-footer"
-                style={{ border: "none", padding: "1.5rem 0 0" }}
-              >
-                <button
-                  className="btn-secondary"
-                  onClick={() => setIsBulkDeliveryOpen(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  className="btn-primary"
-                  onClick={() => handleBulkSubmit()}
-                >
-                  Confirm Delivery
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <BatchModal 
+        isBatchFormOpen={isBatchFormOpen}
+        setIsBatchFormOpen={setIsBatchFormOpen}
+        handleBatchSubmit={handleBatchSubmit}
+        batchItems={batchItems}
+        setBatchItems={setBatchItems}
+        handleBatchInputChange={handleBatchInputChange}
+        initialItemState={initialItemState}
+      />
 
-      {/* SINGLE ITEM MODAL */}
-      {isFormOpen && (
-        <div className="inventory-form-overlay" onClick={closeModal}>
-          <div
-            className="inventory-form-modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="form-modal-header">
-              <h3>{editItemId ? "Update Material" : "New Material"}</h3>
-              <button onClick={closeModal}>×</button>
-            </div>
-            <div className="form-modal-body">
-              {errorMsg && (
-                <div
-                  style={{
-                    padding: "0.75rem 1rem",
-                    background: "#fef2f2",
-                    border: "1px solid #fca5a5",
-                    borderRadius: "8px",
-                    color: "#b91c1c",
-                    fontSize: "0.875rem",
-                    marginBottom: "1rem",
-                  }}
-                >
-                  {errorMsg}
-                </div>
-              )}
-              <form onSubmit={handleAddItem}>
-                <div className="grid-2">
-                  <div className="form-group" style={{ gridColumn: "1/-1" }}>
-                    <label className="label">Item Name</label>
-                    <input
-                      type="text"
-                      name="item_name"
-                      className="input-field"
-                      value={newItem.item_name}
-                      onChange={handleInputChange}
-                      required
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="label">Item Code</label>
-                    <input
-                      type="text"
-                      name="item_code"
-                      className="input-field"
-                      value={newItem.item_code}
-                      onChange={handleInputChange}
-                      required
-                      disabled={!!editItemId}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="label">Unit</label>
-                    <input
-                      type="text"
-                      name="unit"
-                      className="input-field"
-                      value={newItem.unit || ""}
-                      onChange={handleInputChange}
-                      placeholder="e.g. PCS, KGS"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="label">Price in PHP</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      name="price_php"
-                      className="input-field"
-                      value={newItem.price_php || ""}
-                      onChange={handleInputChange}
-                      placeholder="e.g. 150.00"
-                    />
-                  </div>
-                  <div className="form-group" style={{ gridColumn: "1/-1" }}>
-                    <label className="label">Supplier</label>
-                    <input
-                      type="text"
-                      name="supplier_details"
-                      className="input-field"
-                      value={newItem.supplier_details}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-                  <div
-                    className="form-group"
-                    style={{
-                      padding: "0.75rem",
-                      background: "#f0fdf4",
-                      borderRadius: "8px",
-                    }}
-                  >
-                    <label className="label">Total Stock IN</label>
-                    <input
-                      type="number"
-                      name="stock_in"
-                      className="input-field"
-                      value={newItem.stock_in}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-                  <div
-                    className="form-group"
-                    style={{
-                      padding: "0.75rem",
-                      background: "#fef2f2",
-                      borderRadius: "8px",
-                    }}
-                  >
-                    <label className="label">Total Stock OUT</label>
-                    <input
-                      type="number"
-                      name="stock_out"
-                      className="input-field"
-                      value={newItem.stock_out}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-                </div>
-                <div
-                  className="form-modal-footer"
-                  style={{ border: "none", padding: "1.5rem 0 0" }}
-                >
-                  <button
-                    type="button"
-                    className="btn-secondary"
-                    onClick={closeModal}
-                  >
-                    Cancel
-                  </button>
-                  <button type="submit" className="btn-primary">
-                    {editItemId ? "Update" : "Register"}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* BATCH MODAL */}
-      {isBatchFormOpen && (
-        <div
-          className="inventory-form-overlay"
-          onClick={() => setIsBatchFormOpen(false)}
-        >
-          <div
-            className="inventory-form-modal"
-            style={{ maxWidth: "900px" }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="form-modal-header">
-              <h3>Batch Product Update</h3>
-              <button onClick={() => setIsBatchFormOpen(false)}>×</button>
-            </div>
-            <div className="form-modal-body">
-              <form onSubmit={handleBatchSubmit}>
-                {batchItems.map((it, idx) => (
-                  <div
-                    key={idx}
-                    className="grid-responsive"
-                    style={{
-                      gridTemplateColumns: "100px 1fr 80px 80px 40px",
-                      gap: "0.5rem",
-                      marginBottom: "0.5rem",
-                    }}
-                  >
-                    <input
-                      type="text"
-                      name="item_code"
-                      className="input-field"
-                      value={it.item_code}
-                      onChange={(e) => handleBatchInputChange(idx, e)}
-                      placeholder="Code"
-                      style={{ margin: 0 }}
-                    />
-                    <input
-                      type="text"
-                      name="item_name"
-                      className="input-field"
-                      value={it.item_name}
-                      onChange={(e) => handleBatchInputChange(idx, e)}
-                      placeholder="Name"
-                      style={{ margin: 0 }}
-                    />
-                    <input
-                      type="number"
-                      name="stock_in"
-                      className="input-field"
-                      value={it.stock_in}
-                      onChange={(e) => handleBatchInputChange(idx, e)}
-                      placeholder="+In"
-                      style={{ margin: 0 }}
-                    />
-                    <input
-                      type="number"
-                      name="stock_out"
-                      className="input-field"
-                      value={it.stock_out}
-                      onChange={(e) => handleBatchInputChange(idx, e)}
-                      placeholder="-Out"
-                      style={{ margin: 0 }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setBatchItems(batchItems.filter((_, i) => i !== idx))
-                      }
-                      style={{
-                        background: "#fee2e2",
-                        border: "none",
-                        borderRadius: "4px",
-                      }}
-                    >
-                      <Trash2 size={14} color="#ef4444" />
-                    </button>
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={() =>
-                    setBatchItems([...batchItems, { ...initialItemState }])
-                  }
-                  style={{
-                    width: "100%",
-                    margin: "1rem 0",
-                    padding: "0.5rem",
-                    background: "#f8fafc",
-                    border: "1px dashed #cbd5e1",
-                    borderRadius: "8px",
-                  }}
-                >
-                  + New Row
-                </button>
-                <div
-                  className="form-modal-footer"
-                  style={{ border: "none", padding: "1rem 0 0" }}
-                >
-                  <button
-                    type="button"
-                    className="btn-secondary"
-                    onClick={() => setIsBatchFormOpen(false)}
-                  >
-                    Cancel
-                  </button>
-                  <button type="submit" className="btn-primary">
-                    Update Batch
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── AI RECEIPT SCANNER MODAL ─────────────────────────────────── */}
-      {isScanOpen && (
-        <div className="inventory-form-overlay" onClick={closeScan}>
-          <div
-            className="inventory-form-modal"
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              maxWidth: "640px",
-              borderRadius: "16px",
-              overflow: "hidden",
-            }}
-          >
-            {/* Header */}
-            <div
-              className="form-modal-header"
-              style={{
-                background: "linear-gradient(135deg, #7c3aed, #4f46e5)",
-                color: "white",
-                padding: "1.25rem 1.5rem",
-              }}
-            >
-              <div
-                style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}
-              >
-                <Camera size={22} />
-                <div>
-                  <h3 style={{ margin: 0, color: "white" }}>
-                    AI Receipt Scanner
-                  </h3>
-                  <p style={{ margin: 0, fontSize: "0.8rem", opacity: 0.85 }}>
-                    Capture a supplier DR to auto-add inventory
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={closeScan}
-                style={{
-                  color: "white",
-                  opacity: 0.8,
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  fontSize: "1.4rem",
-                }}
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="form-modal-body" style={{ padding: "1.5rem" }}>
-              {/* IDLE: upload / capture */}
-              {(scanState === "idle" || scanState === "error") && (
-                <div>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    onChange={handleFileSelect}
-                    style={{ display: "none" }}
-                    id="scan-input"
-                  />
-
-                  {!scanImage ? (
-                    <label
-                      htmlFor="scan-input"
-                      style={{
-                        display: "block",
-                        border: "2px dashed #a78bfa",
-                        borderRadius: "12px",
-                        padding: "2.5rem",
-                        textAlign: "center",
-                        cursor: "pointer",
-                        background: "#faf5ff",
-                        transition: "all 0.2s",
-                      }}
-                    >
-                      <Camera
-                        size={40}
-                        color="#7c3aed"
-                        style={{ marginBottom: "0.75rem" }}
-                      />
-                      <p
-                        style={{
-                          fontWeight: 700,
-                          color: "#6d28d9",
-                          margin: "0 0 0.25rem",
-                        }}
-                      >
-                        Tap to capture or upload receipt
-                      </p>
-                      <p
-                        style={{
-                          fontSize: "0.82rem",
-                          color: "#9ca3af",
-                          margin: 0,
-                        }}
-                      >
-                        Steniel DR, delivery receipt, or any supplier invoice
-                      </p>
-                    </label>
-                  ) : (
-                    <div>
-                      <img
-                        src={scanImage}
-                        alt="Receipt preview"
-                        style={{
-                          width: "100%",
-                          maxHeight: "300px",
-                          objectFit: "contain",
-                          borderRadius: "8px",
-                          border: "1px solid #e2e8f0",
-                          marginBottom: "1rem",
-                        }}
-                      />
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: "0.75rem",
-                          flexWrap: "wrap",
-                        }}
-                      >
-                        <label
-                          htmlFor="scan-input"
-                          style={{
-                            cursor: "pointer",
-                            padding: "0.6rem 1rem",
-                            background: "#f3f4f6",
-                            borderRadius: "8px",
-                            fontSize: "0.875rem",
-                            fontWeight: 600,
-                            color: "#374151",
-                            border: "1px solid #d1d5db",
-                          }}
-                        >
-                          🔄 Retake
-                        </label>
-                        <button
-                          onClick={handleScanReceipt}
-                          style={{
-                            flex: 1,
-                            padding: "0.7rem 1.25rem",
-                            background:
-                              "linear-gradient(135deg, #7c3aed, #4f46e5)",
-                            color: "white",
-                            border: "none",
-                            borderRadius: "8px",
-                            fontWeight: 700,
-                            cursor: "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            gap: "0.5rem",
-                            fontSize: "0.95rem",
-                          }}
-                        >
-                          <Camera size={18} /> Scan with AI
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {scanState === "error" && (
-                    <div
-                      style={{
-                        marginTop: "1rem",
-                        padding: "0.75rem 1rem",
-                        background: "#fef2f2",
-                        border: "1px solid #fca5a5",
-                        borderRadius: "8px",
-                        color: "#b91c1c",
-                        fontSize: "0.875rem",
-                        display: "flex",
-                        gap: "0.5rem",
-                        alignItems: "flex-start",
-                      }}
-                    >
-                      <XCircle
-                        size={16}
-                        style={{ flexShrink: 0, marginTop: "2px" }}
-                      />
-                      <div>
-                        <strong>Scan failed:</strong> {scanError}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* SCANNING */}
-              {scanState === "scanning" && (
-                <div style={{ textAlign: "center", padding: "2.5rem 1rem" }}>
-                  <div
-                    style={{
-                      width: "56px",
-                      height: "56px",
-                      border: "4px solid #e9d5ff",
-                      borderTop: "4px solid #7c3aed",
-                      borderRadius: "50%",
-                      margin: "0 auto 1.25rem",
-                      animation: "spin 1s linear infinite",
-                    }}
-                  />
-                  <p
-                    style={{
-                      fontWeight: 700,
-                      color: "#6d28d9",
-                      margin: "0 0 0.25rem",
-                    }}
-                  >
-                    AI is reading the receipt...
-                  </p>
-                  <p
-                    style={{ color: "#9ca3af", fontSize: "0.85rem", margin: 0 }}
-                  >
-                    Extracting items, quantities, and DR details
-                  </p>
-                </div>
-              )}
-
-              {/* SAVING */}
-              {scanState === "saving" && (
-                <div style={{ textAlign: "center", padding: "2.5rem 1rem" }}>
-                  <div
-                    style={{
-                      width: "56px",
-                      height: "56px",
-                      border: "4px solid #bbf7d0",
-                      borderTop: "4px solid #16a34a",
-                      borderRadius: "50%",
-                      margin: "0 auto 1.25rem",
-                      animation: "spin 1s linear infinite",
-                    }}
-                  />
-                  <p style={{ fontWeight: 700, color: "#166534", margin: 0 }}>
-                    Saving to inventory...
-                  </p>
-                </div>
-              )}
-
-              {/* DONE */}
-              {scanState === "done" && (
-                <div style={{ textAlign: "center", padding: "2rem 1rem" }}>
-                  <CheckCircle
-                    size={56}
-                    color="#16a34a"
-                    style={{ marginBottom: "1rem" }}
-                  />
-                  <h3 style={{ color: "#166534", margin: "0 0 0.5rem" }}>
-                    Inventory Updated!
-                  </h3>
-                  <p
-                    style={{
-                      color: "#64748b",
-                      margin: "0 0 1.5rem",
-                      fontSize: "0.9rem",
-                    }}
-                  >
-                    {scanResult?.items?.length} item
-                    {scanResult?.items?.length !== 1 ? "s" : ""} from DR #
-                    {scanResult?.drNo} added to stock.
-                  </p>
-                  <button
-                    onClick={closeScan}
-                    className="btn-primary"
-                    style={{ padding: "0.7rem 2rem" }}
-                  >
-                    Done
-                  </button>
-                </div>
-              )}
-
-              {/* PREVIEW: show extracted items for confirmation */}
-              {scanState === "preview" && scanResult && (
-                <div>
-                  {/* Receipt header pill */}
-                  <div
-                    style={{
-                      background: "#f0fdf4",
-                      border: "1px solid #bbf7d0",
-                      borderRadius: "10px",
-                      padding: "0.75rem 1rem",
-                      marginBottom: "1.25rem",
-                      display: "flex",
-                      flexWrap: "wrap",
-                      gap: "1rem",
-                    }}
-                  >
-                    <div>
-                      <span
-                        style={{
-                          fontSize: "0.75rem",
-                          color: "#64748b",
-                          display: "block",
-                        }}
-                      >
-                        Supplier
-                      </span>
-                      <strong style={{ fontSize: "0.9rem" }}>
-                        {scanResult.supplier}
-                      </strong>
-                    </div>
-                    <div>
-                      <span
-                        style={{
-                          fontSize: "0.75rem",
-                          color: "#64748b",
-                          display: "block",
-                        }}
-                      >
-                        DR No.
-                      </span>
-                      <strong style={{ fontSize: "0.9rem" }}>
-                        #{scanResult.drNo}
-                      </strong>
-                    </div>
-                    <div>
-                      <span
-                        style={{
-                          fontSize: "0.75rem",
-                          color: "#64748b",
-                          display: "block",
-                        }}
-                      >
-                        Date
-                      </span>
-                      <strong style={{ fontSize: "0.9rem" }}>
-                        {scanResult.date}
-                      </strong>
-                    </div>
-                  </div>
-
-                  <h4
-                    style={{
-                      margin: "0 0 0.75rem",
-                      fontSize: "0.88rem",
-                      textTransform: "uppercase",
-                      color: "#64748b",
-                      letterSpacing: "0.05em",
-                    }}
-                  >
-                    Extracted Items — verify & confirm
-                  </h4>
-
-                  <div
-                    style={{
-                      border: "1px solid #e2e8f0",
-                      borderRadius: "10px",
-                      overflow: "hidden",
-                      marginBottom: "1.25rem",
-                    }}
-                  >
-                    <table
-                      style={{
-                        width: "100%",
-                        borderCollapse: "collapse",
-                        fontSize: "0.88rem",
-                      }}
-                    >
-                      <thead>
-                        <tr style={{ background: "#f8fafc" }}>
-                          <th
-                            style={{
-                              padding: "0.6rem 0.75rem",
-                              textAlign: "left",
-                              fontWeight: 700,
-                              color: "#374151",
-                              borderBottom: "1px solid #e2e8f0",
-                            }}
-                          >
-                            Item
-                          </th>
-                          <th
-                            style={{
-                              padding: "0.6rem 0.75rem",
-                              textAlign: "right",
-                              fontWeight: 700,
-                              color: "#374151",
-                              borderBottom: "1px solid #e2e8f0",
-                              width: "90px",
-                            }}
-                          >
-                            Qty
-                          </th>
-                          <th
-                            style={{
-                              padding: "0.6rem 0.75rem",
-                              textAlign: "center",
-                              fontWeight: 700,
-                              color: "#374151",
-                              borderBottom: "1px solid #e2e8f0",
-                              width: "40px",
-                            }}
-                          ></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {scanResult.items.map((it, idx) => (
-                          <tr
-                            key={idx}
-                            style={{ borderBottom: "1px solid #f1f5f9" }}
-                          >
-                            <td style={{ padding: "0.6rem 0.75rem" }}>
-                              <div
-                                style={{ fontWeight: 700, color: "#0f172a" }}
-                              >
-                                {it.name}
-                              </div>
-                              <div
-                                style={{
-                                  fontSize: "0.75rem",
-                                  color: "#64748b",
-                                  fontFamily: "monospace",
-                                }}
-                              >
-                                {it.code}
-                              </div>
-                            </td>
-                            <td
-                              style={{
-                                padding: "0.6rem 0.75rem",
-                                textAlign: "right",
-                              }}
-                            >
-                              <input
-                                type="number"
-                                value={it.qty}
-                                min="0"
-                                onChange={(e) =>
-                                  setScanResult((prev) => ({
-                                    ...prev,
-                                    items: prev.items.map((item, i) =>
-                                      i === idx
-                                        ? {
-                                            ...item,
-                                            qty: Number(e.target.value),
-                                          }
-                                        : item
-                                    ),
-                                  }))
-                                }
-                                style={{
-                                  width: "75px",
-                                  padding: "0.35rem 0.5rem",
-                                  border: "1px solid #d1d5db",
-                                  borderRadius: "6px",
-                                  textAlign: "right",
-                                  fontWeight: 700,
-                                  fontSize: "0.9rem",
-                                }}
-                              />
-                            </td>
-                            <td
-                              style={{
-                                padding: "0.6rem 0.5rem",
-                                textAlign: "center",
-                              }}
-                            >
-                              <button
-                                onClick={() =>
-                                  setScanResult((prev) => ({
-                                    ...prev,
-                                    items: prev.items.filter(
-                                      (_, i) => i !== idx
-                                    ),
-                                  }))
-                                }
-                                style={{
-                                  background: "none",
-                                  border: "none",
-                                  cursor: "pointer",
-                                  color: "#ef4444",
-                                }}
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <div style={{ display: "flex", gap: "0.75rem" }}>
-                    <button
-                      onClick={() => {
-                        setScanState("idle");
-                        setScanResult(null);
-                      }}
-                      className="btn-secondary"
-                      style={{ flex: 1 }}
-                    >
-                      ← Retake
-                    </button>
-                    <button
-                      onClick={handleScanConfirm}
-                      className="btn-primary"
-                      style={{
-                        flex: 2,
-                        background: "linear-gradient(135deg, #16a34a, #15803d)",
-                      }}
-                    >
-                      ✓ Add {scanResult.items.filter((i) => i.qty > 0).length}{" "}
-                      Item
-                      {scanResult.items.filter((i) => i.qty > 0).length !== 1
-                        ? "s"
-                        : ""}{" "}
-                      to Inventory
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <AIReceiptScannerModal 
+        isScanOpen={isScanOpen}
+        closeScan={closeScan}
+        scanState={scanState}
+        setScanState={setScanState}
+        scanError={scanError}
+        fileInputRef={fileInputRef}
+        handleFileSelect={handleFileSelect}
+        scanImage={scanImage}
+        handleScanReceipt={handleScanReceipt}
+        scanResult={scanResult}
+        setScanResult={setScanResult}
+        handleScanConfirm={handleScanConfirm}
+      />
 
       {/* Spin keyframes */}
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>

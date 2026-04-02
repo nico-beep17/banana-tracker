@@ -3,6 +3,8 @@ import './ArrivalForm.css';
 import { supabase } from '../supabaseClient';
 import { exportXlsx } from '../utils/exportXlsx';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
+import { useFarmsQuery, useSamplingsQuery } from '../queries/hooks';
 
 const isNative = window.Capacitor && window.Capacitor.isNativePlatform();
 
@@ -68,7 +70,10 @@ const REJECT_DEFECTS = [
     { code: 'WP', name: 'Withered Pedicel' }, { code: 'YB', name: 'Yellow Blossom End' }
 ];
 
-const Sampling = ({ farms = [], samplings = [], setSamplings, onNavigate, initialFarmCode }) => {
+const Sampling = ({ onNavigate, initialFarmCode }) => {
+    const queryClient = useQueryClient();
+    const { data: farms = [] } = useFarmsQuery();
+    const { data: samplings = [] } = useSamplingsQuery();
     const [formData, setFormData] = useState({
         farmCode: initialFarmCode || '',
         dateOfPacking: new Date().toISOString().split('T')[0],
@@ -141,7 +146,7 @@ const Sampling = ({ farms = [], samplings = [], setSamplings, onNavigate, initia
         }
 
         if (data && data.length > 0) {
-            setSamplings(prev => [...prev, data[0]]);
+            queryClient.invalidateQueries({ queryKey: ['samplings'] });
             toast.success("Sampling logged successfully.");
 
             if (onNavigate) {

@@ -1,8 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import './NewContainerForm.css';
 import { toast } from 'sonner';
+import { useContainersQuery } from '../queries/hooks';
 
-const ContainerStuffingGrid = ({ containerId, containers, remainingInventory, onSavePayload, onCancel }) => {
+const ContainerStuffingGrid = ({ containerId, remainingInventory, onSavePayload, onCancel }) => {
+    const { data: containers = [] } = useContainersQuery();
     const container = containers.find(c => c.id === containerId);
 
     const [formData, setFormData] = useState({

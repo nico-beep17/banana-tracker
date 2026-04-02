@@ -4,11 +4,13 @@ import { downloadCSV } from '../utils/exportUtils';
 import { getPortCountry } from '../utils/locationUtils';
 import ContainerManifest from './ContainerManifest';
 import PinVerifyModal from './PinVerifyModal';
+import { useContainersQuery } from '../queries/hooks';
 import './ContainersList.css';
 
 const getCountry = (dest) => getPortCountry(dest);
 
-const ContainersList = ({ containers = [], onNavigate, onDepartContainer, onSealContainer, onEditPayload, onDeletePayload }) => {
+const ContainersList = ({ onNavigate, onDepartContainer, onSealContainer, onEditPayload, onDeletePayload }) => {
+    const { data: containers = [] } = useContainersQuery();
     const componentRef = useRef();
     const [selectedContainer, setSelectedContainer] = useState(null);
     const [breakdownContainer, setBreakdownContainer] = useState(null);

@@ -67,6 +67,7 @@ class ErrorBoundary extends React.Component {
 }
 
 function App() {
+  console.log('[App] RENDER START');
   const {
     activeTab, setActiveTab, tabState, setTabState,
     // Data vars still read directly in App.jsx (notifications, edit-container lookup, ArrivalForm props)
@@ -377,76 +378,88 @@ function App() {
   } = useAppOperations();
 
   // --- Derived Analytics (computed from Zustand store data) ---
-  const approvedArrivals = arrivals.filter(a => a.approval_status === 'APPROVED');
+  let approvedArrivals = [], todayArrivals = [], totalBoxesToday = 0, uniqueFarms = new Set();
+  let totalBoxesAllTime = 0, classATotal = 0, classBTotal = 0;
+  let inventoryMetrics = { total: 0, classA: 0, classB: 0, detailed: {} };
+  let globalSampledBoxes = [], downgradeRate = 0, collectionRate = 100;
+  let advancedAnalytics = { downgradeRate: 0, topFarms: [], collectionRate: 100 };
 
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const todayArrivals = approvedArrivals.filter(a => {
-    const d = new Date(a.dateTimeArrive || a.dateTimeEncoded || 0);
-    return d >= todayStart;
-  });
-  const totalBoxesToday = todayArrivals.reduce((s, a) => s + (Number(a.quantity) || 0), 0);
-  const uniqueFarms = new Set(todayArrivals.map(a => a.farmCode).filter(Boolean));
+  try {
+    console.log('[App] Computing analytics... arrivals:', arrivals?.length, 'containers:', containers?.length, 'samplings:', samplings?.length);
+    approvedArrivals = (arrivals || []).filter(a => a.approval_status === 'APPROVED');
 
-  const totalBoxesAllTime = approvedArrivals.reduce((s, a) => s + (Number(a.quantity) || 0), 0);
-  const classATotal = approvedArrivals
-    .filter(a => a.typeId && a.typeId.startsWith('classA'))
-    .reduce((s, a) => s + (Number(a.quantity) || 0), 0);
-  const classBTotal = approvedArrivals
-    .filter(a => a.typeId && a.typeId.startsWith('classB'))
-    .reduce((s, a) => s + (Number(a.quantity) || 0), 0);
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    todayArrivals = approvedArrivals.filter(a => {
+      const d = new Date(a.dateTimeArrive || a.dateTimeEncoded || 0);
+      return d >= todayStart;
+    });
+    totalBoxesToday = todayArrivals.reduce((s, a) => s + (Number(a.quantity) || 0), 0);
+    uniqueFarms = new Set(todayArrivals.map(a => a.farmCode).filter(Boolean));
 
-  // Remaining inventory = all approved boxes minus what's been stuffed into containers
-  const stuffedByType = {};
-  containers.forEach(c => {
-    (c.stuffedItems || []).forEach(payload => {
-      Object.entries(payload.data || {}).forEach(([typeId, qty]) => {
-        stuffedByType[typeId] = (stuffedByType[typeId] || 0) + (Number(qty) || 0);
+    totalBoxesAllTime = approvedArrivals.reduce((s, a) => s + (Number(a.quantity) || 0), 0);
+    classATotal = approvedArrivals
+      .filter(a => a.typeId && a.typeId.startsWith('classA'))
+      .reduce((s, a) => s + (Number(a.quantity) || 0), 0);
+    classBTotal = approvedArrivals
+      .filter(a => a.typeId && a.typeId.startsWith('classB'))
+      .reduce((s, a) => s + (Number(a.quantity) || 0), 0);
+
+    // Remaining inventory = all approved boxes minus what's been stuffed into containers
+    const stuffedByType = {};
+    (containers || []).forEach(c => {
+      (c.stuffedItems || []).forEach(payload => {
+        Object.entries(payload.data || {}).forEach(([typeId, qty]) => {
+          stuffedByType[typeId] = (stuffedByType[typeId] || 0) + (Number(qty) || 0);
+        });
       });
     });
-  });
-  const approvedByType = {};
-  approvedArrivals.forEach(a => {
-    if (a.typeId) {
-      approvedByType[a.typeId] = (approvedByType[a.typeId] || 0) + (Number(a.quantity) || 0);
-    }
-  });
-  const remainingInventoryDetailed = {};
-  Object.keys(approvedByType).forEach(typeId => {
-    remainingInventoryDetailed[typeId] = Math.max(0, (approvedByType[typeId] || 0) - (stuffedByType[typeId] || 0));
-  });
+    const approvedByType = {};
+    approvedArrivals.forEach(a => {
+      if (a.typeId) {
+        approvedByType[a.typeId] = (approvedByType[a.typeId] || 0) + (Number(a.quantity) || 0);
+      }
+    });
+    const remainingInventoryDetailed = {};
+    Object.keys(approvedByType).forEach(typeId => {
+      remainingInventoryDetailed[typeId] = Math.max(0, (approvedByType[typeId] || 0) - (stuffedByType[typeId] || 0));
+    });
 
-  const remainingTotal = Object.values(remainingInventoryDetailed).reduce((sum, val) => sum + val, 0);
-  const remainingClassA = Object.keys(remainingInventoryDetailed).filter(k => k.startsWith('classA')).reduce((sum, k) => sum + remainingInventoryDetailed[k], 0);
-  const remainingClassB = Object.keys(remainingInventoryDetailed).filter(k => k.startsWith('classB')).reduce((sum, k) => sum + remainingInventoryDetailed[k], 0);
+    const remainingTotal = Object.values(remainingInventoryDetailed).reduce((sum, val) => sum + val, 0);
+    const remainingClassA = Object.keys(remainingInventoryDetailed).filter(k => k.startsWith('classA')).reduce((sum, k) => sum + remainingInventoryDetailed[k], 0);
+    const remainingClassB = Object.keys(remainingInventoryDetailed).filter(k => k.startsWith('classB')).reduce((sum, k) => sum + remainingInventoryDetailed[k], 0);
 
-  const inventoryMetrics = {
-    total: remainingTotal,
-    classA: remainingClassA,
-    classB: remainingClassB,
-    detailed: remainingInventoryDetailed
-  };
+    inventoryMetrics = {
+      total: remainingTotal,
+      classA: remainingClassA,
+      classB: remainingClassB,
+      detailed: remainingInventoryDetailed
+    };
 
-  // ADVANCED ANALYTICS
-  const globalSampledBoxes = samplings.flatMap(s => s.boxes || []);
-  const downgradeRate = globalSampledBoxes.length > 0
-    ? (globalSampledBoxes.filter(b => b.decision === 'DOWNGRADED').length / globalSampledBoxes.length) * 100
-    : 0;
+    // ADVANCED ANALYTICS
+    globalSampledBoxes = (samplings || []).flatMap(s => s.boxes || []);
+    downgradeRate = globalSampledBoxes.length > 0
+      ? (globalSampledBoxes.filter(b => b.decision === 'DOWNGRADED').length / globalSampledBoxes.length) * 100
+      : 0;
 
-  const farmVolumes = {};
-  approvedArrivals.forEach(arr => {
-     farmVolumes[arr.farmName || 'Unknown'] = (farmVolumes[arr.farmName || 'Unknown'] || 0) + (arr.quantity || 0);
-  });
-  const topFarmsList = Object.entries(farmVolumes)
-     .sort((a,b) => b[1] - a[1])
-     .slice(0, 5)
-     .map(([name, volume]) => ({ name, volume }));
+    const farmVolumes = {};
+    approvedArrivals.forEach(arr => {
+       farmVolumes[arr.farmName || 'Unknown'] = (farmVolumes[arr.farmName || 'Unknown'] || 0) + (arr.quantity || 0);
+    });
+    const topFarmsList = Object.entries(farmVolumes)
+       .sort((a,b) => b[1] - a[1])
+       .slice(0, 5)
+       .map(([name, volume]) => ({ name, volume }));
 
-  const totalRev = containers.reduce((s, c) => s + (Number(c.totalBoxes || 0) * (Number(c.agreed_rate) || 0)), 0);
-  const collected = containers.reduce((s, c) => s + (Number(c.amount_paid_partial) || 0), 0);
-  const collectionRate = totalRev > 0 ? (collected / totalRev) * 100 : 100;
+    const totalRev = (containers || []).reduce((s, c) => s + (Number(c.totalBoxes || 0) * (Number(c.agreed_rate) || 0)), 0);
+    const collected = (containers || []).reduce((s, c) => s + (Number(c.amount_paid_partial) || 0), 0);
+    collectionRate = totalRev > 0 ? (collected / totalRev) * 100 : 100;
 
-  const advancedAnalytics = { downgradeRate, topFarms: topFarmsList, collectionRate };
+    advancedAnalytics = { downgradeRate, topFarms: topFarmsList, collectionRate };
+    console.log('[App] Analytics computed OK');
+  } catch (analyticsErr) {
+    console.error('[App] ANALYTICS CRASH:', analyticsErr);
+  }
 
   const [smartNotifications, setSmartNotifications] = useState([]);
 
@@ -520,13 +533,17 @@ function App() {
     setSmartNotifications(processedNotifs);
   }, [arrivals, containers, totalBoxesToday, uniqueFarms.size, downgradeRate, globalSampledBoxes.length, collectionRate, lastReadNotifTime]);
 
+  console.log('[App] PRE-RENDER: authLoading=', authLoading, 'user=', !!user, 'userProfile=', !!userProfile);
+
   if (authLoading) {
-    return <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center' }}>Loading Application...</div>;
+    return <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', color: '#334155' }}>Loading Application...</div>;
   }
 
   if (!user) {
     return <Login />;
   }
+
+  console.log('[App] RENDERING MAIN LAYOUT for tab:', activeTab);
 
   return (
     <ErrorBoundary>

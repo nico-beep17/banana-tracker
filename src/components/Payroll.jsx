@@ -8,8 +8,14 @@ import {
 // QR and scanner loaded only when needed
 import './Accounting.css'; // Reusing ERP styles
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
+import { useEmployeesQuery, useDtrRecordsQuery, useAttendanceLocationsQuery } from '../queries/hooks';
 
-const Payroll = ({ employees = [], dtrRecords = [], attendanceLocations = [], fetchData, initialTab, userProfile }) => {
+const Payroll = ({ initialTab, userProfile }) => {
+    const queryClient = useQueryClient();
+    const { data: employees = [] } = useEmployeesQuery();
+    const { data: dtrRecords = [] } = useDtrRecordsQuery();
+    const { data: attendanceLocations = [] } = useAttendanceLocationsQuery();
     const showToast = (msg, type) => {
         if (type === 'error') toast.error(msg);
         else if (type === 'warning') toast.warning(msg);
@@ -72,7 +78,7 @@ const Payroll = ({ employees = [], dtrRecords = [], attendanceLocations = [], fe
                 bank_account_no: '', sss_no: '', phic_no: '', hdmf_no: '', tin_no: ''
             });
             setIsEditingEmp(false);
-            fetchData();
+            queryClient.invalidateQueries({ queryKey: ['employees'] });
         } catch (error) {
             showToast("Error saving employee: " + error.message, "error");
         }
@@ -121,7 +127,7 @@ const Payroll = ({ employees = [], dtrRecords = [], attendanceLocations = [], fe
             if (insErr) throw insErr;
 
             showToast("DTR saved successfully for " + dtrDate, "success");
-            if (fetchData) fetchData();
+            queryClient.invalidateQueries({ queryKey: ['dtr_records'] });
         } catch (error) {
             showToast("Error saving DTR: " + error.message, "error");
         }
@@ -265,7 +271,7 @@ const Payroll = ({ employees = [], dtrRecords = [], attendanceLocations = [], fe
                 } else {
                     setScanResult({ status: 'warning', message: `${emp.first_name} has already recorded both Time In and Time Out for today.` });
                 }
-                fetchData();
+                queryClient.invalidateQueries({ queryKey: ['dtr_records'] });
             } catch (err) {
                 setScanResult({ status: 'error', message: 'Database error: ' + err.message });
             }
@@ -563,7 +569,7 @@ const Payroll = ({ employees = [], dtrRecords = [], attendanceLocations = [], fe
                                             else await supabase.from('dtr_records').insert([{ employee_id: overrideForm.empId, record_date: d, time_out: t, status: 'PRESENT' }]);
                                         }
                                         showToast("Manual log saved.", "success");
-                                        fetchData();
+                                        queryClient.invalidateQueries({ queryKey: ['dtr_records'] });
                                     } catch (err) { showToast(err.message, "error"); }
                                 }}>Save Adjustment</button>
                             </div>
@@ -757,7 +763,7 @@ const Payroll = ({ employees = [], dtrRecords = [], attendanceLocations = [], fe
                                     showToast("Error adding location: " + error.message, "error");
                                 } else {
                                     showToast("Location added successfully.", "success");
-                                    if (fetchData) fetchData();
+                                    queryClient.invalidateQueries({ queryKey: ['attendance_locations'] });
                                     document.getElementById('ln').value = '';
                                     document.getElementById('la').value = '';
                                     document.getElementById('lo').value = '';

@@ -7,6 +7,8 @@ import {
     Mails, KeyRound, CheckCircle
 } from 'lucide-react';
 import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
+import { useContainersQuery } from '../queries/hooks';
+import { useQueryClient } from '@tanstack/react-query';
 import './ShippingDocs.css';
 
 const DEFAULT_DOCS_STATE = {
@@ -78,7 +80,9 @@ const GoogleAuthButton = ({ setGmailToken }) => {
     );
 };
 
-const ShippingDocs = ({ containers, setContainers }) => {
+const ShippingDocs = () => {
+    const queryClient = useQueryClient();
+    const { data: containers = [] } = useContainersQuery();
     const [searchQuery, setSearchQuery] = useState('');
     const [expandedIds, setExpandedIds] = useState(new Set());
     const [updating, setUpdating] = useState(false);
@@ -148,7 +152,7 @@ const ShippingDocs = ({ containers, setContainers }) => {
             console.error("Supabase Error (Update Docs):", error);
             toast.error("Failed to update checklist.");
         } else if (data && data[0]) {
-            setContainers(prev => prev.map(c => c.id === containerId ? data[0] : c));
+            queryClient.invalidateQueries({ queryKey: ['containers'] });
         }
         
         setUpdating(false);

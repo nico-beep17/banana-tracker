@@ -1,19 +1,19 @@
 import React, { useState } from "react";
 import ArrivalsTable from "./ArrivalsTable";
 import "./ArrivalForm.css";
+import { useArrivalsQuery, useFarmsQuery, useWeeklyRatesQuery, useSamplingsQuery } from "../queries/hooks";
 
 const ArrivalForm = ({
-  arrivals = [],
   onApproveArrival,
   onDeleteArrival,
-  setArrivals,
   userProfile,
   onAddArrival,
-  farms = [],
-  weeklyRates = [],
-  samplings = [],
   onNavigate,
 }) => {
+  const { data: arrivals = [] } = useArrivalsQuery();
+  const { data: farms = [] } = useFarmsQuery();
+  const { data: weeklyRates = [] } = useWeeklyRatesQuery();
+  const { data: samplings = [] } = useSamplingsQuery();
   const [showForm, setShowForm] = useState(false);
   // Helper to get local ISO string compatible with datetime-local
   const getLocalISOString = () => {
@@ -667,7 +667,6 @@ const ArrivalForm = ({
             arrivals={arrivals}
             onApproveArrival={onApproveArrival}
             onDeleteArrival={onDeleteArrival}
-            setArrivals={setArrivals}
             userProfile={userProfile}
             samplings={samplings}
           />

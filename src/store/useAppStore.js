@@ -52,7 +52,7 @@ const useAppStore = create((set) => ({
     setInventoryItems: (inventoryItems) => set({ inventoryItems }),
 
     // Global Settings
-    exchangeRate: 56.50,
+    exchangeRate: import.meta.env.VITE_EXCHANGE_RATE ? parseFloat(import.meta.env.VITE_EXCHANGE_RATE) : 56.50,
     setExchangeRate: (rate) => set({ exchangeRate: rate }),
 
     // HR/Payroll State

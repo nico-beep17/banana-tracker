@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { chatCompletion } from '../utils/geminiAPI';
 import { marked } from 'marked';
 import { Bot, X, Send, User, Sparkles } from 'lucide-react';
+import { useArrivalsQuery, useFarmsQuery, useWeeklyRatesQuery, useSamplingsQuery, useContainersQuery } from '../queries/hooks';
 import './AIAssistantWidget.css';
 
 // ─── helpers ───────────────────────────────────────────────────────────────
@@ -111,12 +112,12 @@ const resolveLocally = (query, { arrivals, farms, weeklyRates = [], samplings = 
     return parsed;
 };
 
-const AIAssistantWidget = ({
-    arrivals = [], containers = [], farms = [],
-    weeklyRates = [], samplings = [],
-    inventoryMetrics = {}, totalBoxesToday = 0,
-    advancedAnalytics = {}, onClose
-}) => {
+const AIAssistantWidget = ({ inventoryMetrics = {}, totalBoxesToday = 0, advancedAnalytics = {}, onClose }) => {
+    const { data: arrivals = [] } = useArrivalsQuery();
+    const { data: farms = [] } = useFarmsQuery();
+    const { data: weeklyRates = [] } = useWeeklyRatesQuery();
+    const { data: samplings = [] } = useSamplingsQuery();
+    const { data: containers = [] } = useContainersQuery();
     const [messages, setMessages] = useState([]);
     const [inputQuery, setInputQuery] = useState('');
     const [isLoading, setIsLoading] = useState(false);
