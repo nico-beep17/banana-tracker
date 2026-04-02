@@ -167,16 +167,29 @@ const ShippingDocs = () => {
         if (v('bookingNo')) updates.bookingNo = v('bookingNo');
         if (v('etd')) updates.dateDeparted = v('etd');
         if (v('eta')) updates.eta = v('eta');
-        // portOfDischarge maps to destination
         if (v('portOfDischarge')) updates.destination = v('portOfDischarge');
 
         if (Object.keys(updates).length === 0) return;
 
+        // Track which fields were synced by AI (merge with existing)
+        const existingSynced = container.emailSyncedFields || {};
+        const syncedFields = { ...existingSynced };
+        for (const [key, val] of Object.entries(updates)) {
+            syncedFields[key] = {
+                value: val,
+                syncedAt: new Date().toISOString(),
+                source: 'Gemini 3.1 Pro — Gmail scan',
+            };
+        }
+        updates.emailSyncedFields = syncedFields;
+
         // Log what changed for transparency
-        const changes = Object.entries(updates).map(([key, val]) => {
-            const old = container[key];
-            return old && old !== val ? `${key}: ${old} → ${val}` : `${key}: ${val}`;
-        });
+        const changes = Object.entries(updates)
+            .filter(([k]) => k !== 'emailSyncedFields')
+            .map(([key, val]) => {
+                const old = container[key];
+                return old && old !== val ? `${key}: ${old} → ${val}` : `${key}: ${val}`;
+            });
         console.log('[AutoFill]', containerId, changes);
 
         const { error } = await supabase

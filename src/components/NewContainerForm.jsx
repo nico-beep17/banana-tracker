@@ -12,6 +12,27 @@ const getISOWeek = (date) => {
     return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
 };
 
+// Small tag to indicate AI-synced fields
+const AiSyncTag = ({ fieldName, syncedFields }) => {
+    if (!syncedFields || !syncedFields[fieldName]) return null;
+    const info = syncedFields[fieldName];
+    const syncDate = info.syncedAt ? new Date(info.syncedAt).toLocaleDateString() : '';
+    return (
+        <span 
+            title={`Auto-filled by ${info.source || 'AI'} on ${syncDate}`}
+            style={{
+                display: 'inline-flex', alignItems: 'center', gap: '2px',
+                background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+                color: '#fff', fontSize: '0.6rem', fontWeight: 700,
+                padding: '1px 6px', borderRadius: '8px', marginLeft: '6px',
+                verticalAlign: 'middle', letterSpacing: '0.02em',
+            }}
+        >
+            ✨ AI
+        </span>
+    );
+};
+
 const NewContainerForm = ({ onSaveContainer, initialData = null, onCancel }) => {
     const { data: consignees = [] } = useConsigneesQuery();
     const getLocalDate = () => {
@@ -48,13 +69,16 @@ const NewContainerForm = ({ onSaveContainer, initialData = null, onCancel }) => 
         grossWeight: '',
         netWeight: ''
     });
+
+    // Track which fields were AI-synced
+    const syncedFields = initialData?.emailSyncedFields || null;
+
     useEffect(() => {
         if (initialData) {
             setFormData({
                 ...initialData,
-                vesselVoyage: initialData.voyageNo || '', // Map old voyageNo to new vesselVoyage
-                driverName: initialData.driver || '', // Map old driver to new driverName
-                // Set defaults for new fields if not present in initialData
+                vesselVoyage: initialData.voyageNo || '',
+                driverName: initialData.driver || '',
                 buyer_name: initialData.buyer_name || '',
                 bookingNo: initialData.bookingNo || '',
                 dateDeparted: initialData.dateDeparted || '',
@@ -131,7 +155,7 @@ const NewContainerForm = ({ onSaveContainer, initialData = null, onCancel }) => 
                         <div className="form-row">
                             {initialData && (
                             <div className="form-group">
-                                <label className="label">Destination Port</label>
+                                <label className="label">Destination Port<AiSyncTag fieldName="destination" syncedFields={syncedFields} /></label>
                                 <select
                                     name="destination"
                                     className="input-field"
@@ -157,7 +181,7 @@ const NewContainerForm = ({ onSaveContainer, initialData = null, onCancel }) => 
                             </div>
                             )}
                             <div className="form-group">
-                                <label className="label">Reefer Name <span style={{color:'red'}}>*</span></label>
+                                <label className="label">Reefer Name <span style={{color:'red'}}>*</span><AiSyncTag fieldName="reeferName" syncedFields={syncedFields} /></label>
                                 <input type="text" name="reeferName" className="input-field" value={formData.reeferName} onChange={handleChange} required placeholder="e.g. COSCO" />
                             </div>
                             <div className="form-group">
@@ -171,7 +195,7 @@ const NewContainerForm = ({ onSaveContainer, initialData = null, onCancel }) => 
                             
                             {/* Seal Number included in initial registration */}
                             <div className="form-group">
-                                <label className="label">Seal No.</label>
+                                <label className="label">Seal No.<AiSyncTag fieldName="sealNo" syncedFields={syncedFields} /></label>
                                 <input type="text" name="sealNo" className="input-field" value={formData.sealNo} onChange={handleChange} />
                             </div>
 
@@ -214,11 +238,12 @@ const NewContainerForm = ({ onSaveContainer, initialData = null, onCancel }) => 
                         <h3 className="form-section-title">🎫 Booking & Details</h3>
                         <div className="form-row">
                             <div className="form-group">
-                                <label className="label">Booking Number</label>
+
+                                <label className="label">Booking Number<AiSyncTag fieldName="bookingNo" syncedFields={syncedFields} /></label>
                                 <input type="text" name="bookingNo" className="input-field" value={formData.bookingNo} onChange={handleChange} required={!!initialData} />
                             </div>
                             <div className="form-group">
-                                <label className="label">Vessel / Voyage No.</label>
+                                <label className="label">Vessel / Voyage No.<AiSyncTag fieldName="voyageNo" syncedFields={syncedFields} /></label>
                                 <input type="text" name="vesselVoyage" className="input-field" value={formData.vesselVoyage} onChange={handleChange} required={!!initialData} />
                             </div>
                             <div className="form-group">
@@ -228,7 +253,7 @@ const NewContainerForm = ({ onSaveContainer, initialData = null, onCancel }) => 
                         </div>
                         <div className="form-row">
                             <div className="form-group">
-                                <label className="label">Date of departure</label>
+                                <label className="label">Date of departure<AiSyncTag fieldName="dateDeparted" syncedFields={syncedFields} /></label>
                                 <input type="date" name="dateDeparted" className="input-field" value={formData.dateDeparted} onChange={handleChange} />
                                 <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: '4px', display: 'block' }}>Subject to change without notice due to vessel delays.</span>
                             </div>
