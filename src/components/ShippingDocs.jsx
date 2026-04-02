@@ -97,10 +97,9 @@ const ShippingDocs = () => {
     const [scanResults, setScanResults] = useState({});
     const scanningRef = useRef(new Set()); // track in-flight scans
 
-    // Only show active containers (not arrived)
+    // Show all containers for document tracking (including arrived — docs still need processing)
     const activeContainers = useMemo(() => {
         return containers
-            .filter(c => c.transit_status !== 'ARRIVED')
             .sort((a, b) => new Date(b.created_at || b.date) - new Date(a.created_at || a.date));
     }, [containers]);
 
