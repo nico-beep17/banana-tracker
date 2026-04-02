@@ -16,6 +16,7 @@ import { offlineSync } from './utils/offlineSync';
 import { Toaster, toast } from 'sonner';
 import useAppStore from './store/useAppStore';
 import { useQueryClient } from '@tanstack/react-query';
+import { useAppOperations } from './hooks/useAppOperations';
 import {
   useFarmsQuery, useArrivalsQuery, useSamplingsQuery, useContainersQuery,
   useWeeklyRatesQuery, useConsigneesQuery, useConsigneeWeeklyRatesQuery,
@@ -68,13 +69,10 @@ class ErrorBoundary extends React.Component {
 function App() {
   const {
     activeTab, setActiveTab, tabState, setTabState,
-    arrivals, setArrivals, farms, setFarms, samplings, setSamplings,
-    containers, setContainers, weeklyRates, setWeeklyRates,
-    consignees, setConsignees, consigneeWeeklyRates, setConsigneeWeeklyRates,
-    chartOfAccounts, setChartOfAccounts, journalEntries, setJournalEntries,
-    journalLines, setJournalLines, inventoryItems, setInventoryItems,
-    exchangeRate, setExchangeRate, employees, setEmployees,
-    dtrRecords, setDtrRecords, attendanceLocations, setAttendanceLocations,
+    // Data vars still read directly in App.jsx (notifications, edit-container lookup, ArrivalForm props)
+    arrivals, setArrivals, farms, setFarms, samplings, containers,
+    // UI state
+    exchangeRate, setExchangeRate,
     user, setUser, userProfile, setUserProfile, authLoading, setAuthLoading,
     isAIOpen, setIsAIOpen, lastReadNotifTime, setLastReadNotifTime
   } = useAppStore();
@@ -364,424 +362,59 @@ function App() {
     setUserProfile(null);
   };
 
-  const handleNavigate = (tabInfo) => {
-    if (typeof tabInfo === 'string') {
-      setActiveTab(tabInfo);
-      setTabState(null);
-      localStorage.setItem('lavc_active_tab', tabInfo);
-    } else {
-      setActiveTab(tabInfo.name);
-      setTabState(tabInfo.state || null);
-      localStorage.setItem('lavc_active_tab', tabInfo.name);
-    }
-  };
+  const {
+    handleNavigate,
+    handleAddArrival,
+    handleSaveContainer,
+    handleSaveContentPayload,
+    handleSealContainer,
+    handleDepartContainer,
+    handleUpdateTransitStatus,
+    handleEditStuffedPayload,
+    handleDeleteStuffedPayload,
+    handleApproveArrival,
+    handleDeleteArrival
+  } = useAppOperations();
 
-  const handleAddArrival = async (newArrivalsBatch) => {
-    try {
-      const { success, data, queued } = await offlineSync.mutate('insert', 'arrivals', newArrivalsBatch);
+  // --- Derived Analytics (computed from Zustand store data) ---
+  const approvedArrivals = arrivals.filter(a => a.approval_status === 'APPROVED');
 
-      if (success) {
-        if (queued) {
-          // Optimistic local state rendering for offline PWA
-          setArrivals(prev => [...newArrivalsBatch, ...prev]);
-          toast.info('📱 Offline Mode: Arrival logged securely and queued for background syncing when internet returns.');
-          return true;
-        } else if (data) {
-          setArrivals(prev => [...data, ...prev]);
-          return true;
-        }
-      }
-    } catch (error) {
-      console.error("Offline Sync error (Arrivals):", error);
-      toast.error(`⚠️ Database Insert Failed: ${error.message || error.details || 'Unknown constraint error.'}`);
-      return false;
-    }
-  };
-
-  const handleSaveContainer = async (containerData) => {
-    const isUpdate = containerData.id && containers.some(c => c.id === containerData.id);
-
-    // Omit columns that are purely front-end display properties or remapped
-    const {
-      vesselVoyage,
-      driverName,
-      plugInTime: _plugInTime,
-      plugOutTime: _plugOutTime,
-      ...dbPayload
-    } = containerData;
-
-    if (isUpdate) {
-      try {
-        const { success, data, queued } = await offlineSync.mutate('update', 'containers', dbPayload, { id: containerData.id });
-        if (success) {
-          const updatedContainer = { ...dbPayload, ...(data ? data[0] : {}), vesselVoyage, driverName };
-          setContainers(prev => prev.map(c => c.id === containerData.id ? { ...c, ...updatedContainer } : c));
-          if (queued) toast.info('📱 Offline Mode: Container modifications saved safely locally.');
-          handleNavigate('containers-list');
-        }
-      } catch (error) {
-        console.error("Supabase error (Update Container):", error);
-        toast.error(`Failed to update container registry in database. Error: ${error.message}`);
-      }
-    } else {
-      try {
-        const { success, data, queued } = await offlineSync.mutate('insert', 'containers', dbPayload);
-        if (success) {
-          const newContainer = { ...dbPayload, ...(data ? data[0] : {}), vesselVoyage, driverName };
-          setContainers(prev => [newContainer, ...prev]);
-          if (queued) toast.info('📱 Offline Mode: New Container correctly registered locally.');
-          handleNavigate('containers-list');
-        }
-      } catch (error) {
-        console.error("Supabase error (Create Container):", error);
-        toast.error(`Failed to create container registry in database. Error: ${error.message}`);
-      }
-    }
-  };
-
-  const handleSaveContentPayload = async (containerId, payload) => {
-    const targetContainer = containers.find(c => c.id === containerId);
-    if (!targetContainer) return;
-
-    const newTotalBoxes = (targetContainer.totalBoxes || 0) + payload.total;
-    const newStuffedItems = [...(targetContainer.stuffedItems || []), payload];
-
-    // Automatically manage started and ended times as instructed
-    const updates = { totalBoxes: newTotalBoxes, stuffedItems: newStuffedItems };
-
-    if (newStuffedItems.length === 1 && !targetContainer.timeStarted) {
-      updates.timeStarted = new Date().toISOString();
-    }
-
-    if (newTotalBoxes >= 1540 && !targetContainer.timeEnded) {
-      updates.timeEnded = new Date().toISOString();
-    }
-
-    const { data, error } = await supabase
-      .from('containers')
-      .update(updates)
-      .eq('id', containerId)
-      .select();
-
-    if (error) {
-      console.error("Supabase error (Stuffed Items):", error);
-      toast.error("Failed to save stuffing payload data.");
-      return;
-    }
-
-    if (data && data[0]) {
-      setContainers(prev => prev.map(c => c.id === containerId ? data[0] : c));
-      handleNavigate('containers-list');
-    }
-  };
-
-  const handleSealContainer = async (containerId) => {
-    const timeSealed = new Date().toISOString();
-
-    // As the timeSealed native column might not be initialized on all remote databases 
-    // until next major migration, we explicitly update transit_status instead, 
-    // and hold timeSealed in memory/app state for seamless UI transitioning.
-    const { data, error } = await supabase
-      .from('containers')
-      .update({ transit_status: 'SEALED' })
-      .eq('id', containerId)
-      .select();
-
-    if (error) {
-      console.error("Supabase error (Seal Container):", error);
-      toast.error("Failed to seal container.");
-      return;
-    }
-
-    if (data && data[0]) {
-      // Patch the local state with timeSealed so the UI reacts correctly
-      setContainers(prev => prev.map(c => c.id === containerId ? { ...data[0], timeSealed } : c));
-      logAudit('SEAL_CONTAINER', 'container', containerId, { timeSealed });
-    }
-  };
-
-  const handleDepartContainer = async (containerId) => {
-    const timeDeparted = new Date().toISOString();
-    const { data, error } = await supabase
-      .from('containers')
-      .update({ timeDeparted })
-      .eq('id', containerId)
-      .select();
-
-    if (error) {
-      console.error("Supabase error (Depart Container):", error);
-      toast.error("Failed to run departure dispatch command.");
-      return;
-    }
-
-    if (data && data[0]) {
-      setContainers(prev => prev.map(c => c.id === containerId ? data[0] : c));
-      logAudit('DEPART_CONTAINER', 'container', containerId, { timeDeparted });
-    }
-  };
-
-  const handleUpdateTransitStatus = async (containerId, newStatus) => {
-    const transit_updated_at = new Date().toISOString();
-    const { data, error } = await supabase
-      .from('containers')
-      .update({ transit_status: newStatus, transit_updated_at })
-      .eq('id', containerId)
-      .select();
-
-    if (error) {
-      console.error("Supabase error (Update Transit):", error);
-      toast.error("Failed to update transit status.");
-      return;
-    }
-
-    if (data && data[0]) {
-      setContainers(prev => prev.map(c => c.id === containerId ? data[0] : c));
-    }
-  };
-
-  // --- Stuffed Payload Override Handlers ---
-  const handleEditStuffedPayload = async (containerId, payloadId, newPayloadData, operatorName) => {
-    const targetContainer = containers.find(c => c.id === containerId);
-    if (!targetContainer || !targetContainer.stuffedItems) return;
-
-    const oldPayload = targetContainer.stuffedItems.find(p => p.id === payloadId);
-    if (!oldPayload) { toast.error('Payload not found.'); return; }
-
-    // Write audit log
-    await supabase.from('override_audit_logs').insert({
-      action: 'EDIT',
-      entity_type: 'STUFFED_PAYLOAD',
-      entity_id: payloadId,
-      batch_id: null,
-      container_id: containerId,
-      old_data: oldPayload,
-      new_data: newPayloadData,
-      operator_name: operatorName
-    });
-
-    // Replace the payload in the array
-    const updatedItems = targetContainer.stuffedItems.map(p =>
-      p.id === payloadId ? { ...p, data: newPayloadData.data, total: newPayloadData.total } : p
-    );
-    const newTotalBoxes = updatedItems.reduce((sum, p) => sum + (p.total || 0), 0);
-
-    const { data, error } = await supabase
-      .from('containers')
-      .update({ stuffedItems: updatedItems, totalBoxes: newTotalBoxes })
-      .eq('id', containerId)
-      .select();
-
-    if (error) {
-      console.error('Supabase error (Edit Payload):', error);
-      toast.error(`Failed to update payload: ${error.message}`);
-      return;
-    }
-    if (data && data[0]) {
-      setContainers(prev => prev.map(c => c.id === containerId ? data[0] : c));
-    }
-  };
-
-  const handleDeleteStuffedPayload = async (containerId, payloadId, operatorName) => {
-    const targetContainer = containers.find(c => c.id === containerId);
-    if (!targetContainer || !targetContainer.stuffedItems) return;
-
-    const oldPayload = targetContainer.stuffedItems.find(p => p.id === payloadId);
-    if (!oldPayload) { toast.error('Payload not found.'); return; }
-
-    if (!window.confirm(`Delete payload ${payloadId} (${oldPayload.total} boxes)? This cannot be undone.`)) return;
-
-    // Write audit log
-    await supabase.from('override_audit_logs').insert({
-      action: 'DELETE',
-      entity_type: 'STUFFED_PAYLOAD',
-      entity_id: payloadId,
-      batch_id: null,
-      container_id: containerId,
-      old_data: oldPayload,
-      new_data: null,
-      operator_name: operatorName
-    });
-
-    // Remove the payload from the array
-    const updatedItems = targetContainer.stuffedItems.filter(p => p.id !== payloadId);
-    const newTotalBoxes = updatedItems.reduce((sum, p) => sum + (p.total || 0), 0);
-
-    const { data, error } = await supabase
-      .from('containers')
-      .update({ stuffedItems: updatedItems, totalBoxes: newTotalBoxes })
-      .eq('id', containerId)
-      .select();
-
-    if (error) {
-      console.error('Supabase error (Delete Payload):', error);
-      toast.error(`Failed to delete payload: ${error.message}`);
-      return;
-    }
-    if (data && data[0]) {
-      setContainers(prev => prev.map(c => c.id === containerId ? data[0] : c));
-    }
-  };
-
-  // Calculate high level metrics
-  // ONLY count APPROVED arrivals
-  const approvedArrivals = arrivals.filter(arr => arr.approval_status === 'APPROVED');
-
-  const todayStr = new Date().toISOString().split('T')[0]; // e.g. '2026-03-23'
-
-  const todayArrivals = approvedArrivals.filter(arr => {
-    const packed = arr.dateOfPacking || arr.dateTimeEncoded?.split('T')[0];
-    return packed === todayStr;
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayArrivals = approvedArrivals.filter(a => {
+    const d = new Date(a.dateTimeArrive || a.dateTimeEncoded || 0);
+    return d >= todayStart;
   });
+  const totalBoxesToday = todayArrivals.reduce((s, a) => s + (Number(a.quantity) || 0), 0);
+  const uniqueFarms = new Set(todayArrivals.map(a => a.farmCode).filter(Boolean));
 
-  const totalBoxesToday = todayArrivals.reduce((sum, arr) => sum + (arr.quantity || 0), 0);
-  const totalBoxesAllTime = approvedArrivals.reduce((sum, arr) => sum + (arr.quantity || 0), 0);
+  const totalBoxesAllTime = approvedArrivals.reduce((s, a) => s + (Number(a.quantity) || 0), 0);
+  const classATotal = approvedArrivals
+    .filter(a => a.typeId && a.typeId.startsWith('classA'))
+    .reduce((s, a) => s + (Number(a.quantity) || 0), 0);
+  const classBTotal = approvedArrivals
+    .filter(a => a.typeId && a.typeId.startsWith('classB'))
+    .reduce((s, a) => s + (Number(a.quantity) || 0), 0);
 
-  const classATotal = approvedArrivals.reduce((sum, arr) => {
-    const isA = arr.typeId ? arr.typeId.startsWith('classA') : (arr.ccClass === 'A' || arr.ccClass === 'Class A' || arr.ccClass === 'SH' || arr.ccClass === 'A (Cluster)');
-    return isA ? sum + (arr.quantity || 0) : sum;
-  }, 0);
-  const classBTotal = approvedArrivals.reduce((sum, arr) => {
-    const isB = arr.typeId ? arr.typeId.startsWith('classB') : (arr.ccClass === 'B' || arr.ccClass === 'Class B' || arr.ccClass === 'B (Cluster)' || arr.ccClass === 'B (Finger Pack)');
-    return isB ? sum + (arr.quantity || 0) : sum;
-  }, 0);
-
-  // Calculate unique farms based on the new 'farmName' property
-  const uniqueFarms = new Set(approvedArrivals.map(arr => arr.farmName));
-
-  const calculateRemainingInventory = () => {
-    const inventory = {};
-
-    // Initial arrival quantities (ONLY APPROVED)
-    approvedArrivals.forEach(arr => {
-      if (arr.typeId) {
-        inventory[arr.typeId] = (inventory[arr.typeId] || 0) + arr.quantity;
-      }
+  // Remaining inventory = all approved boxes minus what's been stuffed into containers
+  const stuffedByType = {};
+  containers.forEach(c => {
+    (c.stuffedItems || []).forEach(payload => {
+      Object.entries(payload.data || {}).forEach(([typeId, qty]) => {
+        stuffedByType[typeId] = (stuffedByType[typeId] || 0) + (Number(qty) || 0);
+      });
     });
-
-    // Subtract stuffed quantities
-    containers.forEach(container => {
-      if (container.stuffedItems) {
-        container.stuffedItems.forEach(payload => {
-          if (payload.data) {
-            Object.keys(payload.data).forEach(classGroupName => {
-              const classObj = payload.data[classGroupName];
-              Object.keys(classObj).forEach(sizeKey => {
-                const val = Number(classObj[sizeKey]) || 0;
-                if (val > 0) {
-                  const typeId = `${classGroupName}.${sizeKey}`;
-                  if (inventory[typeId] !== undefined) {
-                    inventory[typeId] -= val;
-                  }
-                }
-              });
-            });
-          }
-        });
-      }
-    });
-    return inventory;
-  };
-
-  const handleApproveArrival = async (arrivalId, batchId) => {
-    // ── Step 1: Fetch the rows we're about to approve so we can read farmCode + date ──
-    let fetchQuery = supabase.from('arrivals').select('*');
-    if (batchId) fetchQuery = fetchQuery.eq('batchId', batchId);
-    else fetchQuery = fetchQuery.eq('id', arrivalId);
-    const { data: rowsToApprove, error: fetchErr } = await fetchQuery;
-    if (fetchErr || !rowsToApprove?.length) {
-      toast.error(`Failed to fetch arrival rows: ${fetchErr?.message || 'Unknown error'}`);
-      return;
+  });
+  const approvedByType = {};
+  approvedArrivals.forEach(a => {
+    if (a.typeId) {
+      approvedByType[a.typeId] = (approvedByType[a.typeId] || 0) + (Number(a.quantity) || 0);
     }
-
-    // ── Step 2: Resolve locked_rate for each row from weekly_rates ──
-    // Use the arrival's packing date to determine the week number
-    const getWeekNum = (dateStr) => {
-      const d = new Date(dateStr); const s = new Date(d.getFullYear(), 0, 1);
-      return { week: Math.ceil((d.getDay() + 1 + Math.floor((d - s) / 86400000)) / 7), year: d.getFullYear() };
-    };
-
-    // typeId → rates_matrix key mapping
-    const TYPE_TO_RATE_KEY = {
-      'classA.rha4': 'classA.rha4', 'classA.rha5': 'classA.rha5', 'classA.rha6': 'classA.rha6',
-      'classA.sha7': 'classA.sha7', 'classA.sha8': 'classA.sha8', 'classA.sha9': 'classA.sha9',
-      'classA.cla':  'classA.cla',
-      'classB.rhb4': 'classB.rhb4', 'classB.rhb5': 'classB.rhb5', 'classB.rhb6': 'classB.rhb6',
-      'classB.shb7': 'classB.shb7', 'classB.shb8': 'classB.shb8', 'classB.shb9': 'classB.shb9',
-      'classB.clb':  'classB.clb',  'classB.fp':   'classB.fp',
-    };
-
-    // Build per-row updates with locked_rate
-    const rowUpdates = rowsToApprove.map(row => {
-      const packDate = row.dateOfPacking || row.dateTimeArrive;
-      const { week, year } = packDate ? getWeekNum(packDate) : { week: null, year: null };
-
-      // Find matching rate record in state
-      let lockedRate = 0;
-      if (week && year && row.farmCode) {
-        const farm = farms.find(f => f.farmCode === row.farmCode);
-        if (farm) {
-          const rateRecord = weeklyRates.find(r =>
-            r.farm_id === farm.id && r.year === year && r.week_number === week
-          );
-          if (rateRecord?.rates_matrix && row.typeId && TYPE_TO_RATE_KEY[row.typeId]) {
-            lockedRate = Number(rateRecord.rates_matrix[TYPE_TO_RATE_KEY[row.typeId]] || 0);
-          }
-        }
-      }
-      return { ...row, locked_rate: lockedRate, approval_status: 'APPROVED', approved_by: user?.id };
-    });
-
-    // ── Step 3: Batch-update all rows in one upsert ──
-    const { data, error } = await supabase
-      .from('arrivals')
-      .upsert(rowUpdates, { onConflict: 'id' })
-      .select();
-
-    if (error) {
-      console.error("Supabase error (Approve Arrival):", error);
-      alert(`Failed to approve arrival: ${error.message || 'Unknown error'}`);
-      return;
-    }
-
-    if (data && data.length > 0) {
-      const updatedMap = new Map(data.map(item => [item.id, item]));
-      setArrivals(prev => prev.map(a => updatedMap.has(a.id) ? updatedMap.get(a.id) : a));
-      logAudit('APPROVE_ARRIVAL', 'arrival', batchId || arrivalId, { count: data.length });
-
-      // Show rate info in toast if available
-      const totalGross = data.reduce((s, r) => s + (Number(r.quantity || 0) * Number(r.locked_rate || 0)), 0);
-      if (totalGross > 0) {
-        showToast?.(`✅ Batch approved — ₱${totalGross.toLocaleString(undefined, { minimumFractionDigits: 2 })} locked`, 'success');
-      }
-    }
-  };
-
-  const handleDeleteArrival = async (arrivalId, batchId) => {
-    if (!window.confirm('Are you sure you want to delete this arrival batch? This cannot be undone.')) return;
-
-    let query = supabase.from('arrivals').delete();
-    if (batchId) {
-      query = query.eq('batchId', batchId);
-    } else {
-      query = query.eq('id', arrivalId);
-    }
-
-    const { error } = await query;
-    if (error) {
-      console.error('Supabase error (Delete Arrival):', error);
-      alert(`Failed to delete arrival: ${error.message}`);
-      return;
-    }
-
-    if (batchId) {
-      setArrivals(prev => prev.filter(a => a.batchId !== batchId));
-    } else {
-      setArrivals(prev => prev.filter(a => a.id !== arrivalId));
-    }
-    logAudit('DELETE_ARRIVAL', 'arrival', batchId || arrivalId);
-  };
-
-  const remainingInventoryDetailed = calculateRemainingInventory();
+  });
+  const remainingInventoryDetailed = {};
+  Object.keys(approvedByType).forEach(typeId => {
+    remainingInventoryDetailed[typeId] = Math.max(0, (approvedByType[typeId] || 0) - (stuffedByType[typeId] || 0));
+  });
 
   const remainingTotal = Object.values(remainingInventoryDetailed).reduce((sum, val) => sum + val, 0);
   const remainingClassA = Object.keys(remainingInventoryDetailed).filter(k => k.startsWith('classA')).reduce((sum, k) => sum + remainingInventoryDetailed[k], 0);
@@ -819,7 +452,6 @@ function App() {
 
   useEffect(() => {
     const now = Date.now();
-    const TODAY_START = new Date().setHours(0, 0, 0, 0);
     const notifs = [];
 
     // 1. Daily Summary — only if there was actual activity today
@@ -930,65 +562,38 @@ function App() {
             }}
             userProfile={userProfile}
             onNavigate={handleNavigate}
-            arrivals={arrivals}
-            containers={containers}
-            samplings={samplings}
-            farms={farms}
-            weeklyRates={weeklyRates}
           />
         )}
 
         {activeTab === 'log-arrival' && (
           <ArrivalForm
-            arrivals={arrivals}
             onApproveArrival={handleApproveArrival}
             onDeleteArrival={handleDeleteArrival}
-            setArrivals={setArrivals}
             userProfile={userProfile}
             onAddArrival={handleAddArrival}
-            farms={farms}
-            weeklyRates={weeklyRates}
-            samplings={samplings}
-            setSamplings={setSamplings}
             onNavigate={handleNavigate}
           />
         )}
 
         {activeTab === 'sampling' && (
           <Sampling
-            farms={farms}
-            samplings={samplings}
-            setSamplings={setSamplings}
             onNavigate={handleNavigate}
             initialFarmCode={tabState?.farmCode}
           />
         )}
 
         {activeTab === 'farms' && (
-          <FarmsAndGrowers
-            farms={farms}
-            setFarms={setFarms}
-            weeklyRates={weeklyRates}
-            setWeeklyRates={setWeeklyRates}
-            arrivals={arrivals}
-            samplings={samplings}
-          />
+          <FarmsAndGrowers />
         )}
 
         {activeTab === 'consignees' && (
-          <Consignees
-            consignees={consignees}
-            setConsignees={setConsignees}
-            consigneeWeeklyRates={consigneeWeeklyRates}
-            setConsigneeWeeklyRates={setConsigneeWeeklyRates}
-          />
+          <Consignees />
         )}
 
         {activeTab === 'new-container' && (
           <NewContainerForm
             onSaveContainer={handleSaveContainer}
             onCancel={() => handleNavigate('containers-list')}
-            consignees={consignees}
           />
         )}
 
@@ -997,14 +602,12 @@ function App() {
             onSaveContainer={handleSaveContainer}
             initialData={containers.find(c => c.id === tabState.containerId)}
             onCancel={() => handleNavigate('containers-list')}
-            consignees={consignees}
           />
         )}
 
         {activeTab === 'container-stuffing-grid' && tabState?.containerId && (
           <ContainerStuffingGrid
             containerId={tabState.containerId}
-            containers={containers}
             remainingInventory={inventoryMetrics}
             onSavePayload={handleSaveContentPayload}
             onCancel={() => handleNavigate('containers-list')}
@@ -1013,16 +616,12 @@ function App() {
 
         {activeTab === 'inventory' && (
           <MaterialsInventory
-            inventoryItems={inventoryItems}
-            setInventoryItems={setInventoryItems}
             userProfile={userProfile}
-            farms={farms}
           />
         )}
 
         {activeTab === 'containers-list' && (
           <ContainersList
-            containers={containers}
             onNavigate={handleNavigate}
             onDepartContainer={handleDepartContainer}
             onSealContainer={handleSealContainer}
@@ -1032,37 +631,19 @@ function App() {
         )}
 
         {activeTab === 'reports' && (
-          <Reports
-            arrivals={arrivals}
-            containers={containers}
-            samplings={samplings}
-          />
+          <Reports />
         )}
 
         {activeTab === 'accounting' && (
           <Accounting
-            arrivals={arrivals}
-            samplings={samplings}
-            containers={containers}
-            farms={farms}
-            weeklyRates={weeklyRates}
-            consignees={Array.isArray(consignees) ? consignees : []}
-            consigneeWeeklyRates={Array.isArray(consigneeWeeklyRates) ? consigneeWeeklyRates : []}
             userProfile={userProfile}
             exchangeRate={exchangeRate}
             setExchangeRate={setExchangeRate}
-            chartOfAccounts={Array.isArray(chartOfAccounts) ? chartOfAccounts : []}
-            journalEntries={Array.isArray(journalEntries) ? journalEntries : []}
-            journalLines={Array.isArray(journalLines) ? journalLines : []}
           />
         )}
 
         {activeTab === 'payroll' && (
           <Payroll
-            employees={Array.isArray(employees) ? employees : []}
-            dtrRecords={Array.isArray(dtrRecords) ? dtrRecords : []}
-            attendanceLocations={Array.isArray(attendanceLocations) ? attendanceLocations : []}
-            fetchData={fetchData}
             initialTab={tabState?.tab}
             userProfile={userProfile}
           />
@@ -1070,16 +651,12 @@ function App() {
 
         {activeTab === 'shipment-tracker' && (
           <ShipmentTracker
-            containers={containers}
             onUpdateTransitStatus={handleUpdateTransitStatus}
           />
         )}
 
         {activeTab === 'shipping-docs' && (
-          <ShippingDocs
-            containers={containers}
-            setContainers={setContainers}
-          />
+          <ShippingDocs />
         )}
 
         {activeTab === 'user-management' && (
@@ -1119,11 +696,6 @@ function App() {
 
         {isAIOpen && (
           <AIAssistantWidget
-            arrivals={arrivals}
-            containers={containers}
-            farms={farms}
-            weeklyRates={weeklyRates}
-            samplings={samplings}
             inventoryMetrics={inventoryMetrics}
             totalBoxesToday={totalBoxesToday}
             advancedAnalytics={advancedAnalytics}
