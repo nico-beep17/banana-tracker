@@ -57,14 +57,15 @@ const CERT_OF_ORIGIN_LIST = [
     { key: 'ctcPhyto', label: 'CTC PHYTO' }
 ];
 
-// Inner component for the actual Google Login button avoiding provider boundary issues
-const GoogleAuthButton = ({ setGmailToken }) => {
+// Inner component for the actual Google Login button
+const GoogleAuthButton = ({ onToken }) => {
     const login = useGoogleLogin({
         scope: 'https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.readonly',
         onSuccess: tokenResponse => {
-            console.log('Google Auth Success:', tokenResponse);
-            setGmailToken(tokenResponse.access_token);
-            toast.success("Successfully connected to LFJ Google Workspace!");
+            const token = tokenResponse.access_token;
+            sessionStorage.setItem('lavc_company_gmail_token', token);
+            onToken(token);
+            toast.success("Connected to LFJ Google Workspace!");
         },
         onError: error => {
             console.error('Google Auth Failed:', error);
@@ -73,9 +74,9 @@ const GoogleAuthButton = ({ setGmailToken }) => {
     });
 
     return (
-        <button className="btn-primary" onClick={() => login()} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#3b82f6', border: 'none', padding: '0.6rem 1.2rem', borderRadius: '8px' }}>
-            <Mails size={18} />
-            Connect Google (LFJ)
+        <button className="btn-primary" onClick={() => login()} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#3b82f6', border: 'none', padding: '0.5rem 1rem', borderRadius: '8px', fontSize: '0.85rem' }}>
+            <Mails size={16} />
+            Connect Company Gmail
         </button>
     );
 };
@@ -87,9 +88,9 @@ const ShippingDocs = () => {
     const [expandedIds, setExpandedIds] = useState(new Set());
     const [updating, setUpdating] = useState(false);
     
-    // Google Client ID auto-loaded from env
+    // Auto-load company Gmail token from sessionStorage (persists across tab switches)
     const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
-    const [gmailToken, setGmailToken] = useState(null);
+    const [gmailToken, setGmailToken] = useState(() => sessionStorage.getItem('lavc_company_gmail_token') || null);
 
     // Only show active containers (not arrived)
     const activeContainers = useMemo(() => {
@@ -170,41 +171,31 @@ const ShippingDocs = () => {
                 </div>
             </header>
 
-            {/* Google Workspace Integration Panel — Simplified */}
+            {/* Google Workspace — auto-connected status bar */}
             <section className="sd-workspace-panel shadow-sm">
-                <div className="sd-workspace-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.5rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-                        <div style={{ background: '#eff6ff', padding: '0.5rem', borderRadius: '8px', color: '#3b82f6' }}>
-                            <Mails size={24} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.85rem 1.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <div style={{ background: gmailToken ? '#ecfdf5' : '#eff6ff', padding: '0.45rem', borderRadius: '8px', color: gmailToken ? '#10b981' : '#3b82f6' }}>
+                            <Mails size={20} />
                         </div>
                         <div>
-                            <h3 style={{ margin: 0, fontSize: '1.05rem', color: 'var(--text-primary)' }}>Google Workspace Integration</h3>
-                            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Connect LFJ Gmail to automate Packplan & Shipping Instructions</p>
+                            <span style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)' }}>LFJ Google Workspace</span>
+                            <span style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', marginLeft: '0.5rem' }}>
+                                {gmailToken ? '• Gmail API active' : '• Not connected'}
+                            </span>
                         </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         {gmailToken ? (
-                            <>
-                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#10b981', fontSize: '0.85rem', fontWeight: 600 }}>
-                                    <CheckCircle size={16} /> Connected
-                                </span>
-                                <button 
-                                    className="btn-secondary" 
-                                    style={{ padding: '0.35rem 0.8rem', fontSize: '0.8rem', color: '#ef4444', borderColor: '#fca5a5' }}
-                                    onClick={() => { setGmailToken(null); toast.info('Disconnected from Google Workspace.'); }}
-                                >
-                                    Disconnect
-                                </button>
-                            </>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#10b981', fontSize: '0.85rem', fontWeight: 600 }}>
+                                <CheckCircle size={16} /> Connected
+                            </span>
                         ) : googleClientId ? (
                             <GoogleOAuthProvider clientId={googleClientId}>
-                                <GoogleAuthButton setGmailToken={setGmailToken} />
+                                <GoogleAuthButton onToken={setGmailToken} />
                             </GoogleOAuthProvider>
                         ) : (
-                            <span style={{ fontSize: '0.85rem', color: '#ef4444', fontWeight: 600 }}>
-                                <AlertCircle size={16} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
-                                Missing VITE_GOOGLE_CLIENT_ID
-                            </span>
+                            <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>OAuth not configured</span>
                         )}
                     </div>
                 </div>
