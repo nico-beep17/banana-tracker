@@ -153,19 +153,22 @@ const ShippingDocs = () => {
     }, [gmailToken]);
 
     // Auto-fill vessel/shipping info from scanned emails into the container record
+    // ALWAYS overwrites — newer emails may have corrections, delays, vessel changes
     const autoFillVesselInfo = async (containerId, vesselInfo) => {
         const container = containers.find(c => c.id === containerId);
         if (!container) return;
 
         const updates = {};
-        if (vesselInfo.vesselName && !container.reeferName) updates.reeferName = vesselInfo.vesselName;
-        if (vesselInfo.voyageNo && !container.voyageNo) updates.voyageNo = vesselInfo.voyageNo;
-        if (vesselInfo.eta && !container.eta) updates.eta = vesselInfo.eta;
-        if (vesselInfo.etd && !container.etd) updates.etd = vesselInfo.etd;
-        if (vesselInfo.shippingLine && !container.shippingLine) updates.shippingLine = vesselInfo.shippingLine;
-        if (vesselInfo.sealNo && !container.sealNo) updates.sealNo = vesselInfo.sealNo;
+        const v = (field) => vesselInfo[field]?.value; // Extract .value from { value, source, date }
+        
+        if (v('vesselName')) updates.reeferName = v('vesselName');
+        if (v('voyageNo')) updates.voyageNo = v('voyageNo');
+        if (v('eta')) updates.eta = v('eta');
+        if (v('etd')) updates.etd = v('etd');
+        if (v('shippingLine')) updates.shippingLine = v('shippingLine');
+        if (v('sealNo')) updates.sealNo = v('sealNo');
 
-        if (Object.keys(updates).length === 0) return; // Nothing new to fill
+        if (Object.keys(updates).length === 0) return;
 
         const { error } = await supabase
             .from('containers')
@@ -175,7 +178,7 @@ const ShippingDocs = () => {
         if (!error) {
             queryClient.invalidateQueries({ queryKey: ['containers'] });
             const fields = Object.keys(updates).join(', ');
-            toast.success(`Auto-filled from email: ${fields}`, { duration: 4000 });
+            toast.success(`Updated from latest email: ${fields}`, { duration: 4000 });
         }
     };
 
@@ -425,10 +428,10 @@ const ShippingDocs = () => {
                                             <h4>{container.destination || 'Unassigned Destination'} | {container.brand}</h4>
                                             <span style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>
                                                 {container.transit_status || 'HUB'}
-                                                {scan?.vesselInfo?.vesselName && (
+                                                {scan?.vesselInfo?.vesselName?.value && (
                                                     <span style={{ marginLeft: '0.5rem', color: '#7c3aed', fontWeight: 600 }}>
-                                                        • MV {scan.vesselInfo.vesselName}
-                                                        {scan.vesselInfo.voyageNo && ` V.${scan.vesselInfo.voyageNo}`}
+                                                        • MV {scan.vesselInfo.vesselName.value}
+                                                        {scan.vesselInfo.voyageNo?.value && ` V.${scan.vesselInfo.voyageNo.value}`}
                                                     </span>
                                                 )}
                                             </span>
@@ -468,13 +471,13 @@ const ShippingDocs = () => {
                                             {scan?.vesselInfo && Object.keys(scan.vesselInfo).length > 0 && (
                                                 <div className="sd-vessel-banner">
                                                     <Sparkles size={16} />
-                                                    <span>Auto-detected from emails:</span>
-                                                    {scan.vesselInfo.vesselName && <span className="sd-vessel-tag">🚢 {scan.vesselInfo.vesselName}</span>}
-                                                    {scan.vesselInfo.voyageNo && <span className="sd-vessel-tag">📋 VOY {scan.vesselInfo.voyageNo}</span>}
-                                                    {scan.vesselInfo.eta && <span className="sd-vessel-tag">📅 ETA {scan.vesselInfo.eta}</span>}
-                                                    {scan.vesselInfo.etd && <span className="sd-vessel-tag">🚀 ETD {scan.vesselInfo.etd}</span>}
-                                                    {scan.vesselInfo.shippingLine && <span className="sd-vessel-tag">🏢 {scan.vesselInfo.shippingLine}</span>}
-                                                    {scan.vesselInfo.sealNo && <span className="sd-vessel-tag">🔒 Seal {scan.vesselInfo.sealNo}</span>}
+                                                    <span>Auto-detected from latest emails:</span>
+                                                    {scan.vesselInfo.vesselName?.value && <span className="sd-vessel-tag">🚢 {scan.vesselInfo.vesselName.value}</span>}
+                                                    {scan.vesselInfo.voyageNo?.value && <span className="sd-vessel-tag">📋 VOY {scan.vesselInfo.voyageNo.value}</span>}
+                                                    {scan.vesselInfo.eta?.value && <span className="sd-vessel-tag">📅 ETA {scan.vesselInfo.eta.value}</span>}
+                                                    {scan.vesselInfo.etd?.value && <span className="sd-vessel-tag">🚀 ETD {scan.vesselInfo.etd.value}</span>}
+                                                    {scan.vesselInfo.shippingLine?.value && <span className="sd-vessel-tag">🏢 {scan.vesselInfo.shippingLine.value}</span>}
+                                                    {scan.vesselInfo.sealNo?.value && <span className="sd-vessel-tag">🔒 Seal {scan.vesselInfo.sealNo.value}</span>}
                                                 </div>
                                             )}
 

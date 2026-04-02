@@ -125,7 +125,7 @@ export async function searchGmailForContainer(token, reeferNo) {
     
     const validMessages = messageDetails.filter(Boolean);
     
-    // Process each message
+    // Sort newest first — corrections/updates in later emails take priority
     const processedMessages = validMessages.map(msg => {
       const headers = msg.payload?.headers || [];
       const getHeader = (name) => headers.find(h => h.name.toLowerCase() === name.toLowerCase())?.value || '';
@@ -149,17 +149,22 @@ export async function searchGmailForContainer(token, reeferNo) {
       // Strip HTML tags for pattern matching
       bodyText = bodyText.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
       
+      const dateStr = getHeader('Date');
+      let timestamp = 0;
+      try { timestamp = new Date(dateStr).getTime() || 0; } catch(e) {}
+      
       return {
         id: msg.id,
         threadId: msg.threadId,
         subject: getHeader('Subject'),
         from: getHeader('From'),
-        date: getHeader('Date'),
+        date: dateStr,
+        timestamp,
         snippet: msg.snippet || '',
         bodyText,
         hasAttachments: (msg.payload?.parts || []).some(p => p.filename && p.filename.length > 0),
       };
-    });
+    }).sort((a, b) => b.timestamp - a.timestamp); // Newest first
     
     // Match emails to checklist items
     const matchedDocs = {};
@@ -200,16 +205,19 @@ export async function searchGmailForContainer(token, reeferNo) {
       }
     }
     
-    // Extract vessel/container info from all emails
+    // Extract vessel/container info — newest email first, so latest corrections win
+    // Since processedMessages is already sorted newest-first, the first match is the most recent
     const vesselInfo = {};
     for (const email of processedMessages) {
       const fullText = `${email.subject} ${email.bodyText}`;
       for (const [field, patterns] of Object.entries(VESSEL_PATTERNS)) {
-        if (vesselInfo[field]) continue; // Already found
         for (const pattern of patterns) {
           const match = fullText.match(pattern);
           if (match && match[1]) {
-            vesselInfo[field] = match[1].trim();
+            // Always take the first (newest) match found — don't overwrite with older emails
+            if (!vesselInfo[field]) {
+              vesselInfo[field] = { value: match[1].trim(), source: email.subject, date: email.date };
+            }
             break;
           }
         }
