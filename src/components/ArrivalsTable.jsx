@@ -5,6 +5,7 @@ import ArrivalManifest from './ArrivalManifest';
 import PinVerifyModal from './PinVerifyModal';
 import { supabase } from '../supabaseClient';
 import './ArrivalsTable.css';
+import { canPerformAction } from '../utils/permissions';
 import { useQueryClient } from '@tanstack/react-query';
 
 const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, userProfile, samplings = [] }) => {
@@ -377,7 +378,8 @@ const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, userP
                     <tbody>
                         {paginatedArrivals.map((arrival, index) => {
                             const isApproved = arrival.approval_status === 'APPROVED';
-                            const canApprove = userProfile?.role === 'Administrator' || userProfile?.role === 'Admin / Developer' || userProfile?.role === 'Hub Operations In-Charge' || userProfile?.role === 'Data Management Supervisor and Hub operations in-charge' || userProfile?.role === 'Production Supervisor';
+                            const canApprove = canPerformAction(userProfile, 'action:approve-arrival');
+                            const canDelete = canPerformAction(userProfile, 'action:delete-arrival');
                             const confirmKey = arrival.batchId || arrival.id;
                             const isConfirming = confirmApprovalId === confirmKey;
 
@@ -440,7 +442,7 @@ const ArrivalsTable = ({ arrivals = [], onApproveArrival, onDeleteArrival, userP
                                                 >
                                                     {isApproved ? '🔒 Edit' : '✏️ Edit'}
                                                 </button>
-                                                {onDeleteArrival && (
+                                                {canDelete && onDeleteArrival && (
                                                     <button
                                                         onClick={() => handleDeleteClick(arrival)}
                                                         style={{

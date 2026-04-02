@@ -21,6 +21,20 @@ const ALL_MODULES = [
     { key: 'user-management',  label: 'Users & Roles (Admin)',   icon: '🛡️' },
 ];
 
+// Granular action-level permissions
+const ALL_ACTIONS = [
+    { key: 'action:approve-arrival',   label: 'Approve Arrivals',        icon: '✅', group: 'Arrivals' },
+    { key: 'action:delete-arrival',    label: 'Delete Arrivals',         icon: '🗑️', group: 'Arrivals' },
+    { key: 'action:stuff-container',   label: 'Stuff Containers',        icon: '📥', group: 'Containers' },
+    { key: 'action:seal-container',    label: 'Seal Containers',         icon: '🔒', group: 'Containers' },
+    { key: 'action:depart-container',  label: 'Depart Containers',       icon: '🚛', group: 'Containers' },
+    { key: 'action:edit-payload',      label: 'Edit Stuffed Payloads',   icon: '✏️', group: 'Containers' },
+    { key: 'action:delete-payload',    label: 'Delete Stuffed Payloads', icon: '❌', group: 'Containers' },
+    { key: 'action:register-container',label: 'Register New Containers', icon: '🆕', group: 'Containers' },
+];
+
+const ALL_ACTION_KEYS = ALL_ACTIONS.map(a => a.key);
+
 const ROLES = [
     'Pending',
     'Guest',
@@ -38,21 +52,21 @@ const ROLES = [
     'Hub Operations In-Charge',
 ];
 
-// Default module access per role (used as fallback when no custom permissions saved)
+// Default module + action access per role
 const DEFAULT_ACCESS = {
-    'Administrator': ALL_MODULES.map(m => m.key),
-    'Admin / Developer': ALL_MODULES.map(m => m.key),
-    'Hub Receiver': ['dashboard', 'log-arrival', 'containers-list', 'sampling'],
-    'Production Manager': ['dashboard', 'log-arrival', 'farms', 'sampling', 'reports', 'containers-list', 'inventory'],
-    'Production Supervisor': ['dashboard', 'log-arrival', 'farms', 'sampling'],
+    'Administrator': [...ALL_MODULES.map(m => m.key), ...ALL_ACTION_KEYS],
+    'Admin / Developer': [...ALL_MODULES.map(m => m.key), ...ALL_ACTION_KEYS],
+    'Hub Receiver': ['dashboard', 'log-arrival', 'containers-list', 'sampling', 'action:stuff-container'],
+    'Production Manager': ['dashboard', 'log-arrival', 'farms', 'sampling', 'reports', 'containers-list', 'inventory', 'action:approve-arrival', 'action:stuff-container', 'action:seal-container', 'action:depart-container', 'action:register-container', 'action:edit-payload', 'action:delete-payload'],
+    'Production Supervisor': ['dashboard', 'log-arrival', 'farms', 'sampling', 'action:approve-arrival', 'action:stuff-container'],
     'Quality Manager': ['dashboard', 'sampling', 'reports'],
     'Quality Supervisor': ['dashboard', 'sampling'],
     'Accounting Manager': ['dashboard', 'consignees', 'accounting', 'payroll', 'reports'],
     'Accounting Staff': ['dashboard', 'consignees', 'accounting', 'reports'],
     'HR Manager': ['dashboard', 'payroll'],
-    'Logistics Supervisor': ['dashboard', 'containers-list', 'shipment-tracker'],
+    'Logistics Supervisor': ['dashboard', 'containers-list', 'shipment-tracker', 'action:seal-container', 'action:depart-container'],
     'Shipping Documentation Supervisor': ['dashboard', 'consignees', 'containers-list', 'shipment-tracker', 'shipping-docs'],
-    'Hub Operations In-Charge': ['dashboard', 'containers-list', 'inventory', 'shipment-tracker'],
+    'Hub Operations In-Charge': ['dashboard', 'containers-list', 'inventory', 'shipment-tracker', 'action:approve-arrival', 'action:stuff-container', 'action:seal-container', 'action:depart-container', 'action:register-container', 'action:edit-payload', 'action:delete-payload', 'action:delete-arrival'],
     'Guest': ['dashboard'],
     'Pending': [],
 };
@@ -237,10 +251,14 @@ export default function UserManagement({ userProfile }) {
                             {/* Module Permissions Panel */}
                             {isExpanded && !isAdmin && (
                                 <div style={{ padding: '1rem 1.25rem', borderTop: '1px solid var(--border-color)', background: 'var(--bg-surface)' }}>
-                                    <p style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', marginBottom: '0.85rem' }}>
-                                        Toggle which modules this user can access. Changes override the role defaults.
+                                    {/* MODULE ACCESS */}
+                                    <p style={{ fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                        <span>📂</span> Module Access
                                     </p>
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.5rem', marginBottom: '1rem' }}>
+                                    <p style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', marginBottom: '0.7rem' }}>
+                                        Toggle which pages this user can see in the sidebar.
+                                    </p>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.5rem', marginBottom: '1.25rem' }}>
                                         {ALL_MODULES.map(mod => {
                                             const allowed = perms.has(mod.key);
                                             return (
@@ -266,7 +284,50 @@ export default function UserManagement({ userProfile }) {
                                             );
                                         })}
                                     </div>
-                                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+
+                                    {/* ACTION PERMISSIONS */}
+                                    <div style={{ borderTop: '1px dashed var(--border-color)', paddingTop: '1rem', marginTop: '0.5rem' }}>
+                                        <p style={{ fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#7c3aed', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                            <span>⚡</span> Action Permissions
+                                        </p>
+                                        <p style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', marginBottom: '0.7rem' }}>
+                                            Control which specific operations this user can perform within modules.
+                                        </p>
+                                        {/* Group actions by group */}
+                                        {['Arrivals', 'Containers'].map(group => (
+                                            <div key={group} style={{ marginBottom: '0.75rem' }}>
+                                                <p style={{ fontSize: '0.7rem', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{group}</p>
+                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: '0.4rem' }}>
+                                                    {ALL_ACTIONS.filter(a => a.group === group).map(action => {
+                                                        const allowed = perms.has(action.key);
+                                                        return (
+                                                            <button
+                                                                key={action.key}
+                                                                onClick={() => toggleModule(profile.id, action.key)}
+                                                                style={{
+                                                                    display: 'flex', alignItems: 'center', gap: '0.5rem',
+                                                                    padding: '0.5rem 0.8rem', borderRadius: '10px', cursor: 'pointer',
+                                                                    border: `1px solid ${allowed ? '#7c3aed' : 'var(--border-color)'}`,
+                                                                    background: allowed ? 'rgba(124,58,237,0.08)' : 'var(--bg-card)',
+                                                                    color: allowed ? '#5b21b6' : 'var(--text-secondary)',
+                                                                    fontSize: '0.8rem', fontWeight: '500',
+                                                                    transition: 'all 0.15s ease', textAlign: 'left',
+                                                                }}
+                                                            >
+                                                                <span>{action.icon}</span>
+                                                                <span style={{ flex: 1 }}>{action.label}</span>
+                                                                {allowed
+                                                                    ? <ToggleRight size={18} color="#7c3aed" />
+                                                                    : <ToggleLeft size={18} color="#94a3b8" />}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
                                         <button
                                             onClick={() => setExpandedId(null)}
                                             style={{ padding: '0.45rem 1rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'none', cursor: 'pointer', fontSize: '0.85rem', color: 'var(--text-secondary)' }}

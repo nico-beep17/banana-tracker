@@ -5,11 +5,12 @@ import { getPortCountry } from '../utils/locationUtils';
 import ContainerManifest from './ContainerManifest';
 import PinVerifyModal from './PinVerifyModal';
 import { useContainersQuery } from '../queries/hooks';
+import { canPerformAction } from '../utils/permissions';
 import './ContainersList.css';
 
 const getCountry = (dest) => getPortCountry(dest);
 
-const ContainersList = ({ onNavigate, onDepartContainer, onSealContainer, onEditPayload, onDeletePayload }) => {
+const ContainersList = ({ onNavigate, onDepartContainer, onSealContainer, onEditPayload, onDeletePayload, userProfile }) => {
     const { data: containers = [] } = useContainersQuery();
     const componentRef = useRef();
     const [selectedContainer, setSelectedContainer] = useState(null);
@@ -194,7 +195,9 @@ const ContainersList = ({ onNavigate, onDepartContainer, onSealContainer, onEdit
                     <button className="btn-secondary" onClick={handleExport} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         📊 Export to Excel
                     </button>
+                    {canPerformAction(userProfile, 'action:register-container') && (
                     <button className="btn-primary" onClick={() => onNavigate('new-container')}>+ Register New Container</button>
+                    )}
                 </div>
             </header>
 
@@ -271,6 +274,7 @@ const ContainersList = ({ onNavigate, onDepartContainer, onSealContainer, onEdit
                                                         <button className="btn-print" onClick={() => handlePrintClick(container)}>Print Manifest</button>
                                                     </>
                                                 ) : !isFull ? (
+                                                    canPerformAction(userProfile, 'action:stuff-container') ? (
                                                     <button
                                                         className="btn-primary"
                                                         onClick={() => onNavigate({ name: 'container-stuffing-grid', state: { containerId: container.id } })}
@@ -278,11 +282,16 @@ const ContainersList = ({ onNavigate, onDepartContainer, onSealContainer, onEdit
                                                     >
                                                         Stuff Container
                                                     </button>
+                                                    ) : null
                                                 ) : !isSealed ? (
+                                                    canPerformAction(userProfile, 'action:seal-container') ? (
                                                     <button className="btn-seal" onClick={() => onSealContainer(container.id)}>Seal Container</button>
+                                                    ) : <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', fontWeight: '600' }}>FULL</span>
                                                 ) : (
                                                     <>
+                                                        {canPerformAction(userProfile, 'action:depart-container') && (
                                                         <button className="btn-depart" onClick={() => onDepartContainer(container.id)}>Depart Hub</button>
+                                                        )}
                                                         <button className="btn-print" onClick={() => handlePrintClick(container)}>Print Manifest</button>
                                                     </>
                                                 )}
@@ -292,7 +301,7 @@ const ContainersList = ({ onNavigate, onDepartContainer, onSealContainer, onEdit
                                                 >
                                                     Edit Details
                                                 </button>
-                                                {(container.stuffedItems && container.stuffedItems.length > 0) && (
+                                                {(container.stuffedItems && container.stuffedItems.length > 0) && (canPerformAction(userProfile, 'action:edit-payload') || canPerformAction(userProfile, 'action:delete-payload')) && (
                                                     <button
                                                         style={{
                                                             background: 'none', border: 'none', color: '#d97706', textDecoration: 'underline',

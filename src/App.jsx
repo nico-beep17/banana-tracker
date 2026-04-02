@@ -644,6 +644,7 @@ function App() {
             onSealContainer={handleSealContainer}
             onEditPayload={handleEditStuffedPayload}
             onDeletePayload={handleDeleteStuffedPayload}
+            userProfile={userProfile}
           />
         )}
 
