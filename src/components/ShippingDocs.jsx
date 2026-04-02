@@ -160,14 +160,24 @@ const ShippingDocs = () => {
         const updates = {};
         const v = (field) => vesselInfo[field]?.value; // Extract .value from { value, source, date }
         
+        // Map AI fields → actual DB columns
         if (v('vesselName')) updates.reeferName = v('vesselName');
         if (v('voyageNo')) updates.voyageNo = v('voyageNo');
-        if (v('eta')) updates.eta = v('eta');
-        if (v('etd')) updates.etd = v('etd');
-        if (v('shippingLine')) updates.shippingLine = v('shippingLine');
         if (v('sealNo')) updates.sealNo = v('sealNo');
+        if (v('bookingNo')) updates.bookingNo = v('bookingNo');
+        if (v('etd')) updates.dateDeparted = v('etd');
+        if (v('eta')) updates.eta = v('eta');
+        // portOfDischarge maps to destination
+        if (v('portOfDischarge')) updates.destination = v('portOfDischarge');
 
         if (Object.keys(updates).length === 0) return;
+
+        // Log what changed for transparency
+        const changes = Object.entries(updates).map(([key, val]) => {
+            const old = container[key];
+            return old && old !== val ? `${key}: ${old} → ${val}` : `${key}: ${val}`;
+        });
+        console.log('[AutoFill]', containerId, changes);
 
         const { error } = await supabase
             .from('containers')
@@ -176,8 +186,10 @@ const ShippingDocs = () => {
 
         if (!error) {
             queryClient.invalidateQueries({ queryKey: ['containers'] });
-            const fields = Object.keys(updates).join(', ');
-            toast.success(`Updated from latest email: ${fields}`, { duration: 4000 });
+            toast.success(`Synced from email: ${changes.join(', ')}`, { duration: 5000 });
+        } else {
+            console.error('[AutoFill] Failed:', error);
+            toast.error('Failed to sync vessel info to container');
         }
     };
 
@@ -461,13 +473,16 @@ const ShippingDocs = () => {
                                             {scan?.vesselInfo && Object.keys(scan.vesselInfo).length > 0 && (
                                                 <div className="sd-vessel-banner">
                                                     <Sparkles size={16} />
-                                                    <span>Auto-detected from latest emails:</span>
+                                                    <span>Auto-synced from latest emails:</span>
                                                     {scan.vesselInfo.vesselName?.value && <span className="sd-vessel-tag">🚢 {scan.vesselInfo.vesselName.value}</span>}
                                                     {scan.vesselInfo.voyageNo?.value && <span className="sd-vessel-tag">📋 VOY {scan.vesselInfo.voyageNo.value}</span>}
+                                                    {scan.vesselInfo.bookingNo?.value && <span className="sd-vessel-tag">🎫 BKG {scan.vesselInfo.bookingNo.value}</span>}
                                                     {scan.vesselInfo.eta?.value && <span className="sd-vessel-tag">📅 ETA {scan.vesselInfo.eta.value}</span>}
                                                     {scan.vesselInfo.etd?.value && <span className="sd-vessel-tag">🚀 ETD {scan.vesselInfo.etd.value}</span>}
                                                     {scan.vesselInfo.shippingLine?.value && <span className="sd-vessel-tag">🏢 {scan.vesselInfo.shippingLine.value}</span>}
                                                     {scan.vesselInfo.sealNo?.value && <span className="sd-vessel-tag">🔒 Seal {scan.vesselInfo.sealNo.value}</span>}
+                                                    {scan.vesselInfo.portOfLoading?.value && <span className="sd-vessel-tag">⚓ POL {scan.vesselInfo.portOfLoading.value}</span>}
+                                                    {scan.vesselInfo.portOfDischarge?.value && <span className="sd-vessel-tag">🏁 POD {scan.vesselInfo.portOfDischarge.value}</span>}
                                                 </div>
                                             )}
 
