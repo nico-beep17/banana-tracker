@@ -335,8 +335,8 @@ Extract the LATEST/MOST RECENT information for these fields (corrections and del
 - shippingLine: Carrier/shipping line name
 - sealNo: Container seal number
 - bookingNo: Booking reference number
-- portOfLoading: Port of loading
-- portOfDischarge: Port of discharge/destination port
+TASK 3 - DETAILED CONTAINER ANALYSIS REPORT:
+Generate a highly detailed, comprehensive analysis report regarding this specific container based on all available emails. Include context such as the full shipping timeline, any mentioned delays, outstanding invoices, port transfers, forwarder communications, missing paperwork, or any relevant supply chain context found. Format the summary cleanly using paragraphs and bullet points if necessary.
 
 Return ONLY valid JSON in this exact format. You must populate the "matchedDocs" object with a key for EVERY SINGLE document listed above (e.g. atwObtained, atwUsed, etradeRegistered, ciDone, plDone, lcuDone, phytoDone, closedTicket, ed, bl, ci, pl, ctcPhyto).
 {
@@ -366,7 +366,7 @@ Return ONLY valid JSON in this exact format. You must populate the "matchedDocs"
     "portOfLoading": "value or null",
     "portOfDischarge": "value or null"
   },
-  "summary": "1-2 sentence summary of what was found"
+  "summary": "WRITE YOUR COMPREHENSIVE, MULTI-PARAGRAPH DETAILED ANALYSIS HERE. Use standard text. You may use line breaks (\\n) and bullet points."
 }`;
 
     const parts = [{ text: systemPrompt + '\n\nEMAILS:\n' + emailSummaries }];

@@ -598,9 +598,14 @@ const ShippingDocs = () => {
 
                                             {/* AI Summary */}
                                             {scan?.aiSummary && !scan.scanning && (
-                                                <div className="sd-ai-summary">
-                                                    <Sparkles size={14} />
-                                                    <span>{scan.aiSummary}</span>
+                                                <div className="sd-ai-summary" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '16px', borderRadius: '8px', marginTop: '1rem' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#166534', fontWeight: 600, marginBottom: '8px' }}>
+                                                        <Sparkles size={16} />
+                                                        <span>AI Container Intelligence Report</span>
+                                                    </div>
+                                                    <div style={{ color: '#15803d', fontSize: '13px', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                                                        {scan.aiSummary}
+                                                    </div>
                                                 </div>
                                             )}
 
