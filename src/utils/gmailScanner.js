@@ -165,7 +165,12 @@ export async function searchGmailForContainer(token, container, customQuery = nu
       m.attachmentRefs.filter(a => a.isImage || a.isPdf).map(a => ({ ...a, fromEmail: m.subject }))
     ).slice(0, 10);
     
+    let totalBytes = 0;
     for (const ref of allAttachmentRefs) {
+      if (totalBytes > 3800000) {
+          console.warn('[GmailScan] Reached Vercel 4.5MB payload limit, skipping remaining attachments.');
+          break;
+      }
       try {
         const attRes = await fetch(
           `${GMAIL_API_BASE}/messages/${ref.messageId}/attachments/${ref.attachmentId}`,
@@ -174,12 +179,16 @@ export async function searchGmailForContainer(token, container, customQuery = nu
         if (attRes.ok) {
           const attData = await attRes.json();
           if (attData.data) {
+            const byteSize = attData.data.length * 0.75; // Approx decoded size or just use string length
+            if (totalBytes + byteSize > 3800000) break;
+            
             imageAttachments.push({
               base64Data: attData.data.replace(/-/g, '+').replace(/_/g, '/'),
               mimeType: ref.mimeType || 'image/jpeg',
               filename: ref.filename,
               fromEmail: ref.fromEmail,
             });
+            totalBytes += byteSize;
           }
         }
       } catch (e) {
@@ -247,48 +256,109 @@ export async function searchGmailForContainer(token, container, customQuery = nu
  * Send emails + images to Gemini 3.1 Pro via the serverless API endpoint
  */
 async function analyzeWithAI(emails, reeferNo, imageAttachments) {
-  try {
-    // Determine API base URL
-    const baseUrl = window.location.hostname === 'localhost' 
-      ? 'http://localhost:5173' 
-      : window.location.origin;
+    if (!emails || emails.length === 0) {
+      return { matchedDocs: {}, vesselInfo: {}, summary: '' };
+    }
     
-    const payload = {
-      reeferNo,
-      emails: emails.map(e => ({
-        subject: e.subject,
-        from: e.from,
-        date: e.date,
-        bodyText: e.bodyText,
-        snippet: e.snippet,
-        hasAttachments: e.hasAttachments,
-        attachmentCount: e.attachmentCount,
-      })),
-      imageAttachments: imageAttachments.map(img => ({
-        base64Data: img.base64Data,
-        mimeType: img.mimeType,
-        filename: img.filename,
-        fromEmail: img.fromEmail,
-      })),
-    };
-    
-    const res = await fetch(`${baseUrl}/api/scan-emails`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      console.error('[AI Scan] Server error:', err);
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!apiKey) {
+      console.warn("Gemini API key missing on client");
       return null;
     }
     
-    return await res.json();
-  } catch (err) {
-    console.error('[AI Scan] Failed to analyze:', err);
-    return null;
-  }
+    // Prepare Gemini payload
+    const emailSummaries = emails.map((e, i) => 
+        `--- Email ${i + 1} ---\nSubject: ${e.subject}\nFrom: ${e.from}\nDate: ${e.date}\nBody:\n${(e.bodyText || e.snippet || '').slice(0, 3000)}\n`
+    ).join('\n');
+    
+    const systemPrompt = `You are an expert shipping documentation analyst for a banana export company (LAVC/LFJ) in the Philippines.
+Analyze the following emails related to container/reefer number "${reeferNo}" and return a JSON response.
+
+TASK 1 - DOCUMENT DETECTION:
+For each email, determine if it contains or references any of these shipping documents. Use smart context understanding. Consider the email subject, body, and attached file names.
+Pre-Departure Documents:
+- "atwObtained": ATW (Authority to Withdraw) from shipping lines
+- "atwUsed": ATW used to get container from Container Yard (CY)  
+- "etradeRegistered": eTrade.net.ph registration or export declaration input
+- "ciDone": Commercial Invoice (CI) from BIR
+- "plDone": Packing List (PL)
+- "lcuDone": Letter of Commitment and Undertaking (LCU)
+- "phytoDone": Phytosanitary Certificate
+
+Certificate of Origin (BOC) Attachments:
+- "closedTicket": Closed Ticket / Booking Confirmation
+- "ed": Export Declaration (ED)
+- "bl": Bill of Lading (B/L)
+- "ci": Commercial Invoice (CI) - final copy for BOC
+- "pl": Packing List (PL) - final copy for BOC
+- "ctcPhyto": CTC Phytosanitary (Certified True Copy)
+
+TASK 2 - VESSEL & SHIPPING INFO EXTRACTION:
+Extract the LATEST/MOST RECENT information for these fields (corrections and delays override earlier data):
+- vesselName: Name of the vessel (e.g., MV PACIFIC GLORY)
+- voyageNo: Voyage number
+- eta: Estimated Time of Arrival (any format)
+- etd: Estimated Time of Departure (any format)
+- shippingLine: Carrier/shipping line name
+- sealNo: Container seal number
+- bookingNo: Booking reference number
+- portOfLoading: Port of loading
+- portOfDischarge: Port of discharge/destination port
+
+Return ONLY valid JSON in this exact format:
+{
+  "matchedDocs": {
+    "atwObtained": { "found": true/false, "confidence": "high/medium/low", "emailIndex": 0, "reason": "brief reason" }
+  },
+  "vesselInfo": {
+    "vesselName": "value or null",
+    "voyageNo": "value or null",
+    "eta": "value or null",
+    "etd": "value or null",
+    "shippingLine": "value or null",
+    "sealNo": "value or null",
+    "bookingNo": "value or null",
+    "portOfLoading": "value or null",
+    "portOfDischarge": "value or null"
+  },
+  "summary": "1-2 sentence summary"
+}`;
+
+    const parts = [{ text: systemPrompt + '\n\nEMAILS:\n' + emailSummaries }];
+    for (const img of imageAttachments) {
+       parts.push({ inlineData: { mimeType: img.mimeType || 'image/jpeg', data: img.base64Data } });
+       parts.push({ text: `[Attachment from email "${img.fromEmail || 'unknown'}": ${img.filename || 'unknown'}]` });
+    }
+    
+    console.log('[GmailScan] Making direct call to Gemini API...');
+    try {
+      const gRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts }],
+          generationConfig: { maxOutputTokens: 4096, temperature: 0.1, responseMimeType: 'application/json' }
+        })
+      });
+      
+      if (!gRes.ok) throw new Error('Gemini API Error');
+      const gData = await gRes.json();
+      const text = gData?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+      let aiResult = { matchedDocs: {}, vesselInfo: {} };
+      
+      try {
+        aiResult = JSON.parse(text);
+      } catch(e) {
+        const match = text.match(/\{[\s\S]*\}/);
+        if (match) aiResult = JSON.parse(match[0]);
+      }
+      
+      return aiResult;
+
+    } catch (apiErr) {
+      console.error('[GmailScan] Direct Gemini fetch failed:', apiErr);
+      return null;
+    }
 }
 
 /**
