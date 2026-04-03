@@ -338,10 +338,22 @@ Extract the LATEST/MOST RECENT information for these fields (corrections and del
 - portOfLoading: Port of loading
 - portOfDischarge: Port of discharge/destination port
 
-Return ONLY valid JSON in this exact format:
+Return ONLY valid JSON in this exact format. You must populate the "matchedDocs" object with a key for EVERY SINGLE document listed above (e.g. atwObtained, atwUsed, etradeRegistered, ciDone, plDone, lcuDone, phytoDone, closedTicket, ed, bl, ci, pl, ctcPhyto).
 {
   "matchedDocs": {
-    "atwObtained": { "found": true/false, "confidence": "high/medium/low", "emailIndex": 0, "reason": "brief reason" }
+    "atwObtained": { "found": true/false, "confidence": "high/medium/low", "emailIndex": 0, "reason": "brief reason" },
+    "atwUsed": { "found": true/false, "confidence": "high/medium/low", "emailIndex": 0, "reason": "brief reason" },
+    "etradeRegistered": { "found": true/false, "confidence": "high/medium/low", "emailIndex": 0, "reason": "brief reason" },
+    "ciDone": { "found": true/false, "confidence": "high/medium/low", "emailIndex": 0, "reason": "brief reason" },
+    "plDone": { "found": true/false, "confidence": "high/medium/low", "emailIndex": 0, "reason": "brief reason" },
+    "lcuDone": { "found": true/false, "confidence": "high/medium/low", "emailIndex": 0, "reason": "brief reason" },
+    "phytoDone": { "found": true/false, "confidence": "high/medium/low", "emailIndex": 0, "reason": "brief reason" },
+    "closedTicket": { "found": true/false, "confidence": "high/medium/low", "emailIndex": 0, "reason": "brief reason" },
+    "ed": { "found": true/false, "confidence": "high/medium/low", "emailIndex": 0, "reason": "brief reason" },
+    "bl": { "found": true/false, "confidence": "high/medium/low", "emailIndex": 0, "reason": "brief reason" },
+    "ci": { "found": true/false, "confidence": "high/medium/low", "emailIndex": 0, "reason": "brief reason" },
+    "pl": { "found": true/false, "confidence": "high/medium/low", "emailIndex": 0, "reason": "brief reason" },
+    "ctcPhyto": { "found": true/false, "confidence": "high/medium/low", "emailIndex": 0, "reason": "brief reason" }
   },
   "vesselInfo": {
     "vesselName": "value or null",
@@ -354,7 +366,7 @@ Return ONLY valid JSON in this exact format:
     "portOfLoading": "value or null",
     "portOfDischarge": "value or null"
   },
-  "summary": "1-2 sentence summary"
+  "summary": "1-2 sentence summary of what was found"
 }`;
 
     const parts = [{ text: systemPrompt + '\n\nEMAILS:\n' + emailSummaries }];
