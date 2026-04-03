@@ -280,11 +280,17 @@ const Accounting = ({ userProfile, exchangeRate, setExchangeRate }) => {
     const totalPendingReceivables = totalExpectedRevenue - totalCollectedRevenue;
 
     const handleMarkAsPaid = async (batchId) => {
-        // Because the payment applies to the whole batch, update all arrivals matching batchId
+        // batchId can be either a BATCH-xxx string or a UUID (legacy arrivals without batchId)
+        // Only include id.eq.X if batchId looks like a UUID, otherwise Postgres throws a type error
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(batchId);
+        const filter = isUUID
+            ? `batchId.eq.${batchId},id.eq.${batchId}`
+            : `batchId.eq.${batchId}`;
+
         const { error } = await supabase
             .from('arrivals')
             .update({ payment_status: 'PAID', payment_date: new Date().toISOString() })
-            .or(`batchId.eq.${batchId},id.eq.${batchId}`);
+            .or(filter);
 
         if (error) {
             console.error("Error marking paid:", error);
