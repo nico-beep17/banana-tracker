@@ -236,13 +236,28 @@ export async function searchGmailForContainer(token, container, customQuery = nu
     const matchedDocs = {};
     if (aiResult?.matchedDocs) {
       for (const [key, doc] of Object.entries(aiResult.matchedDocs)) {
-        if (doc.found) {
-          const emailIdx = doc.emailIndex ?? 0;
-          const sourceEmail = processedMessages[emailIdx] || processedMessages[0];
+        let isFound = false;
+        let cfd = 'medium';
+        let reason = '';
+        let eIdx = 0;
+
+        if (typeof doc === 'boolean') {
+            isFound = doc;
+        } else if (typeof doc === 'string') {
+            isFound = doc.toLowerCase() === 'true';
+        } else if (typeof doc === 'object' && doc !== null) {
+            isFound = doc.found === true || doc.found === 'true';
+            cfd = doc.confidence || 'medium';
+            reason = doc.reason || '';
+            eIdx = doc.emailIndex ?? 0;
+        }
+
+        if (isFound) {
+          const sourceEmail = processedMessages[eIdx] || processedMessages[0];
           matchedDocs[key] = {
             category: getCategoryForKey(key),
-            confidence: doc.confidence || 'medium',
-            reason: doc.reason || '',
+            confidence: cfd,
+            reason: reason || 'AI identified shipping reference',
             emails: sourceEmail ? [{
               id: sourceEmail.id,
               subject: sourceEmail.subject,
