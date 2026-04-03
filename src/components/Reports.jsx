@@ -4,7 +4,9 @@ import {
     PieChart, Pie, Cell
 } from 'recharts';
 import './Reports.css';
-import { useArrivalsQuery, useContainersQuery, useSamplingsQuery } from '../queries/hooks';
+import { useArrivalsQuery, useContainersQuery, useSamplingsQuery, useFarmsQuery } from '../queries/hooks';
+import { Download } from 'lucide-react';
+import { exportXlsx } from '../utils/exportXlsx';
 
 const COLORS = ['#14b8a6', '#f59e0b', '#3b82f6', '#ef4444', '#8b5cf6'];
 
@@ -106,12 +108,148 @@ const Reports = () => {
     const { data: arrivals = [] } = useArrivalsQuery();
     const { data: containers = [] } = useContainersQuery();
     const { data: samplings = [] } = useSamplingsQuery();
+    const { data: farms = [] } = useFarmsQuery();
 
     const [aiInsight, setAiInsight] = useState('');
     const [aiLoading, setAiLoading] = useState(false);
     const [aiError, setAiError] = useState('');
 
+    // Production per Grower per Week — state
+    const currentYear = new Date().getFullYear();
+    const getISOWeek = (d) => {
+        const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+        const dayNum = date.getUTCDay() || 7;
+        date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+        const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+        return Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+    };
+    const currentWeek = getISOWeek(new Date());
+    const [selectedYear, setSelectedYear] = useState(currentYear);
+    const [selectedWeekRange, setSelectedWeekRange] = useState([Math.max(1, currentWeek - 3), currentWeek]);
+
     const approvedArrivals = useMemo(() => arrivals.filter(arr => arr.approval_status === 'APPROVED'), [arrivals]);
+
+    // 🌱 Production per Grower per Week computation
+    const growerWeeklyProduction = useMemo(() => {
+        // Group arrivals by farm + week
+        const dataMap = {}; // { farmName: { week: { total, classA, classB } } }
+        const weekSet = new Set();
+        
+        approvedArrivals.forEach(arr => {
+            const farmName = arr.farmName || 'Unknown';
+            const dateStr = arr.dateOfPacking || arr.dateTimeEncoded?.split('T')[0];
+            if (!dateStr) return;
+            
+            const d = new Date(dateStr);
+            const yr = d.getFullYear();
+            if (yr !== selectedYear) return;
+            
+            const wk = getISOWeek(d);
+            if (wk < selectedWeekRange[0] || wk > selectedWeekRange[1]) return;
+            
+            weekSet.add(wk);
+            if (!dataMap[farmName]) dataMap[farmName] = {};
+            if (!dataMap[farmName][wk]) dataMap[farmName][wk] = { total: 0, classA: 0, classB: 0 };
+            
+            const qty = Number(arr.quantity) || 0;
+            const isA = arr.typeId ? arr.typeId.startsWith('classA') : false;
+            dataMap[farmName][wk].total += qty;
+            if (isA) dataMap[farmName][wk].classA += qty;
+            else dataMap[farmName][wk].classB += qty;
+        });
+        
+        const weeks = [...weekSet].sort((a, b) => a - b);
+        
+        // Build rows
+        const rows = Object.entries(dataMap).map(([farmName, weekData]) => {
+            const farm = farms.find(f => f.name === farmName);
+            const totalAllWeeks = weeks.reduce((s, wk) => s + (weekData[wk]?.total || 0), 0);
+            
+            // Week-over-week trend (last 2 weeks in range)
+            const lastWk = weeks[weeks.length - 1];
+            const prevWk = weeks[weeks.length - 2];
+            const lastVal = weekData[lastWk]?.total || 0;
+            const prevVal = prevWk ? (weekData[prevWk]?.total || 0) : 0;
+            const trend = prevVal > 0 ? ((lastVal - prevVal) / prevVal * 100).toFixed(0) : null;
+            
+            return {
+                farmName,
+                farmCode: farm?.farmCode || '',
+                location: farm?.location || '',
+                weekData,
+                totalAllWeeks,
+                trend,
+                lastVal,
+                prevVal,
+            };
+        }).sort((a, b) => b.totalAllWeeks - a.totalAllWeeks);
+        
+        // Grand totals per week
+        const weekTotals = {};
+        weeks.forEach(wk => {
+            weekTotals[wk] = rows.reduce((s, r) => s + (r.weekData[wk]?.total || 0), 0);
+        });
+        
+        // Bar chart data
+        const chartData = weeks.map(wk => {
+            const entry = { week: `Wk ${wk}` };
+            rows.slice(0, 10).forEach(r => { // Top 10 growers
+                entry[r.farmName] = r.weekData[wk]?.total || 0;
+            });
+            return entry;
+        });
+        
+        return { rows, weeks, weekTotals, chartData, topFarms: rows.slice(0, 10) };
+    }, [approvedArrivals, farms, selectedYear, selectedWeekRange]);
+
+    // Export production per grower
+    const handleExportProduction = async () => {
+        try {
+            const { default: ExcelJS } = await import('exceljs');
+            const wb = new ExcelJS.Workbook();
+            const ws = wb.addWorksheet('Production per Grower');
+
+            const cols = [
+                { header: 'Farm Code', key: 'farmCode', width: 12 },
+                { header: 'Grower', key: 'farmName', width: 28 },
+                { header: 'Location', key: 'location', width: 24 },
+            ];
+            growerWeeklyProduction.weeks.forEach(wk => {
+                cols.push({ header: `Wk ${wk}`, key: `wk_${wk}`, width: 12 });
+            });
+            cols.push({ header: 'TOTAL', key: 'total', width: 14 });
+            cols.push({ header: 'Trend', key: 'trend', width: 10 });
+            ws.columns = cols;
+
+            ws.getRow(1).eachCell(cell => {
+                cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF166534' } };
+                cell.alignment = { vertical: 'middle', horizontal: 'center' };
+            });
+
+            growerWeeklyProduction.rows.forEach(r => {
+                const row = { farmCode: r.farmCode, farmName: r.farmName, location: r.location, total: r.totalAllWeeks, trend: r.trend ? `${r.trend}%` : '-' };
+                growerWeeklyProduction.weeks.forEach(wk => {
+                    row[`wk_${wk}`] = r.weekData[wk]?.total || 0;
+                });
+                ws.addRow(row);
+            });
+
+            // Grand total row
+            const grandRow = { farmCode: '', farmName: 'GRAND TOTAL', location: '' };
+            growerWeeklyProduction.weeks.forEach(wk => {
+                grandRow[`wk_${wk}`] = growerWeeklyProduction.weekTotals[wk] || 0;
+            });
+            grandRow.total = growerWeeklyProduction.rows.reduce((s, r) => s + r.totalAllWeeks, 0);
+            grandRow.trend = '';
+            const lastRow = ws.addRow(grandRow);
+            lastRow.eachCell(cell => { cell.font = { bold: true }; });
+
+            await exportXlsx(wb, `Production_PerGrower_${selectedYear}_Wk${selectedWeekRange[0]}-${selectedWeekRange[1]}.xlsx`);
+        } catch (err) {
+            console.error('Export failed:', err);
+        }
+    };
 
     // 1. Boxes by Day Bar Chart
     const boxesByDay = useMemo(() => {
@@ -281,6 +419,184 @@ Write in a professional, concise tone. Use bullet points only for the recommenda
                         Click "Generate AI Insight" to get an executive-level analysis of your current operational data.
                     </div>
                 )}
+            </div>
+
+            {/* 🌱 Production per Grower per Week */}
+            <div className="card report-card" style={{ marginBottom: '2rem', borderTop: '4px solid #10b981' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
+                    <div>
+                        <h3 style={{ margin: '0 0 0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            🌱 Production per Grower per Week
+                        </h3>
+                        <p className="subtitle" style={{ margin: 0 }}>Total boxes produced by each farm, aggregated by ISO week.</p>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <select 
+                            value={selectedYear} 
+                            onChange={e => setSelectedYear(Number(e.target.value))}
+                            className="input-field"
+                            style={{ width: 'auto', padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
+                        >
+                            <option value={2026}>2026</option>
+                            <option value={2027}>2027</option>
+                        </select>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                            <span style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)' }}>Wk</span>
+                            <input 
+                                type="number" min={1} max={52} 
+                                value={selectedWeekRange[0]}
+                                onChange={e => setSelectedWeekRange([Number(e.target.value), selectedWeekRange[1]])}
+                                className="input-field"
+                                style={{ width: '60px', padding: '0.4rem', fontSize: '0.85rem', textAlign: 'center' }}
+                            />
+                            <span style={{ color: 'var(--text-tertiary)' }}>→</span>
+                            <input 
+                                type="number" min={1} max={52}
+                                value={selectedWeekRange[1]}
+                                onChange={e => setSelectedWeekRange([selectedWeekRange[0], Number(e.target.value)])}
+                                className="input-field"
+                                style={{ width: '60px', padding: '0.4rem', fontSize: '0.85rem', textAlign: 'center' }}
+                            />
+                        </div>
+                        <button 
+                            className="btn-secondary" 
+                            onClick={handleExportProduction}
+                            style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 0.8rem', fontSize: '0.82rem' }}
+                        >
+                            <Download size={14} /> Excel
+                        </button>
+                    </div>
+                </div>
+
+                {/* Summary cards */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                    <div style={{ background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', padding: '0.8rem 1rem', borderRadius: '10px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '0.75rem', color: '#166534', fontWeight: 600, textTransform: 'uppercase' }}>Active Growers</div>
+                        <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#15803d' }}>{growerWeeklyProduction.rows.length}</div>
+                    </div>
+                    <div style={{ background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', padding: '0.8rem 1rem', borderRadius: '10px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '0.75rem', color: '#1e40af', fontWeight: 600, textTransform: 'uppercase' }}>Weeks Shown</div>
+                        <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#1d4ed8' }}>{growerWeeklyProduction.weeks.length}</div>
+                    </div>
+                    <div style={{ background: 'linear-gradient(135deg, #fefce8, #fef9c3)', padding: '0.8rem 1rem', borderRadius: '10px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '0.75rem', color: '#854d0e', fontWeight: 600, textTransform: 'uppercase' }}>Total Boxes</div>
+                        <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#a16207' }}>
+                            {growerWeeklyProduction.rows.reduce((s, r) => s + r.totalAllWeeks, 0).toLocaleString()}
+                        </div>
+                    </div>
+                    <div style={{ background: 'linear-gradient(135deg, #fdf2f8, #fce7f3)', padding: '0.8rem 1rem', borderRadius: '10px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '0.75rem', color: '#9d174d', fontWeight: 600, textTransform: 'uppercase' }}>Top Grower</div>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#be185d', marginTop: '0.25rem' }}>
+                            {growerWeeklyProduction.rows[0]?.farmName || '-'}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Stacked Bar Chart — Top 10 */}
+                {growerWeeklyProduction.chartData.length > 0 && (
+                    <div style={{ marginBottom: '2rem' }}>
+                        <h4 style={{ marginBottom: '0.75rem', fontSize: '0.95rem' }}>Top 10 Growers — Weekly Volume</h4>
+                        <div style={{ height: 320 }}>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={growerWeeklyProduction.chartData}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                                    <XAxis dataKey="week" tick={{ fontSize: 12 }} />
+                                    <YAxis tick={{ fontSize: 12 }} />
+                                    <Tooltip />
+                                    <Legend wrapperStyle={{ fontSize: '0.75rem' }} />
+                                    {growerWeeklyProduction.topFarms.map((farm, i) => {
+                                        const barColors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316', '#84cc16', '#ec4899', '#6366f1'];
+                                        return (
+                                            <Bar key={farm.farmName} dataKey={farm.farmName} stackId="prod" fill={barColors[i % barColors.length]} />
+                                        );
+                                    })}
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+                )}
+
+                {/* Heatmap Table */}
+                <div className="table-responsive" style={{ maxHeight: '500px', overflowY: 'auto' }}>
+                    <table className="banana-table" style={{ fontSize: '0.82rem' }}>
+                        <thead>
+                            <tr>
+                                <th style={{ position: 'sticky', left: 0, background: '#fff', zIndex: 2 }}>Farm</th>
+                                <th>Code</th>
+                                {growerWeeklyProduction.weeks.map(wk => (
+                                    <th key={wk} className="text-center" style={{ background: wk === currentWeek ? '#f0fdf4' : undefined }}>
+                                        Wk {wk}
+                                        {wk === currentWeek && <div style={{ fontSize: '0.6rem', color: '#16a34a' }}>NOW</div>}
+                                    </th>
+                                ))}
+                                <th className="text-center" style={{ fontWeight: 800, background: '#f8fafc' }}>TOTAL</th>
+                                <th className="text-center">WoW</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {growerWeeklyProduction.rows.length === 0 ? (
+                                <tr><td colSpan={growerWeeklyProduction.weeks.length + 4} className="text-center" style={{ padding: '2rem', color: 'var(--text-tertiary)' }}>No production data for this week range.</td></tr>
+                            ) : (
+                                growerWeeklyProduction.rows.map((row, idx) => {
+                                    const maxVal = Math.max(...growerWeeklyProduction.weeks.map(wk => row.weekData[wk]?.total || 0), 1);
+                                    return (
+                                        <tr key={row.farmName}>
+                                            <td style={{ position: 'sticky', left: 0, background: '#fff', zIndex: 1, fontWeight: 600, color: 'var(--color-primary-dark)', whiteSpace: 'nowrap' }}>
+                                                {idx + 1}. {row.farmName}
+                                            </td>
+                                            <td style={{ color: 'var(--text-tertiary)', fontSize: '0.78rem' }}>{row.farmCode}</td>
+                                            {growerWeeklyProduction.weeks.map(wk => {
+                                                const val = row.weekData[wk]?.total || 0;
+                                                const intensity = val > 0 ? Math.min(0.6, (val / maxVal) * 0.6) + 0.08 : 0;
+                                                return (
+                                                    <td key={wk} className="text-center" style={{
+                                                        background: val > 0 ? `rgba(16, 185, 129, ${intensity})` : undefined,
+                                                        fontWeight: val > 0 ? 600 : 400,
+                                                        color: val > 0 ? '#065f46' : '#cbd5e1',
+                                                    }}
+                                                    title={val > 0 ? `A: ${row.weekData[wk]?.classA || 0} | B: ${row.weekData[wk]?.classB || 0}` : ''}
+                                                    >
+                                                        {val > 0 ? val.toLocaleString() : '-'}
+                                                    </td>
+                                                );
+                                            })}
+                                            <td className="text-center" style={{ fontWeight: 800, color: 'var(--color-primary-dark)', background: '#f8fafc' }}>
+                                                {row.totalAllWeeks.toLocaleString()}
+                                            </td>
+                                            <td className="text-center" style={{ fontSize: '0.78rem' }}>
+                                                {row.trend !== null ? (
+                                                    <span style={{
+                                                        color: Number(row.trend) > 0 ? '#16a34a' : Number(row.trend) < 0 ? '#dc2626' : '#94a3b8',
+                                                        fontWeight: 600,
+                                                    }}>
+                                                        {Number(row.trend) > 0 ? '↑' : Number(row.trend) < 0 ? '↓' : '→'}
+                                                        {Math.abs(Number(row.trend))}%
+                                                    </span>
+                                                ) : <span style={{ color: '#cbd5e1' }}>-</span>}
+                                            </td>
+                                        </tr>
+                                    );
+                                })
+                            )}
+                            {/* Grand total row */}
+                            {growerWeeklyProduction.rows.length > 0 && (
+                                <tr style={{ background: '#f0fdf4', fontWeight: 700 }}>
+                                    <td style={{ position: 'sticky', left: 0, background: '#f0fdf4', zIndex: 1, color: '#166534' }}>GRAND TOTAL</td>
+                                    <td></td>
+                                    {growerWeeklyProduction.weeks.map(wk => (
+                                        <td key={wk} className="text-center" style={{ color: '#166534' }}>
+                                            {(growerWeeklyProduction.weekTotals[wk] || 0).toLocaleString()}
+                                        </td>
+                                    ))}
+                                    <td className="text-center" style={{ color: '#166534', fontSize: '1rem' }}>
+                                        {growerWeeklyProduction.rows.reduce((s, r) => s + r.totalAllWeeks, 0).toLocaleString()}
+                                    </td>
+                                    <td></td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             <div className="grid-2">
