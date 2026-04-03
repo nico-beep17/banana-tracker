@@ -332,7 +332,7 @@ Return ONLY valid JSON in this exact format:
     
     console.log('[GmailScan] Making direct call to Gemini API...');
     try {
-      const gRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro:generateContent?key=${apiKey}`, {
+      const gRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
