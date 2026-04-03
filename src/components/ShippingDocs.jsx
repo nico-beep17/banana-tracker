@@ -513,30 +513,12 @@ const ShippingDocs = () => {
                                             )}
 
                                             {gmailToken && !scan?.scanning && (
-                                                <div className="sd-manual-search-box" style={{ background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '1rem', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                                    <Search size={16} color="#94a3b8" style={{marginLeft: '4px'}}/>
-                                                    <input 
-                                                        type="text" 
-                                                        placeholder="Custom Search (e.g., Vessel Name, Booking No) - Leave blank for Auto"
-                                                        value={customQueries[container.id] || ''}
-                                                        onChange={(e) => setCustomQueries(prev => ({ ...prev, [container.id]: e.target.value }))}
-                                                        style={{ flex: 1, padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', outline: 'none' }}
-                                                        onKeyDown={(e) => { 
-                                                            if(e.key === 'Enter') {
-                                                                setScanResults(prev => { const n = {...prev}; delete n[container.id]; return n; });
-                                                                scanContainerEmails(container.id);
-                                                            } 
-                                                        }}
-                                                    />
-                                                    <button 
-                                                        onClick={() => {
-                                                            setScanResults(prev => { const n = {...prev}; delete n[container.id]; return n; });
-                                                            scanContainerEmails(container.id);
-                                                        }}
-                                                        style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#3b82f6', color: 'white', padding: '8px 16px', borderRadius: '6px', border: 'none', fontWeight: 500, fontSize: '13px', cursor: 'pointer', whiteSpace: 'nowrap' }}
-                                                    >
-                                                        <Sparkles size={14} /> Scan & Detect
-                                                    </button>
+                                                <div className="sd-scan-banner" style={{ cursor: 'pointer', background: '#eff6ff', padding: '12px', borderRadius: '8px', border: '1px solid #bfdbfe', marginBottom: '1rem', display: 'flex', gap: '8px', alignItems: 'center' }}
+                                                    onClick={() => scanContainerEmails(container.id)}>
+                                                    <Sparkles size={16} color="#3b82f6" />
+                                                    <span style={{ color: '#1e40af', fontSize: '14px', fontWeight: 500 }}>
+                                                        Click to AI-scan Gmail for <strong>{container.reeferNo}</strong> documents & images
+                                                    </span>
                                                 </div>
                                             )}
 

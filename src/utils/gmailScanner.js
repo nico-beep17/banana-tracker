@@ -12,21 +12,34 @@ const GMAIL_API_BASE = 'https://gmail.googleapis.com/gmail/v1/users/me';
  * @param {string} reeferNo - Container/reefer number to search for
  * @returns {Promise<{messages: Array, matchedDocs: Object, vesselInfo: Object}>}
  */
-export async function searchGmailForContainer(token, container) {
+export async function searchGmailForContainer(token, container, customQuery = null) {
   if (!token || !container) return { messages: [], error: 'Missing token or container data' };
   
   try {
-    // Build a dynamic search flow using all available container identifiers.
-    // The user explicitly requested to include multiple keywords since the container ID is not always present in emails.
-    const terms = [];
-    if (container.reeferNo) terms.push(`"${container.reeferNo}"`);
-    if (container.bookingNo) terms.push(`"${container.bookingNo}"`);
-    // Add brand and destination as general text keywords
-    if (container.brand) terms.push(`"${container.brand}"`);
-    if (container.destination) terms.push(`"${container.destination}"`);
+    let queryStr = '';
     
-    // Combine terms with an OR operator so we match ANY of them.
-    const queryStr = terms.length > 0 ? `(${terms.join(' OR ')})` : '';
+    if (customQuery && customQuery.trim() !== '') {
+        queryStr = customQuery;
+    } else {
+        // Build a dynamic search flow using all available container identifiers.
+        // The user explicitly requested to include multiple keywords since the container ID is not always present in emails.
+        const terms = [];
+        if (container.reeferNo) {
+            terms.push(`"${container.reeferNo}"`);
+            // Add stripped version for fuzzy format matching e.g. GMOU 903627 4 -> GMOU9036274
+            const clean = container.reeferNo.replace(/[^A-Za-z0-9]/g, '');
+            if (clean.length > 4) terms.push(`"${clean}"`);
+        }
+        if (container.bookingNo) terms.push(`"${container.bookingNo}"`);
+        if (container.reeferName) terms.push(`"${container.reeferName}"`);
+        if (container.voyageNo) terms.push(`"${container.voyageNo}"`);
+        // Add brand and destination as general text keywords
+        if (container.brand) terms.push(`"${container.brand}"`);
+        if (container.destination) terms.push(`"${container.destination}"`);
+        
+        // Combine terms with an OR operator so we match ANY of them.
+        queryStr = terms.length > 0 ? `(${terms.join(' OR ')})` : '';
+    }
     
     // Search in everywhere (inbox, sent, etc.) up to 40 results to find the most relevant context.
     const q = encodeURIComponent(`in:anywhere ${queryStr}`);
