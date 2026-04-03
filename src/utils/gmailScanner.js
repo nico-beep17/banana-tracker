@@ -16,10 +16,11 @@ export async function searchGmailForContainer(token, reeferNo) {
   if (!token || !reeferNo) return { messages: [], error: 'Missing token or reefer number' };
   
   try {
-    // Search for emails containing the reefer number
-    const query = encodeURIComponent(`"${reeferNo}"`);
+    // Fetch the 30 most recent emails directly to broaden the search.
+    // The previous stringent search by exact reeferNo caused us to miss important docs
+    // when the reefer number was only present inside attached PDFs/images but not in text.
     const res = await fetch(
-      `${GMAIL_API_BASE}/messages?q=${query}&maxResults=30`,
+      `${GMAIL_API_BASE}/messages?maxResults=30`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
     
