@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { 
     CalendarClock, Clock, CheckCircle2, Circle, AlertCircle, FileText, 
     Ship, BookOpen, FileCheck, CheckSquare, Search, ChevronDown, ChevronUp, Anchor,
-    Mails, CheckCircle, Printer, Mail, Loader2, Sparkles, ExternalLink, FileSearch
+    Mails, CheckCircle, Printer, Mail, Loader2, Sparkles, ExternalLink, FileSearch, Database
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
