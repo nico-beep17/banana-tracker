@@ -59,15 +59,42 @@ const CERT_OF_ORIGIN_LIST = [
     { key: 'ctcPhyto', label: 'CTC PHYTO' }
 ];
 
-// Inner component for the actual Google Login button
 const GoogleAuthButton = ({ onToken }) => {
     const login = useGoogleLogin({
+        flow: 'auth-code',
         scope: 'https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.readonly',
-        onSuccess: tokenResponse => {
-            const token = tokenResponse.access_token;
-            sessionStorage.setItem('lavc_company_gmail_token', token);
-            onToken(token);
-            toast.success("Connected to LFJ Google Workspace!");
+        onSuccess: async (codeResponse) => {
+            const code = codeResponse.code;
+            toast.loading("Exchanging auth code with server...", { id: "oauth" });
+            
+            try {
+                // Determine base URL (handles localhost vs vercel deployment automatically)
+                const baseUrl = window.location.origin;
+                const res = await fetch(`${baseUrl}/api/exchange-token`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code })
+                });
+                
+                const data = await res.json();
+                
+                if (res.ok && data.access_token) {
+                    sessionStorage.setItem('lavc_company_gmail_token', data.access_token);
+                    onToken(data.access_token);
+                    toast.success("Connected Workspace Auth!", { id: "oauth" });
+                    
+                    if (data.refresh_token) {
+                        console.log("CRITICAL: GOOGLE_REFRESH_TOKEN acquired: ", data.refresh_token);
+                        toast.success("Refresh Token mapped! Check console or copy below.", { duration: 8000 });
+                        prompt("Copy your permanent GOOGLE_REFRESH_TOKEN for Vercel:", data.refresh_token);
+                    }
+                } else {
+                    toast.error(`Exchange failed: ${data.error}`, { id: "oauth" });
+                }
+            } catch (err) {
+                console.error("Exchange Error", err);
+                toast.error("Vercel Serverless Function error during exchange.", { id: "oauth" });
+            }
         },
         onError: error => {
             console.error('Google Auth Failed:', error);
@@ -78,7 +105,7 @@ const GoogleAuthButton = ({ onToken }) => {
     return (
         <button className="btn-primary" onClick={() => login()} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#3b82f6', border: 'none', padding: '0.5rem 1rem', borderRadius: '8px', fontSize: '0.85rem' }}>
             <Mails size={16} />
-            Connect Company Gmail
+            Connect Company Gmail (Offline Mode)
         </button>
     );
 };
