@@ -38,6 +38,7 @@ const Accounting = ({ userProfile, exchangeRate, setExchangeRate }) => {
     const [localChartOfAccounts, setLocalChartOfAccounts] = useState(chartOfAccounts);
     const [accountingPeriods, setAccountingPeriods] = useState([]);
     const [editingReceivable, setEditingReceivable] = useState(null); // { id, agreedRate, amountPaid, status }
+    const [expandedReceivable, setExpandedReceivable] = useState(null);
     const [receivableEditForm, setReceivableEditForm] = useState({ agreed_rate: '', amount_paid_partial: '', receivables_status: 'UNPAID' });
 
     // Farm Carton Inventory State
@@ -207,7 +208,6 @@ const Accounting = ({ userProfile, exchangeRate, setExchangeRate }) => {
 
     // RECEIVABLES LOGIC (Revenue from Buyers)
     const receivablesData = useMemo(() => {
-        // Only look at containers that are fully stuffed or departed
         const activeContainers = containers.filter(c => c.totalBoxes > 0);
 
         return activeContainers.map(container => {
@@ -215,8 +215,12 @@ const Accounting = ({ userProfile, exchangeRate, setExchangeRate }) => {
             const amountPaid = Number(container.amount_paid_partial) || 0;
             const totalBoxes = Number(container.totalBoxes) || 0;
             let grossRevenue = totalBoxes * agreedRate;
+            let rateSource = agreedRate > 0 ? 'flat' : 'none'; // Track where the rate comes from
+            let specBreakdown = []; // Per-spec line items
+            let rateWeek = null;
 
-            if (agreedRate === 0 && container.buyer_name && consignees.length > 0 && consigneeWeeklyRates.length > 0) {
+            // Auto-calculate from consignee weekly rates when no flat rate is set
+            if (container.buyer_name && consignees.length > 0 && consigneeWeeklyRates.length > 0) {
                 const buyer = consignees.find(c => c.company_name === container.buyer_name);
                 if (buyer) {
                     const getWeekNum = (dateStr) => {
@@ -230,6 +234,7 @@ const Accounting = ({ userProfile, exchangeRate, setExchangeRate }) => {
                     
                     if (rateRecord?.rates_matrix && container.stuffedItems) {
                         let dynamicGross = 0;
+                        const breakdown = [];
                         container.stuffedItems.forEach(payload => {
                             if (payload.data) {
                                 Object.keys(payload.data).forEach(classGroupName => {
@@ -239,7 +244,13 @@ const Accounting = ({ userProfile, exchangeRate, setExchangeRate }) => {
                                         if (qty > 0) {
                                             const typeId = `${classGroupName}.${sizeKey}`;
                                             const specRate = Number(rateRecord.rates_matrix[typeId]) || 0;
-                                            dynamicGross += (qty * specRate);
+                                            const lineTotal = qty * specRate;
+                                            dynamicGross += lineTotal;
+                                            const label = `${classGroupName === 'classA' ? 'A' : 'B'}-${sizeKey.toUpperCase()}`;
+                                            // Merge into existing spec or add new
+                                            const existing = breakdown.find(b => b.spec === label);
+                                            if (existing) { existing.qty += qty; existing.total += lineTotal; }
+                                            else breakdown.push({ spec: label, qty, rate: specRate, total: lineTotal });
                                         }
                                     });
                                 });
@@ -249,6 +260,9 @@ const Accounting = ({ userProfile, exchangeRate, setExchangeRate }) => {
                         if (dynamicGross > 0) {
                             grossRevenue = dynamicGross;
                             agreedRate = Number((dynamicGross / totalBoxes).toFixed(2));
+                            rateSource = 'weekly_matrix';
+                            specBreakdown = breakdown.sort((a, b) => b.total - a.total);
+                            rateWeek = `Wk ${week}, ${year}`;
                         }
                     }
                 }
@@ -266,7 +280,10 @@ const Accounting = ({ userProfile, exchangeRate, setExchangeRate }) => {
                 amountPaid,
                 grossRevenue,
                 balanceDue,
-                receivablesStatus: payStatus
+                receivablesStatus: payStatus,
+                rateSource,
+                specBreakdown,
+                rateWeek,
             };
         });
     }, [containers, consignees, consigneeWeeklyRates]);
@@ -637,7 +654,7 @@ const Accounting = ({ userProfile, exchangeRate, setExchangeRate }) => {
                                         <th>Container / Voyage</th>
                                         <th>Buyer</th>
                                         <th className="text-right">Total Boxes</th>
-                                        <th className="text-right">Agreed Rate (USD)</th>
+                                        <th className="text-right">Rate (USD)</th>
                                         <th className="text-right">Gross Rev</th>
                                         <th className="text-right" style={{ color: '#16a34a' }}>Amount Paid</th>
                                         <th className="text-right">Balance Due</th>
@@ -649,23 +666,53 @@ const Accounting = ({ userProfile, exchangeRate, setExchangeRate }) => {
                                     {receivablesData.length === 0 ? (
                                         <tr><td colSpan="9" className="text-center" style={{ padding: '2rem' }}>No outbound containers found.</td></tr>
                                     ) : (
-                                        receivablesData.sort((a, b) => new Date(b.dateCreated) - new Date(a.dateCreated)).map(c => (
+                                        receivablesData.sort((a, b) => new Date(b.dateCreated) - new Date(a.dateCreated)).map(c => {
+                                            const isExpanded = expandedReceivable === c.id;
+                                            return (
                                             <React.Fragment key={c.id}>
-                                                <tr>
+                                                <tr
+                                                    onClick={() => setExpandedReceivable(isExpanded ? null : c.id)}
+                                                    style={{ cursor: 'pointer', transition: 'background 0.15s' }}
+                                                >
                                                     <td>
-                                                        <div style={{ fontWeight: '800', color: 'var(--color-primary-dark)' }}>{c.reeferNo || 'Pending'}</div>
-                                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>{c.vesselVoyage}</div>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                                            <span style={{ color: isExpanded ? '#16a34a' : '#94a3b8', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0)', fontSize: '0.7rem' }}>▶</span>
+                                                            <div>
+                                                                <div style={{ fontWeight: '800', color: 'var(--color-primary-dark)' }}>{c.reeferNo || 'Pending'}</div>
+                                                                <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>{c.voyageNo || c.vesselVoyage}</div>
+                                                            </div>
+                                                        </div>
                                                     </td>
                                                     <td>
-                                                        <div style={{ fontWeight: '600' }}>{c.buyer_name || 'Unassigned'}</div>
+                                                        <div style={{ fontWeight: '600' }}>{c.buyer_name || <span style={{ color: '#dc2626' }}>⚠ Unassigned</span>}</div>
                                                         <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>{c.destination}</div>
                                                     </td>
                                                     <td className="text-right" style={{ fontWeight: '600' }}>{c.totalBoxes}</td>
-                                                    <td className="text-right">${c.agreedRate.toFixed(2)}</td>
-                                                    <td className="text-right" style={{ color: '#64748b' }}>${c.grossRevenue.toFixed(2)}</td>
+                                                    <td className="text-right">
+                                                        {c.rateSource === 'weekly_matrix' ? (
+                                                            <>
+                                                                <div style={{ fontSize: '0.85rem' }}>${c.agreedRate.toFixed(2)}/avg</div>
+                                                                <div style={{
+                                                                    fontSize: '0.6rem', fontWeight: 700,
+                                                                    background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+                                                                    color: '#fff', padding: '1px 5px', borderRadius: '6px',
+                                                                    display: 'inline-block', marginTop: '2px',
+                                                                }}>📊 Weekly Matrix</div>
+                                                                <div style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>{c.rateWeek}</div>
+                                                            </>
+                                                        ) : c.rateSource === 'flat' ? (
+                                                            <>
+                                                                <div>${c.agreedRate.toFixed(2)}</div>
+                                                                <div style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>Flat rate</div>
+                                                            </>
+                                                        ) : (
+                                                            <div style={{ color: '#dc2626', fontSize: '0.8rem' }}>Not set</div>
+                                                        )}
+                                                    </td>
+                                                    <td className="text-right" style={{ color: c.grossRevenue > 0 ? '#64748b' : '#dc2626' }}>${c.grossRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                                                     <td className="text-right" style={{ color: '#16a34a', fontWeight: '600' }}>${c.amountPaid.toFixed(2)}</td>
                                                     <td className="text-right" style={{ fontWeight: '800', fontSize: '1.1rem', color: 'var(--color-primary-dark)' }}>
-                                                        ${c.balanceDue.toFixed(2)}
+                                                        ${c.balanceDue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                                     </td>
                                                     <td className="text-center">
                                                         <span className="status-badge" style={c.receivablesStatus === 'FULLY_PAID' ? { background: '#dcfce7', color: '#16a34a' } : c.receivablesStatus === 'PARTIAL' ? { background: '#dbeafe', color: '#2563eb' } : { background: '#fef3c7', color: '#b45309' }}>
@@ -675,9 +722,11 @@ const Accounting = ({ userProfile, exchangeRate, setExchangeRate }) => {
                                                     <td className="text-center">
                                                         <button
                                                             className="btn-secondary"
-                                                            onClick={() => {
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                if (editingReceivable === c.id) { setEditingReceivable(null); return; }
                                                                 setEditingReceivable(c.id);
-                                                                setReceivableEditForm({ agreed_rate: c.agreedRate, amount_paid_partial: c.amountPaid, receivables_status: c.receivablesStatus });
+                                                                setReceivableEditForm({ agreed_rate: c.rateSource === 'flat' ? c.agreedRate : '', amount_paid_partial: c.amountPaid, receivables_status: c.receivablesStatus });
                                                             }}
                                                             style={{ fontSize: '0.7rem', padding: '0.3rem 0.6rem' }}
                                                         >
@@ -685,16 +734,56 @@ const Accounting = ({ userProfile, exchangeRate, setExchangeRate }) => {
                                                         </button>
                                                     </td>
                                                 </tr>
+
+                                                {/* Spec breakdown when expanded */}
+                                                {isExpanded && c.specBreakdown.length > 0 && (
+                                                    <tr>
+                                                        <td colSpan="9" style={{ background: '#f8fafc', padding: '0.75rem 1.5rem', borderBottom: '2px solid #e2e8f0' }}>
+                                                            <div style={{ fontSize: '0.78rem', fontWeight: 700, marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>
+                                                                📊 Spec-Level Revenue Breakdown — {c.rateWeek}
+                                                            </div>
+                                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '0.4rem' }}>
+                                                                {c.specBreakdown.map(s => (
+                                                                    <div key={s.spec} style={{
+                                                                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                                                        padding: '0.4rem 0.6rem', background: '#fff', borderRadius: '6px',
+                                                                        border: '1px solid #e2e8f0', fontSize: '0.78rem',
+                                                                    }}>
+                                                                        <span style={{ fontWeight: 600, color: 'var(--color-primary-dark)' }}>{s.spec}</span>
+                                                                        <span style={{ color: 'var(--text-tertiary)' }}>{s.qty} × ${s.rate.toFixed(2)}</span>
+                                                                        <span style={{ fontWeight: 700 }}>${s.total.toFixed(2)}</span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                                {isExpanded && c.specBreakdown.length === 0 && (
+                                                    <tr>
+                                                        <td colSpan="9" style={{ background: '#fffbeb', padding: '0.75rem 1.5rem', fontSize: '0.82rem', color: '#92400e', borderBottom: '2px solid #fef3c7' }}>
+                                                            ⚠ No spec-level breakdown available. {!c.buyer_name ? 'Assign a buyer first.' : 'Weekly rates may not be set for this period.'}
+                                                        </td>
+                                                    </tr>
+                                                )}
+
                                                 {editingReceivable === c.id && (
                                                     <tr>
                                                         <td colSpan="9" style={{ background: '#f0fdf4', padding: '1rem 1.5rem', borderBottom: '2px solid #10b981' }}>
                                                             <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                                                                <div>
-                                                                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, marginBottom: '4px' }}>Agreed Rate (USD/box)</label>
-                                                                    <input type="number" step="0.01" className="input-field" value={receivableEditForm.agreed_rate}
-                                                                        onChange={e => setReceivableEditForm({ ...receivableEditForm, agreed_rate: e.target.value })}
-                                                                        style={{ width: '130px' }} />
-                                                                </div>
+                                                                {c.rateSource !== 'weekly_matrix' && (
+                                                                    <div>
+                                                                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, marginBottom: '4px' }}>Flat Rate Override (USD/box)</label>
+                                                                        <input type="number" step="0.01" className="input-field" value={receivableEditForm.agreed_rate}
+                                                                            onChange={e => setReceivableEditForm({ ...receivableEditForm, agreed_rate: e.target.value })}
+                                                                            style={{ width: '130px' }} />
+                                                                        <div style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', marginTop: '2px' }}>Leave 0 to use weekly matrix</div>
+                                                                    </div>
+                                                                )}
+                                                                {c.rateSource === 'weekly_matrix' && (
+                                                                    <div style={{ padding: '0.5rem 0.75rem', background: 'rgba(124, 58, 237, 0.08)', borderRadius: '8px', border: '1px solid rgba(124, 58, 237, 0.2)', fontSize: '0.8rem', color: '#7c3aed' }}>
+                                                                        📊 Rate auto-calculated from <strong>{c.rateWeek}</strong> weekly matrix = <strong>${c.agreedRate.toFixed(2)}/avg</strong>
+                                                                    </div>
+                                                                )}
                                                                 <div>
                                                                     <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, marginBottom: '4px' }}>Amount Paid (USD)</label>
                                                                     <input type="number" step="0.01" className="input-field" value={receivableEditForm.amount_paid_partial}
@@ -722,7 +811,8 @@ const Accounting = ({ userProfile, exchangeRate, setExchangeRate }) => {
                                                     </tr>
                                                 )}
                                             </React.Fragment>
-                                        ))
+                                            );
+                                        })
                                     )}
                                 </tbody>
                             </table>
