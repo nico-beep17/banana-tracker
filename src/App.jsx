@@ -409,8 +409,18 @@ function App() {
     const stuffedByType = {};
     (containers || []).forEach(c => {
       (c.stuffedItems || []).forEach(payload => {
-        Object.entries(payload.data || {}).forEach(([typeId, qty]) => {
-          stuffedByType[typeId] = (stuffedByType[typeId] || 0) + (Number(qty) || 0);
+        const data = payload.data || {};
+        Object.entries(data).forEach(([key, val]) => {
+          if (val && typeof val === 'object') {
+            // Nested format: { classA: { rha4: 100, rha5: 50 } }
+            Object.entries(val).forEach(([subKey, subVal]) => {
+              const typeId = `${key}.${subKey}`;
+              stuffedByType[typeId] = (stuffedByType[typeId] || 0) + (Number(subVal) || 0);
+            });
+          } else {
+            // Flat format: { 'classA.rha4': 100 }
+            stuffedByType[key] = (stuffedByType[key] || 0) + (Number(val) || 0);
+          }
         });
       });
     });
