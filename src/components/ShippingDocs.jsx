@@ -9,7 +9,7 @@ import {
 import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
 import { useContainersQuery } from '../queries/hooks';
 import { useQueryClient } from '@tanstack/react-query';
-import { searchGmailForContainer, getEmailHtmlForPrint } from '../utils/gmailScanner';
+import { searchGmailForContainer, getEmailHtmlForPrint, generateInboxSummary } from '../utils/gmailScanner';
 import './ShippingDocs.css';
 
 const DEFAULT_DOCS_STATE = {
@@ -104,6 +104,27 @@ const ShippingDocs = () => {
     }, [containers]);
 
     const [customQueries, setCustomQueries] = useState({});
+
+    const [globalInboxSummary, setGlobalInboxSummary] = useState(null);
+    const [generatingSummary, setGeneratingSummary] = useState(false);
+    
+    const handleGenerateInboxSummary = async () => {
+        if (!gmailToken) {
+            toast.error('Connect Gmail first.');
+            return;
+        }
+        setGeneratingSummary(true);
+        toast.info('Analyzing company inbox operations...');
+        try {
+            const md = await generateInboxSummary(gmailToken);
+            setGlobalInboxSummary(md);
+            toast.success('Inbox intelligence summary generated.');
+        } catch(e) {
+            toast.error('Failed to generate summary.');
+        } finally {
+            setGeneratingSummary(false);
+        }
+    };
 
     const filteredContainers = useMemo(() => {
         if (!searchQuery) return activeContainers;
@@ -380,6 +401,32 @@ const ShippingDocs = () => {
                         )}
                     </div>
                 </div>
+                
+                {/* Global Inbox Summary Panel */}
+                {gmailToken && (
+                    <div style={{ padding: '0 1.5rem 1.5rem 1.5rem', borderTop: '1px solid #f1f5f9', marginTop: '0.5rem', paddingTop: '1rem' }}>
+                        <button 
+                            onClick={handleGenerateInboxSummary}
+                            disabled={generatingSummary}
+                            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0.75rem 1.5rem', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', fontSize: '0.95rem', fontWeight: 500, cursor: generatingSummary ? 'not-allowed' : 'pointer', opacity: generatingSummary ? 0.7 : 1 }}
+                        >
+                            {generatingSummary ? <Loader2 size={18} className="sd-spin" /> : <Sparkles size={18} />}
+                            {generatingSummary ? 'Scanning Entire Inbox...' : 'Generate Inbox Operations Report'}
+                        </button>
+                        
+                        {globalInboxSummary && (
+                            <div className="animation-fade-in" style={{ marginTop: '1rem', background: '#f8fafc', padding: '1.5rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem', color: '#1e293b' }}>
+                                    <Mail size={18} style={{ color: '#3b82f6' }} />
+                                    <h4 style={{ margin: 0 }}>Executive Inbox Report</h4>
+                                </div>
+                                <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, color: '#334155', fontSize: '0.95rem' }}>
+                                    {globalInboxSummary}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
             </section>
 
             {/* Weekly Schedule & Reminders Widget */}

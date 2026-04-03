@@ -487,3 +487,67 @@ export async function getEmailHtmlForPrint(token, messageId) {
     return `<html><body><h2>Error loading email</h2><p>${err.message}</p></body></html>`;
   }
 }
+
+/**
+ * Generate a comprehensive summary of the entire Gmail account/inbox
+ * @param {string} token - Gmail OAuth token
+ * @returns {Promise<string>} Markdown formatted report
+ */
+export async function generateInboxSummary(token) {
+  if (!token) return 'No Gmail token provided.';
+  
+  try {
+    const res = await fetch(`${GMAIL_API_BASE}/messages?maxResults=50`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const data = await res.json();
+    
+    if (!data.messages) return 'No emails found in the inbox.';
+    
+    // Fetch snippets
+    const emails = [];
+    for (const msgData of data.messages) {
+      try {
+        const msgRes = await fetch(`${GMAIL_API_BASE}/messages/${msgData.id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const m = await msgRes.json();
+        const subject = m.payload?.headers?.find(h => h.name.toLowerCase() === 'subject')?.value || 'No Subject';
+        const from = m.payload?.headers?.find(h => h.name.toLowerCase() === 'from')?.value || 'Unknown';
+        emails.push(`- From: ${from} | Subject: ${subject} | Preview: ${m.snippet}`);
+      } catch(e) {}
+    }
+    
+    const emailSummaries = emails.join('\n');
+    const systemPrompt = `You are a high-level Operations Intelligence AI for a banana export logistics company.
+Read the following 50 most recent emails from the company inbox. 
+Generate a comprehensive, executive-level "Inbox Activity Summary".
+Highlight:
+1. Urgent or pending actions required.
+2. Status updates from forwarders/shipping lines.
+3. Emerging issues or delays mentioned across any containers.
+4. General volume or flow of documentation currently happening.
+
+Format neatly using markdown, headers, and bullet points. Do NOT output JSON. Output ONLY the markdown report.`;
+
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    const parts = [{ text: systemPrompt + '\n\nRECENT INBOX EMAILS:\n' + emailSummaries }];
+    
+    const gRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ role: 'user', parts }],
+        generationConfig: { maxOutputTokens: 4096, temperature: 0.3 }
+      })
+    });
+    
+    if (!gRes.ok) throw new Error('Gemini API Error');
+    const gData = await gRes.json();
+    return gData?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || 'Failed to generate summary.';
+    
+  } catch (err) {
+    console.error('Inbox Summary Error:', err);
+    return 'Error generating inbox summary: ' + err.message;
+  }
+}
