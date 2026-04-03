@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { RefreshCw, Bell, Settings, LayoutDashboard, ClipboardEdit, TestTubes, Leaf, Handshake, Ship, Package, Globe, LineChart, Calculator, Users, LogOut, UserCog, FileText } from 'lucide-react';
+import { RefreshCw, Bell, Settings, LayoutDashboard, ClipboardEdit, TestTubes, Leaf, Handshake, Ship, Package, Globe, LineChart, Calculator, Users, LogOut, UserCog, FileText, Search } from 'lucide-react';
 import offlineSync from '../utils/offlineSync';
 import './Layout.css';
 
@@ -289,7 +289,7 @@ const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notif
                             onKeyDown={e => e.key === 'Escape' && setSearchOpen(false)}
                             style={{ paddingLeft: '2rem' }}
                         />
-                        <span style={{ position: 'absolute', left: '0.6rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.9rem', pointerEvents: 'none' }}>🔍</span>
+                        <span style={{ position: 'absolute', left: '0.6rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', display: 'flex', alignItems: 'center' }}><Search size={16} color="#94a3b8" /></span>
                         {searchOpen && searchQuery.trim().length >= 2 && (
                             <div style={{
                                 position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0,
