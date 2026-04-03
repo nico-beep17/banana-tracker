@@ -400,14 +400,40 @@ const ShippingDocs = () => {
             <section className="sd-tracker-section">
                 <div className="sd-tracker-header">
                     <h3>Active Consignments ({filteredContainers.length})</h3>
-                    <div className="sd-search-box">
-                        <Search size={18} />
-                        <input 
-                            type="text" 
-                            placeholder="Search Container / Brand..." 
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
+                    <div className="sd-search-box" style={{ display: 'flex', gap: '10px' }}>
+                        {gmailToken && (
+                            <button 
+                                onClick={async () => {
+                                    try {
+                                        toast.info('Fetching sample inbox data...');
+                                        const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=50', { headers: { Authorization: `Bearer ${gmailToken}` } });
+                                        const data = await res.json();
+                                        const details = await Promise.all(data.messages.map(m => fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From`, { headers: { Authorization: `Bearer ${gmailToken}` } }).then(r => r.json())));
+                                        const textStr = details.map((m, i) => `${i+1}. From: ${m.payload?.headers?.find(h=>h.name==='From')?.value}\n   Subj: ${m.payload?.headers?.find(h=>h.name==='Subject')?.value}\n   Snippet: ${m.snippet}\n`).join('\n');
+                                        const link = document.createElement('a');
+                                        link.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(textStr);
+                                        link.download = 'gmail_inbox_structure.txt';
+                                        link.click();
+                                        toast.success('Downloaded! Please share this file with the AI.');
+                                    } catch (e) {
+                                        toast.error('Failed to export inbox');
+                                    }
+                                }}
+                                style={{ background: '#fef3c7', border: '1px solid #f59e0b', color: '#92400e', padding: '6px 12px', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', fontWeight: 600 }}
+                            >
+                                🐞 Export Inbox for AI
+                            </button>
+                        )}
+                        <div style={{ display: 'flex', alignItems: 'center', background: '#fff', padding: '0 10px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                            <Search size={18} color="#94a3b8" />
+                            <input 
+                                type="text" 
+                                placeholder="Search Container..." 
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                style={{ border: 'none', background: 'transparent', padding: '8px', outline: 'none' }}
+                            />
+                        </div>
                     </div>
                 </div>
 
