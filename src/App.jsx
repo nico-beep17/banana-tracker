@@ -24,21 +24,37 @@ import {
   useMaterialsInventoryQuery, useEmployeesQuery, useDtrRecordsQuery, useAttendanceLocationsQuery
 } from './queries/hooks';
 
+// Auto-retry lazy imports: if a chunk fails to load (stale PWA cache after redeploy),
+// force a hard page reload once to pick up the new filenames.
+const lazyRetry = (importFn) => lazy(() =>
+  importFn().catch(() => {
+    // Only reload once per session to avoid infinite loops
+    const hasReloaded = sessionStorage.getItem('lavc_chunk_reload');
+    if (!hasReloaded) {
+      sessionStorage.setItem('lavc_chunk_reload', '1');
+      window.location.reload();
+      return new Promise(() => {}); // never resolves — page is reloading
+    }
+    // If already reloaded once this session, surface the real error
+    return importFn();
+  })
+);
+
 // Lazy-loaded heavy modules — only downloaded when user navigates to the tab
-const ArrivalForm = lazy(() => import('./components/ArrivalForm'));
-const ArrivalsTable = lazy(() => import('./components/ArrivalsTable'));
-const FarmsAndGrowers = lazy(() => import('./components/FarmsAndGrowers'));
-const Sampling = lazy(() => import('./components/Sampling'));
-const NewContainerForm = lazy(() => import('./components/NewContainerForm'));
-const ContainersList = lazy(() => import('./components/ContainersList'));
-const ContainerStuffingGrid = lazy(() => import('./components/ContainerStuffingGrid'));
-const Reports = lazy(() => import('./components/Reports'));
-const Accounting = lazy(() => import('./components/Accounting'));
-const Payroll = lazy(() => import('./components/Payroll'));
-const ShipmentTracker = lazy(() => import('./components/ShipmentTracker'));
-const MaterialsInventory = lazy(() => import('./components/MaterialsInventory'));
-const Consignees = lazy(() => import('./components/Consignees'));
-const ShippingDocs = lazy(() => import('./components/ShippingDocs'));
+const ArrivalForm = lazyRetry(() => import('./components/ArrivalForm'));
+const ArrivalsTable = lazyRetry(() => import('./components/ArrivalsTable'));
+const FarmsAndGrowers = lazyRetry(() => import('./components/FarmsAndGrowers'));
+const Sampling = lazyRetry(() => import('./components/Sampling'));
+const NewContainerForm = lazyRetry(() => import('./components/NewContainerForm'));
+const ContainersList = lazyRetry(() => import('./components/ContainersList'));
+const ContainerStuffingGrid = lazyRetry(() => import('./components/ContainerStuffingGrid'));
+const Reports = lazyRetry(() => import('./components/Reports'));
+const Accounting = lazyRetry(() => import('./components/Accounting'));
+const Payroll = lazyRetry(() => import('./components/Payroll'));
+const ShipmentTracker = lazyRetry(() => import('./components/ShipmentTracker'));
+const MaterialsInventory = lazyRetry(() => import('./components/MaterialsInventory'));
+const Consignees = lazyRetry(() => import('./components/Consignees'));
+const ShippingDocs = lazyRetry(() => import('./components/ShippingDocs'));
 
 // Loading fallback for lazy modules
 const LazyFallback = () => (

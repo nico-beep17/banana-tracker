@@ -191,8 +191,17 @@ const ConsigneeForm = ({
                                         <select name="spec_ventilation" className="input-premium" value={newConsignee.spec_ventilation || ''} onChange={handleInputChange}>
                                             <option value="">Select Status...</option>
                                             <option value="CLOSED">CLOSED</option>
+                                            <option value="5% OPEN">5% OPEN</option>
+                                            <option value="10% OPEN">10% OPEN</option>
                                             <option value="15% OPEN">15% OPEN</option>
+                                            <option value="20% OPEN">20% OPEN</option>
                                             <option value="25% OPEN">25% OPEN</option>
+                                            <option value="30% OPEN">30% OPEN</option>
+                                            <option value="35% OPEN">35% OPEN</option>
+                                            <option value="40% OPEN">40% OPEN</option>
+                                            <option value="45% OPEN">45% OPEN</option>
+                                            <option value="50% OPEN">50% OPEN</option>
+                                            <option value="FULLY OPEN">FULLY OPEN</option>
                                         </select>
                                     </div>
                                 </div>
