@@ -131,9 +131,9 @@ function GrowerProfileModal({ farm, weeklyRates, arrivals, samplings = [], onClo
             <body>
                 <div class="header">
                     <div class="brand">
-                        <h1>LA.VC TRADING</h1>
-                        <p>Brgy. Kinamayan, Sto. Tomas, Davao Del Norte</p>
-                        <p>TIN: 279-052-826-000</p>
+                        <h1>LFJ AGRI-VENTURES CORPORATION</h1>
+                        <p>Purok 3, San Vicente, Panabo City, Davao del Norte, Philippines 8105</p>
+                        <p>Tel # (084) 823-5317 | Email: lfjagriventurescorp@gmail.com</p>
                     </div>
                     <div>
                         <img src="${LAvcLogo}" alt="LAVC Logo" class="logo" />

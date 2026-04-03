@@ -73,7 +73,9 @@ const ContainerManifest = React.forwardRef(({ container, style }, ref) => {
                     </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                    <div style={{ color: '#64748b', fontSize: '14px', fontWeight: '600', marginBottom: '4px' }}>LFJ AGRI-VENTURES CORPORATION</div>
+                    <div style={{ color: '#1e293b', fontSize: '16px', fontWeight: '800', marginBottom: '2px' }}>LFJ AGRI-VENTURES CORPORATION</div>
+                    <div style={{ color: '#64748b', fontSize: '11px', marginBottom: '1px' }}>Purok 3, San Vicente, Panabo City, Davao del Norte, Philippines 8105</div>
+                    <div style={{ color: '#64748b', fontSize: '11px', marginBottom: '8px' }}>Tel # (084) 823-5317 | Email: lfjagriventurescorp@gmail.com</div>
                     <div style={{ fontSize: '14px' }}><strong>Date Printed:</strong> {new Date().toLocaleDateString(undefined, { dateStyle: 'long' })}</div>
                 </div>
             </div>
