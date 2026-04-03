@@ -1,8 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
-export const config = {
-    maxDuration: 60, // Vercel Cron needs more time (Pro allows up to 300s, Hobby 10s. Default is 10s in Hobby but let's request 60s)
-};
+// Note: On Vercel Hobby plan, serverless functions have a 10s limit.
+// Upgrade to Pro for longer execution times if needed.
 
 export default async function handler(req, res) {
     if (req.method !== 'GET' && req.method !== 'POST') {
