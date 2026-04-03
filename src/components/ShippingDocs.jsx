@@ -405,18 +405,56 @@ const ShippingDocs = () => {
                             <button 
                                 onClick={async () => {
                                     try {
-                                        toast.info('Fetching sample inbox data...');
-                                        const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=50', { headers: { Authorization: `Bearer ${gmailToken}` } });
+                                        toast.info('Initiating full inbox scan... Please wait, this will download all emails and attachments.');
+                                        const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=100', { headers: { Authorization: `Bearer ${gmailToken}` } });
                                         const data = await res.json();
-                                        const details = await Promise.all(data.messages.map(m => fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From`, { headers: { Authorization: `Bearer ${gmailToken}` } }).then(r => r.json())));
-                                        const textStr = details.map((m, i) => `${i+1}. From: ${m.payload?.headers?.find(h=>h.name==='From')?.value}\n   Subj: ${m.payload?.headers?.find(h=>h.name==='Subject')?.value}\n   Snippet: ${m.snippet}\n`).join('\n');
+                                        
+                                        if (!data.messages) {
+                                            toast.error('No messages found');
+                                            return;
+                                        }
+
+                                        let allMails = [];
+                                        for (let i = 0; i < data.messages.length; i++) {
+                                            toast.info(`Downloading email data & attachments ${i+1}/${data.messages.length}...`);
+                                            const mRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${data.messages[i].id}?format=full`, { headers: { Authorization: `Bearer ${gmailToken}` } });
+                                            const mData = await mRes.json();
+                                            
+                                            // Extract attachments
+                                            const parts = mData.payload?.parts || [];
+                                            const attachments = [];
+                                            for (const part of parts) {
+                                                if (part.body?.attachmentId) {
+                                                    const attRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${data.messages[i].id}/attachments/${part.body.attachmentId}`, { headers: { Authorization: `Bearer ${gmailToken}` } });
+                                                    const attData = await attRes.json();
+                                                    attachments.push({ filename: part.filename, mimeType: part.mimeType, size: attData.size, data: attData.data });
+                                                }
+                                            }
+                                            
+                                            allMails.push({
+                                                id: mData.id,
+                                                subject: mData.payload.headers.find(h => h.name === 'Subject')?.value || 'No Subject',
+                                                from: mData.payload.headers.find(h => h.name === 'From')?.value || 'Unknown',
+                                                date: mData.payload.headers.find(h => h.name === 'Date')?.value || 'Unknown Time',
+                                                snippet: mData.snippet,
+                                                attachments: attachments
+                                            });
+                                        }
+                                        
+                                        toast.success('Compiling massive dataset...');
+                                        const textStr = JSON.stringify(allMails, null, 2);
+                                        const blob = new Blob([textStr], { type: 'application/json' });
+                                        const url = URL.createObjectURL(blob);
+                                        
                                         const link = document.createElement('a');
-                                        link.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(textStr);
-                                        link.download = 'gmail_inbox_structure.txt';
+                                        link.href = url;
+                                        link.download = 'gmail_full_dump_with_attachments.json';
                                         link.click();
-                                        toast.success('Downloaded! Please share this file with the AI.');
+                                        URL.revokeObjectURL(url);
+                                        toast.success('Full system dump downloaded completely.');
                                     } catch (e) {
-                                        toast.error('Failed to export inbox');
+                                        console.error(e);
+                                        toast.error('Export failed: ' + e.message);
                                     }
                                 }}
                                 style={{ background: '#fef3c7', border: '1px solid #f59e0b', color: '#92400e', padding: '6px 12px', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', fontWeight: 600 }}
