@@ -336,9 +336,9 @@ Extract the LATEST/MOST RECENT information for these fields (corrections and del
 - sealNo: Container seal number
 - bookingNo: Booking reference number
 TASK 3 - DETAILED CONTAINER ANALYSIS REPORT:
-Generate a highly detailed, comprehensive analysis report regarding this specific container based on all available emails. Include context such as the full shipping timeline, any mentioned delays, outstanding invoices, port transfers, forwarder communications, missing paperwork, or any relevant supply chain context found. Format the summary cleanly using paragraphs and bullet points if necessary.
+Generate a highly detailed, comprehensive analysis report regarding this specific container based on all available emails. Include context such as the full shipping timeline, any mentioned delays, outstanding invoices, port transfers, forwarder communications, missing paperwork, or any relevant supply chain context found. Format the summary cleanly using paragraphs and bullet points if necessary. EVEN IF YOU FIND NO DOCUMENTS, YOU MUST STILL WRITE A DETAILED SUMMARY OF WHAT IS HAPPENING IN THE EMAILS. DO NOT LEAVE THE SUMMARY BLANK.
 
-Return ONLY valid JSON in this exact format. You must populate the "matchedDocs" object with a key for EVERY SINGLE document listed above (e.g. atwObtained, atwUsed, etradeRegistered, ciDone, plDone, lcuDone, phytoDone, closedTicket, ed, bl, ci, pl, ctcPhyto).
+Return ONLY valid JSON in this exact format. You must populate the "matchedDocs" object with a key for EVERY SINGLE document listed above. BE EXTREMELY AGGRESSIVE AND LENIENT: if a PDF is attached or the email says "SHIPPING DOCS" or "attached", flag the documents (bl, ci, pl, ed) as FOUND.
 {
   "matchedDocs": {
     "atwObtained": { "found": true/false, "confidence": "high/medium/low", "emailIndex": 0, "reason": "brief reason" },
@@ -401,7 +401,13 @@ Return ONLY valid JSON in this exact format. You must populate the "matchedDocs"
           } catch(e) {
             const match = text.match(/\{[\s\S]*\}/);
             if (match) {
-                try { aiResult = JSON.parse(match[0]); } catch(err) {}
+                try { 
+                    aiResult = JSON.parse(match[0]); 
+                } catch(err) {
+                    aiResult.summary = `### ⚠️ AI Processing Failed\n\nThe AI successfully analyzed the 27 emails, but the generated report was too complex and failed to parse securely (JSON Parse Error). Please try scanning again.\n\nRaw Output Snippet: ${text.slice(0, 150)}...`;
+                }
+            } else {
+                aiResult.summary = `### ⚠️ AI Format Error\n\nThe AI did not return a valid structured response format.`;
             }
           }
       } else {
@@ -412,7 +418,11 @@ Return ONLY valid JSON in this exact format. You must populate the "matchedDocs"
 
     } catch (apiErr) {
       console.error('[GmailScan] Direct Gemini fetch failed:', apiErr);
-      return null;
+      return { 
+        matchedDocs: {}, 
+        vesselInfo: {}, 
+        summary: `### ⚠️ AI Processing Failed\n\nThe AI encountered an error while analyzing the 27 emails. This happens if the email attachments exceeded data limits or the Google Gemini API rejected the PDF payloads.\n\n**Error Trace:**\n${apiErr.message}` 
+      };
     }
 }
 
