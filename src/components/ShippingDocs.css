@@ -500,3 +500,38 @@
     font-weight: 500;
     line-height: 1.5;
 }
+
+
+/* Markdown Custom Styles */
+.sd-markdown-content p {
+  margin: 0 0 0.85rem 0;
+  line-height: 1.6;
+}
+
+.sd-markdown-content p:last-child {
+  margin-bottom: 0;
+}
+
+.sd-markdown-content ul, .sd-markdown-content ol {
+  margin: 0.5rem 0 1rem 1.5rem;
+  padding: 0;
+}
+
+.sd-markdown-content li {
+  margin-bottom: 0.4rem;
+  line-height: 1.5;
+}
+
+.sd-markdown-content h1, .sd-markdown-content h2, .sd-markdown-content h3, .sd-markdown-content h4 {
+  margin: 1.5rem 0 0.75rem 0;
+  font-weight: 600;
+  color: inherit;
+}
+
+.sd-markdown-content h1:first-child, .sd-markdown-content h2:first-child, .sd-markdown-content h3:first-child {
+  margin-top: 0;
+}
+
+.sd-markdown-content strong {
+  font-weight: 600;
+}

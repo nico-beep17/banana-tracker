@@ -6,6 +6,7 @@ import {
     Ship, BookOpen, FileCheck, CheckSquare, Search, ChevronDown, ChevronUp, Anchor,
     Mails, CheckCircle, Printer, Mail, Loader2, Sparkles, ExternalLink, FileSearch
 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
 import { useContainersQuery } from '../queries/hooks';
 import { useQueryClient } from '@tanstack/react-query';
@@ -420,8 +421,8 @@ const ShippingDocs = () => {
                                     <Mail size={18} style={{ color: '#3b82f6' }} />
                                     <h4 style={{ margin: 0 }}>Executive Inbox Report</h4>
                                 </div>
-                                <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, color: '#334155', fontSize: '0.95rem' }}>
-                                    {globalInboxSummary}
+                                <div className="sd-markdown-content" style={{ color: '#334155', fontSize: '0.95rem' }}>
+                                    <ReactMarkdown>{globalInboxSummary}</ReactMarkdown>
                                 </div>
                             </div>
                         )}
@@ -650,8 +651,8 @@ const ShippingDocs = () => {
                                                         <Sparkles size={16} />
                                                         <span>AI Container Intelligence Report</span>
                                                     </div>
-                                                    <div style={{ color: '#15803d', fontSize: '13px', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
-                                                        {scan.aiSummary}
+                                                    <div className="sd-markdown-content" style={{ color: '#15803d', fontSize: '13px' }}>
+                                                        <ReactMarkdown>{scan.aiSummary}</ReactMarkdown>
                                                     </div>
                                                 </div>
                                             )}
