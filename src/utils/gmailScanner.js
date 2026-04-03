@@ -382,7 +382,13 @@ Return ONLY valid JSON in this exact format. You must populate the "matchedDocs"
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ role: 'user', parts }],
-          generationConfig: { maxOutputTokens: 4096, temperature: 0.1, responseMimeType: 'application/json' }
+          generationConfig: { maxOutputTokens: 4096, temperature: 0.1, responseMimeType: 'application/json' },
+          safetySettings: [
+            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+          ]
         })
       });
       
@@ -411,7 +417,9 @@ Return ONLY valid JSON in this exact format. You must populate the "matchedDocs"
             }
           }
       } else {
-          console.warn('[GmailScan] Gemini returned empty response or hit a safety filter:', gData);
+          const finishReason = gData?.candidates?.[0]?.finishReason || 'UNKNOWN';
+          console.warn('[GmailScan] Gemini returned empty response:', gData);
+          aiResult.summary = `### ⚠️ AI Blocked by Safety Filters\n\nThe Google Gemini model successfully read your emails, but refused to output the data due to automatic Safety Blocks (\`${finishReason}\`). This often happens when scanning highly confidential documents with signatures, stamps, or specific foreign text. Please try bypassing the attachments manually.`;
       }
       
       return aiResult;
@@ -548,7 +556,13 @@ Format neatly using markdown, headers, and bullet points. Do NOT output JSON. Ou
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ role: 'user', parts }],
-        generationConfig: { maxOutputTokens: 4096, temperature: 0.3 }
+        generationConfig: { maxOutputTokens: 4096, temperature: 0.3 },
+        safetySettings: [
+          { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+        ]
       })
     });
     
