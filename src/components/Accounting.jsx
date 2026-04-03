@@ -28,6 +28,7 @@ const Accounting = ({ userProfile, exchangeRate, setExchangeRate }) => {
     };
 
     const [activeTab, setActiveTab] = useState('payables');
+    const [expandedPayableWeeks, setExpandedPayableWeeks] = useState([]);
     const [subTab, setSubTab] = useState('overview');
 
     // Financial Reports State
@@ -430,17 +431,58 @@ const Accounting = ({ userProfile, exchangeRate, setExchangeRate }) => {
                         </button>
                     </div>
 
-                    {/* Payables Ledger */}
-                    {activeTab === 'payables' && (
+                    {/* Payables Ledger — Grouped by Week */}
+                    {activeTab === 'payables' && (() => {
+                        // Group payables by ISO week + grower
+                        const getISOWeek = (dateStr) => {
+                            if (!dateStr) return { wk: 0, yr: 0 };
+                            const d = new Date(dateStr);
+                            const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+                            const dayNum = date.getUTCDay() || 7;
+                            date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+                            const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+                            return { wk: Math.ceil((((date - yearStart) / 86400000) + 1) / 7), yr: date.getUTCFullYear() };
+                        };
+
+                        // Group: { "2026-W14|FarmName": { weekKey, farmName, farmCode, batches: [], totals } }
+                        const weekGroups = {};
+                        payablesData.forEach(p => {
+                            const { wk, yr } = getISOWeek(p.dateOfPacking || p.dateTimeEncoded);
+                            const weekKey = `${yr}-W${String(wk).padStart(2, '0')}`;
+                            const groupKey = `${weekKey}|${p.farmName}`;
+                            if (!weekGroups[groupKey]) {
+                                weekGroups[groupKey] = {
+                                    weekKey, wk, yr,
+                                    farmName: p.farmName,
+                                    farmCode: p.farmCode,
+                                    batches: [],
+                                    totalBoxes: 0, grossAmount: 0, deductions: 0, netDue: 0,
+                                    classAQty: 0, classBQty: 0,
+                                    allPaid: true, expectedPaymentDate: p.expectedPaymentDate,
+                                };
+                            }
+                            weekGroups[groupKey].batches.push(p);
+                            weekGroups[groupKey].totalBoxes += p.totalQuantity;
+                            weekGroups[groupKey].grossAmount += p.grossAmount;
+                            weekGroups[groupKey].deductions += p.deductionsTotal;
+                            weekGroups[groupKey].netDue += p.netAmountDue;
+                            weekGroups[groupKey].classAQty += p.classADetails.quantity;
+                            weekGroups[groupKey].classBQty += p.classBDetails.quantity;
+                            if (p.paymentStatus !== 'PAID') weekGroups[groupKey].allPaid = false;
+                        });
+
+                        const sortedGroups = Object.values(weekGroups)
+                            .sort((a, b) => b.weekKey.localeCompare(a.weekKey) || b.netDue - a.netDue);
+
+                        return (
                         <div className="card shadow-lg" style={{ padding: '0', overflow: 'hidden' }}>
                             <table className="banana-table">
                                 <thead>
                                     <tr>
-                                        <th>Delivery Batch</th>
+                                        <th>Week</th>
                                         <th>Grower</th>
                                         <th className="text-right">Total Boxes</th>
-                                        <th className="text-right">Rates (PHP)</th>
-                                        <th className="text-right">Gross</th>
+                                        <th className="text-right">Gross (PHP)</th>
                                         <th className="text-right" style={{ color: '#dc2626' }}>Deductions</th>
                                         <th className="text-right">Net Due (PHP)</th>
                                         <th className="text-center">Status</th>
@@ -448,67 +490,137 @@ const Accounting = ({ userProfile, exchangeRate, setExchangeRate }) => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {payablesData.length === 0 ? (
-                                        <tr><td colSpan="9" className="text-center" style={{ padding: '2rem' }}>No pending payables.</td></tr>
+                                    {sortedGroups.length === 0 ? (
+                                        <tr><td colSpan="8" className="text-center" style={{ padding: '2rem' }}>No payables data.</td></tr>
                                     ) : (
-                                        payablesData.sort((a, b) => new Date(b.dateTimeEncoded) - new Date(a.dateTimeEncoded)).map(p => (
-                                            <tr key={p.id}>
-                                                <td style={{ fontSize: '0.85rem' }}>
-                                                    {p.dateOfPacking ? new Date(p.dateOfPacking).toLocaleDateString() : 'N/A'}
-                                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>{p.deliveryReceipt || p.plateNumber}</div>
-                                                </td>
-                                                <td>
-                                                    <div style={{ fontWeight: '600', color: 'var(--color-primary-dark)' }}>{p.farmName}</div>
-                                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>{p.farmCode}</div>
-                                                </td>
-                                                <td className="text-right">
-                                                    <strong>{p.totalQuantity}</strong>
-                                                    <div style={{ fontSize: '0.7rem', color: 'var(--color-primary-main)' }}>
-                                                        {p.classADetails.quantity > 0 && `${p.classADetails.quantity} A`}
-                                                        {p.classADetails.quantity > 0 && p.classBDetails.quantity > 0 && ' | '}
-                                                        {p.classBDetails.quantity > 0 && `${p.classBDetails.quantity} B`}
-                                                    </div>
-                                                </td>
-                                                <td className="text-right">
-                                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Varied based</div>
-                                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>on spec matrix</div>
-                                                </td>
-                                                <td className="text-right" style={{ color: '#64748b' }}>₱{p.grossAmount.toFixed(2)}</td>
-                                                <td className="text-right" style={{ color: '#ef4444' }}>
-                                                    {p.deductionsTotal > 0 ? `-₱${p.deductionsTotal.toFixed(2)}` : '₱0.00'}
-                                                    {p.rejectedCount > 0 && <div style={{ fontSize: '0.7rem' }}>({p.rejectedCount} rejected)</div>}
-                                                </td>
-                                                <td className="text-right" style={{ fontWeight: '800', fontSize: '1.1rem', color: 'var(--color-primary-dark)' }}>
-                                                    ₱{p.netAmountDue.toFixed(2)}
-                                                </td>
-                                                <td className="text-center">
-                                                    <span className="status-badge" style={p.paymentStatus === 'PAID' ? { background: '#dcfce7', color: '#16a34a' } : { background: '#fef3c7', color: '#b45309' }}>
-                                                        {p.paymentStatus}
-                                                    </span>
-                                                    {p.paymentStatus === 'PENDING' && (
-                                                        <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', marginTop: '4px' }}>
-                                                            Due: <strong>{p.expectedPaymentDate}</strong>
-                                                        </div>
-                                                    )}
-                                                </td>
-                                                <td className="text-center">
-                                                    {p.paymentStatus !== 'PAID' && (
-                                                        <button
-                                                            className="btn-primary"
-                                                            onClick={() => handleMarkAsPaid(p.id)}
-                                                            style={{ fontSize: '0.7rem', padding: '0.3rem 0.6rem' }}
-                                                        >
-                                                            Mark Paid
-                                                        </button>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        ))
+                                        sortedGroups.map(group => {
+                                            const isExpanded = (expandedPayableWeeks || []).includes(`${group.weekKey}|${group.farmName}`);
+                                            const toggleKey = `${group.weekKey}|${group.farmName}`;
+                                            return (
+                                                <React.Fragment key={toggleKey}>
+                                                    {/* Week/Grower summary row */}
+                                                    <tr
+                                                        onClick={() => {
+                                                            setExpandedPayableWeeks(prev => {
+                                                                const arr = prev || [];
+                                                                return arr.includes(toggleKey)
+                                                                    ? arr.filter(k => k !== toggleKey)
+                                                                    : [...arr, toggleKey];
+                                                            });
+                                                        }}
+                                                        style={{
+                                                            cursor: 'pointer',
+                                                            background: isExpanded ? '#f0fdf4' : undefined,
+                                                            transition: 'background 0.15s',
+                                                        }}
+                                                    >
+                                                        <td style={{ fontWeight: 700, fontSize: '0.88rem' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                                                <span style={{ color: isExpanded ? '#16a34a' : '#94a3b8', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0)' }}>▶</span>
+                                                                <span>{group.weekKey}</span>
+                                                            </div>
+                                                            <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', marginLeft: '1.2rem' }}>
+                                                                {group.batches.length} deliver{group.batches.length !== 1 ? 'ies' : 'y'}
+                                                            </div>
+                                                        </td>
+                                                        <td>
+                                                            <div style={{ fontWeight: 600, color: 'var(--color-primary-dark)' }}>{group.farmName}</div>
+                                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>{group.farmCode}</div>
+                                                        </td>
+                                                        <td className="text-right">
+                                                            <strong>{group.totalBoxes.toLocaleString()}</strong>
+                                                            <div style={{ fontSize: '0.7rem', color: 'var(--color-primary-main)' }}>
+                                                                {group.classAQty > 0 && `${group.classAQty} A`}
+                                                                {group.classAQty > 0 && group.classBQty > 0 && ' | '}
+                                                                {group.classBQty > 0 && `${group.classBQty} B`}
+                                                            </div>
+                                                        </td>
+                                                        <td className="text-right" style={{ color: '#64748b' }}>₱{group.grossAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                                                        <td className="text-right" style={{ color: '#ef4444' }}>
+                                                            {group.deductions > 0 ? `-₱${group.deductions.toFixed(2)}` : '₱0.00'}
+                                                        </td>
+                                                        <td className="text-right" style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--color-primary-dark)' }}>
+                                                            ₱{group.netDue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                        </td>
+                                                        <td className="text-center">
+                                                            <span className="status-badge" style={group.allPaid ? { background: '#dcfce7', color: '#16a34a' } : { background: '#fef3c7', color: '#b45309' }}>
+                                                                {group.allPaid ? 'PAID' : 'PENDING'}
+                                                            </span>
+                                                        </td>
+                                                        <td className="text-center">
+                                                            {!group.allPaid && (
+                                                                <button
+                                                                    className="btn-primary"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        group.batches.filter(b => b.paymentStatus !== 'PAID').forEach(b => handleMarkAsPaid(b.id));
+                                                                    }}
+                                                                    style={{ fontSize: '0.7rem', padding: '0.3rem 0.6rem' }}
+                                                                >
+                                                                    Pay All
+                                                                </button>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+
+                                                    {/* Expanded batch details */}
+                                                    {isExpanded && group.batches
+                                                        .sort((a, b) => new Date(b.dateTimeEncoded) - new Date(a.dateTimeEncoded))
+                                                        .map(p => (
+                                                        <tr key={p.id} style={{ background: '#f8fafc', fontSize: '0.82rem' }}>
+                                                            <td style={{ paddingLeft: '2rem' }}>
+                                                                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                                                                    {p.dateOfPacking ? new Date(p.dateOfPacking).toLocaleDateString() : 'N/A'}
+                                                                </div>
+                                                                <div style={{ fontSize: '0.68rem', color: 'var(--text-tertiary)' }}>{p.deliveryReceipt || p.plateNumber}</div>
+                                                            </td>
+                                                            <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                                                                {p.deliveryReceipt || `Batch ${p.id?.slice(-6)}`}
+                                                            </td>
+                                                            <td className="text-right">
+                                                                {p.totalQuantity}
+                                                                <div style={{ fontSize: '0.68rem', color: 'var(--color-primary-main)' }}>
+                                                                    {p.classADetails.quantity > 0 && `${p.classADetails.quantity}A`}
+                                                                    {p.classADetails.quantity > 0 && p.classBDetails.quantity > 0 && '|'}
+                                                                    {p.classBDetails.quantity > 0 && `${p.classBDetails.quantity}B`}
+                                                                </div>
+                                                            </td>
+                                                            <td className="text-right" style={{ color: '#94a3b8' }}>₱{p.grossAmount.toFixed(2)}</td>
+                                                            <td className="text-right" style={{ color: '#ef4444', fontSize: '0.8rem' }}>
+                                                                {p.deductionsTotal > 0 ? `-₱${p.deductionsTotal.toFixed(2)}` : '-'}
+                                                            </td>
+                                                            <td className="text-right" style={{ fontWeight: 600 }}>₱{p.netAmountDue.toFixed(2)}</td>
+                                                            <td className="text-center">
+                                                                <span style={{
+                                                                    fontSize: '0.68rem', padding: '2px 6px', borderRadius: '6px',
+                                                                    background: p.paymentStatus === 'PAID' ? '#dcfce7' : '#fef9c3',
+                                                                    color: p.paymentStatus === 'PAID' ? '#16a34a' : '#92400e',
+                                                                }}>
+                                                                    {p.paymentStatus}
+                                                                </span>
+                                                            </td>
+                                                            <td className="text-center">
+                                                                {p.paymentStatus !== 'PAID' && (
+                                                                    <button
+                                                                        className="btn-secondary"
+                                                                        onClick={(e) => { e.stopPropagation(); handleMarkAsPaid(p.id); }}
+                                                                        style={{ fontSize: '0.65rem', padding: '0.2rem 0.5rem' }}
+                                                                    >
+                                                                        Mark Paid
+                                                                    </button>
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </React.Fragment>
+                                            );
+                                        })
                                     )}
                                 </tbody>
                             </table>
                         </div>
-                    )}
+                        );
+                    })()}
 
                     {/* Receivables Ledger */}
                     {activeTab === 'receivables' && (
