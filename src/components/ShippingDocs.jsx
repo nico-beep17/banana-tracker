@@ -166,25 +166,17 @@ const ShippingDocs = () => {
         );
     }, [activeContainers, searchQuery]);
 
-    // Scan Gmail for a specific container
+    // Scan DB for a specific container
     const scanContainerEmails = useCallback(async (containerId, overrideQuery = null) => {
         const container = containers.find(c => c.id === containerId);
-        if (!gmailToken || !container || scanningRef.current.has(containerId)) return;
+        if (!container || scanningRef.current.has(containerId)) return;
         
         scanningRef.current.add(containerId);
         setScanResults(prev => ({ ...prev, [containerId]: { ...prev[containerId], scanning: true, error: null } }));
         
         // Use overrideQuery if provided, else use whatever they typed in the box
         const userQuery = overrideQuery || customQueries[containerId] || null;
-        const result = await searchGmailForContainer(gmailToken, container, userQuery);
-        
-        if (result.error === 'TOKEN_EXPIRED') {
-            sessionStorage.removeItem('lavc_company_gmail_token');
-            setGmailToken(null);
-            toast.error('Gmail token expired. Please reconnect.');
-            scanningRef.current.delete(containerId);
-            return;
-        }
+        const result = await searchGmailForContainer(null, container, userQuery);
         
         setScanResults(prev => ({
             ...prev,
@@ -204,8 +196,49 @@ const ShippingDocs = () => {
             await autoFillVesselInfo(containerId, result.vesselInfo);
         }
         
+        // Auto-fill checklist and attach permanent URLs to the documents
+        if (result.matchedDocs && Object.keys(result.matchedDocs).length > 0) {
+            await autoFillChecklist(containerId, result.matchedDocs);
+        }
+        
         scanningRef.current.delete(containerId);
     }, [gmailToken]);
+
+    const autoFillChecklist = async (containerId, matchedDocs) => {
+        const container = containers.find(c => c.id === containerId);
+        if (!container || !matchedDocs || Object.keys(matchedDocs).length === 0) return;
+
+        let currentDocs = container.shippingDocs || JSON.parse(JSON.stringify(DEFAULT_DOCS_STATE));
+        if (typeof currentDocs === 'string') {
+            try { currentDocs = JSON.parse(currentDocs); } catch (e) { currentDocs = JSON.parse(JSON.stringify(DEFAULT_DOCS_STATE)); }
+        }
+
+        let updated = false;
+        if (!currentDocs.attachments) currentDocs.attachments = {};
+
+        for (const [docKey, details] of Object.entries(matchedDocs)) {
+           const category = details.category === 'Pre-Departure' ? 'preDeparture' : 'certOfOrigin';
+           if (!currentDocs[category]) currentDocs[category] = {};
+
+           if (!currentDocs[category][docKey]) {
+               currentDocs[category][docKey] = true;
+               updated = true;
+           }
+           
+           if (details.attachmentUrl && currentDocs.attachments[docKey] !== details.attachmentUrl) {
+               currentDocs.attachments[docKey] = details.attachmentUrl;
+               updated = true;
+           }
+        }
+
+        if (updated) {
+            const { error } = await supabase.from('containers').update({ shippingDocs: currentDocs }).eq('id', containerId);
+            if (!error) {
+                queryClient.invalidateQueries({ queryKey: ['containers'] });
+                toast.success('AI synced detected documents into your checklist.');
+            }
+        }
+    };
 
     // Auto-fill vessel/shipping info from scanned emails into the container record
     // ALWAYS overwrites — newer emails may have corrections, delays, vessel changes
@@ -268,9 +301,9 @@ const ShippingDocs = () => {
             newSet.delete(id);
         } else {
             newSet.add(id);
-            // Auto-scan when expanding if we have a Gmail token and no cached result
+            // Auto-scan when expanding if we have no cached result
             const container = containers.find(c => c.id === id);
-            if (gmailToken && container?.reeferNo && !scanResults[id]) {
+            if (container?.reeferNo && !scanResults[id]) {
                 scanContainerEmails(id);
             }
         }
@@ -671,16 +704,16 @@ const ShippingDocs = () => {
                                             {scan?.scanning && (
                                                 <div className="sd-scan-banner">
                                                     <Loader2 size={16} className="sd-spin" />
-                                                    <span>AI scanning company inbox for <strong>{container.reeferNo}</strong> — analyzing emails{scan?.imagesAnalyzed > 0 ? ` & ${scan.imagesAnalyzed} images` : ''}…</span>
+                                                    <span>AI scanning container database for <strong>{container.reeferNo}</strong> — analyzing emails{scan?.imagesAnalyzed > 0 ? ` & ${scan.imagesAnalyzed} images` : ''}…</span>
                                                 </div>
                                             )}
 
-                                            {gmailToken && !scan?.scanning && (
+                                            {!scan?.scanning && (
                                                 <div className="sd-scan-banner" style={{ cursor: 'pointer', background: '#eff6ff', padding: '12px', borderRadius: '8px', border: '1px solid #bfdbfe', marginBottom: '1rem', display: 'flex', gap: '8px', alignItems: 'center' }}
                                                     onClick={() => scanContainerEmails(container.id)}>
                                                     <Sparkles size={16} color="#3b82f6" />
                                                     <span style={{ color: '#1e40af', fontSize: '14px', fontWeight: 500 }}>
-                                                        Click to AI-scan Gmail for <strong>{container.reeferNo}</strong> documents & images
+                                                        Click to AI-scan database for <strong>{container.reeferNo}</strong> documents & images
                                                     </span>
                                                 </div>
                                             )}
@@ -734,6 +767,11 @@ const ShippingDocs = () => {
                                                                     style={{ width: '16px', height: '16px', cursor: 'pointer' }}
                                                                 />
                                                                 <span style={{ fontSize: '0.9rem', color: isChecked ? '#166534' : '#475569', fontWeight: isChecked ? 600 : 400 }}>{doc.label}</span>
+                                                                {docsState.attachments?.[doc.id] && (
+                                                                    <a href={docsState.attachments[doc.id]} target="_blank" rel="noopener noreferrer" style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', background: '#e0e7ff', color: '#4338ca', padding: '4px 8px', borderRadius: '12px', textDecoration: 'none', fontWeight: 600 }} onClick={e => e.stopPropagation()}>
+                                                                        <ExternalLink size={12} /> View
+                                                                    </a>
+                                                                )}
                                                             </label>
                                                         )})}
                                                     </div>
@@ -756,6 +794,11 @@ const ShippingDocs = () => {
                                                                     style={{ width: '16px', height: '16px', cursor: 'pointer' }}
                                                                 />
                                                                 <span style={{ fontSize: '0.9rem', color: isChecked ? '#166534' : '#475569', fontWeight: isChecked ? 600 : 400 }}>{doc.label}</span>
+                                                                {docsState.attachments?.[doc.id] && (
+                                                                    <a href={docsState.attachments[doc.id]} target="_blank" rel="noopener noreferrer" style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', background: '#e0e7ff', color: '#4338ca', padding: '4px 8px', borderRadius: '12px', textDecoration: 'none', fontWeight: 600 }} onClick={e => e.stopPropagation()}>
+                                                                        <ExternalLink size={12} /> View
+                                                                    </a>
+                                                                )}
                                                             </label>
                                                         )})}
                                                     </div>
