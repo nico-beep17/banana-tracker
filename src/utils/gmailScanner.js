@@ -30,10 +30,18 @@ export async function searchGmailForContainer(token, container, customQuery = nu
             const clean = container.reeferNo.replace(/[^A-Za-z0-9]/g, '');
             if (clean.length > 4) terms.push(`"${clean}"`);
         }
-        const bookingNo = container.bookingno || container.bookingNo;
+        const bookingNo = (container.bookingno || container.bookingNo || '').trim();
         if (bookingNo) terms.push(`"${bookingNo}"`);
-        if (container.reeferName) terms.push(`"${container.reeferName}"`);
-        if (container.voyageNo) terms.push(`"${container.voyageNo}"`);
+        
+        // Sometimes users put just "COSCO" or "SITC" in reeferName, which is a poison pill that pulls 10,000 emails.
+        const reeferName = (container.reeferName || '').trim();
+        const poisonLines = ['cosco', 'sitc', 'oocl', 'evergreen', 'msc', 'cma', 'wanhai', 'maersk', 'yangming', 'hmm', 'zim', 'one'];
+        if (reeferName && !poisonLines.includes(reeferName.toLowerCase())) {
+            terms.push(`"${reeferName}"`);
+        }
+        
+        const voyageNo = (container.voyageNo || '').trim().replace(/\t/g, ' ');
+        if (voyageNo) terms.push(`"${voyageNo}"`);
         
         // Combine terms with an OR operator so we match ANY of them.
         queryStr = terms.length > 0 ? `(${terms.join(' OR ')})` : '';
