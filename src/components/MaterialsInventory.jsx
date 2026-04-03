@@ -519,8 +519,10 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
         <div class="header-container">
             <img src="${LAvcLogo}" class="logo-img" alt="LAVC Logo" onload="window.print()" onerror="window.print()" />
             <div>
-                <h1 style="margin:0">LFJ AGRI VENTURES CORP.</h1>
-                <h2 style="margin:5px 0 0 0; color:#555;">Materials Inventory Report</h2>
+                <h1 style="margin:0">LFJ AGRI-VENTURES CORPORATION</h1>
+                <p style="margin:3px 0 0 0; font-size:11px; color:#555;">Purok 3, San Vicente, Panabo City, Davao del Norte, Philippines 8105</p>
+                <p style="margin:1px 0 0 0; font-size:10px; color:#777;">Tel # (084) 823-5317 &nbsp;|&nbsp; Email: lfjagriventurescorp@gmail.com</p>
+                <h2 style="margin:8px 0 0 0; color:#555;">Materials Inventory Report</h2>
                 <p style="margin:5px 0 0 0; font-size:12px">Generated: ${new Date().toLocaleString()}</p>
             </div>
         </div>
@@ -589,8 +591,9 @@ For quantities, use the printed number in the "Quantity" column, not bundle coun
             <body>
                 <div class="header">
                     <img src="${LAvcLogo}" class="logo-img" alt="LAVC Logo" onload="window.print()" onerror="window.print()" />
-                    <h1>LFJ AGRI VENTURES CORP.</h1>
-                    <p>PUROK 3, SAN VICENTE PANABO CITY DAVAO DEL NORTE</p>
+                    <h1>LFJ AGRI-VENTURES CORPORATION</h1>
+                    <p>Purok 3, San Vicente, Panabo City, Davao del Norte, Philippines 8105</p>
+                    <p style="font-size:10px; margin:1px 0 0 0; color:#555;">Tel # (084) 823-5317 &nbsp;|&nbsp; Email: lfjagriventurescorp@gmail.com</p>
                     
                     <div class="top-right-info">
                         <div class="mis-no">No. ${
