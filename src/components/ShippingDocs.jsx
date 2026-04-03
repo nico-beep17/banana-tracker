@@ -103,6 +103,8 @@ const ShippingDocs = () => {
             .sort((a, b) => new Date(b.created_at || b.date) - new Date(a.created_at || a.date));
     }, [containers]);
 
+    const [customQueries, setCustomQueries] = useState({});
+
     const filteredContainers = useMemo(() => {
         if (!searchQuery) return activeContainers;
         const q = searchQuery.toLowerCase();
@@ -114,14 +116,16 @@ const ShippingDocs = () => {
     }, [activeContainers, searchQuery]);
 
     // Scan Gmail for a specific container
-    const scanContainerEmails = useCallback(async (containerId) => {
+    const scanContainerEmails = useCallback(async (containerId, overrideQuery = null) => {
         const container = containers.find(c => c.id === containerId);
         if (!gmailToken || !container || scanningRef.current.has(containerId)) return;
         
         scanningRef.current.add(containerId);
         setScanResults(prev => ({ ...prev, [containerId]: { ...prev[containerId], scanning: true, error: null } }));
         
-        const result = await searchGmailForContainer(gmailToken, container);
+        // Use overrideQuery if provided, else use whatever they typed in the box
+        const userQuery = overrideQuery || customQueries[containerId] || null;
+        const result = await searchGmailForContainer(gmailToken, container, userQuery);
         
         if (result.error === 'TOKEN_EXPIRED') {
             sessionStorage.removeItem('lavc_company_gmail_token');
@@ -508,11 +512,31 @@ const ShippingDocs = () => {
                                                 </div>
                                             )}
 
-                                            {gmailToken && !scan && container.reeferNo && (
-                                                <div className="sd-scan-banner" style={{ cursor: 'pointer' }}
-                                                    onClick={() => scanContainerEmails(container.id)}>
-                                                    <Sparkles size={16} />
-                                                    <span>Click to AI-scan Gmail for <strong>{container.reeferNo}</strong> documents & images</span>
+                                            {gmailToken && !scan?.scanning && (
+                                                <div className="sd-manual-search-box" style={{ background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '1rem', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                    <Search size={16} color="#94a3b8" style={{marginLeft: '4px'}}/>
+                                                    <input 
+                                                        type="text" 
+                                                        placeholder="Custom Search (e.g., Vessel Name, Booking No) - Leave blank for Auto"
+                                                        value={customQueries[container.id] || ''}
+                                                        onChange={(e) => setCustomQueries(prev => ({ ...prev, [container.id]: e.target.value }))}
+                                                        style={{ flex: 1, padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', outline: 'none' }}
+                                                        onKeyDown={(e) => { 
+                                                            if(e.key === 'Enter') {
+                                                                setScanResults(prev => { const n = {...prev}; delete n[container.id]; return n; });
+                                                                scanContainerEmails(container.id);
+                                                            } 
+                                                        }}
+                                                    />
+                                                    <button 
+                                                        onClick={() => {
+                                                            setScanResults(prev => { const n = {...prev}; delete n[container.id]; return n; });
+                                                            scanContainerEmails(container.id);
+                                                        }}
+                                                        style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#3b82f6', color: 'white', padding: '8px 16px', borderRadius: '6px', border: 'none', fontWeight: 500, fontSize: '13px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                                                    >
+                                                        <Sparkles size={14} /> Scan & Detect
+                                                    </button>
                                                 </div>
                                             )}
 
@@ -523,15 +547,6 @@ const ShippingDocs = () => {
                                                         <strong>Gemini 3.1 Pro:</strong> {scan.totalFound} email{scan.totalFound !== 1 ? 's' : ''} analyzed • {detectedCount} doc{detectedCount !== 1 ? 's' : ''} found
                                                         {scan.imagesAnalyzed > 0 && ` • ${scan.imagesAnalyzed} image${scan.imagesAnalyzed !== 1 ? 's' : ''} scanned`}
                                                     </span>
-                                                    <button 
-                                                        className="sd-rescan-btn"
-                                                        onClick={() => { 
-                                                            setScanResults(prev => { const n = {...prev}; delete n[container.id]; return n; });
-                                                            scanContainerEmails(container.id);
-                                                        }}
-                                                    >
-                                                        ↻ Rescan
-                                                    </button>
                                                 </div>
                                             )}
 
@@ -546,16 +561,7 @@ const ShippingDocs = () => {
                                             {scan && !scan.scanning && scan.totalFound === 0 && !scan.error && (
                                                 <div className="sd-scan-summary" style={{ color: '#94a3b8' }}>
                                                     <AlertCircle size={14} />
-                                                    <span>No emails found for <strong>{container.reeferNo}</strong> in company inbox</span>
-                                                    <button 
-                                                        className="sd-rescan-btn"
-                                                        onClick={() => { 
-                                                            setScanResults(prev => { const n = {...prev}; delete n[container.id]; return n; });
-                                                            scanContainerEmails(container.id);
-                                                        }}
-                                                    >
-                                                        ↻ Retry
-                                                    </button>
+                                                    <span>No emails found for <strong>{customQueries[container.id] || container.reeferNo}</strong> in company inbox</span>
                                                 </div>
                                             )}
 
