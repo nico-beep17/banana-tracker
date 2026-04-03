@@ -211,12 +211,12 @@ const Accounting = ({ userProfile, exchangeRate, setExchangeRate }) => {
         const activeContainers = containers.filter(c => c.totalBoxes > 0);
 
         return activeContainers.map(container => {
-            let agreedRate = Number(container.agreed_rate) || 0;
+            let agreedRate = 0;
             const amountPaid = Number(container.amount_paid_partial) || 0;
             const totalBoxes = Number(container.totalBoxes) || 0;
-            let grossRevenue = totalBoxes * agreedRate;
-            let rateSource = agreedRate > 0 ? 'flat' : 'none'; // Track where the rate comes from
-            let specBreakdown = []; // Per-spec line items
+            let grossRevenue = 0;
+            let rateSource = 'none';
+            let specBreakdown = [];
             let rateWeek = null;
 
             // Auto-calculate from consignee weekly rates when no flat rate is set
@@ -700,13 +700,8 @@ const Accounting = ({ userProfile, exchangeRate, setExchangeRate }) => {
                                                                 }}>📊 Weekly Matrix</div>
                                                                 <div style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>{c.rateWeek}</div>
                                                             </>
-                                                        ) : c.rateSource === 'flat' ? (
-                                                            <>
-                                                                <div>${c.agreedRate.toFixed(2)}</div>
-                                                                <div style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>Flat rate</div>
-                                                            </>
                                                         ) : (
-                                                            <div style={{ color: '#dc2626', fontSize: '0.8rem' }}>Not set</div>
+                                                            <div style={{ color: '#dc2626', fontSize: '0.8rem' }}>No matrix set</div>
                                                         )}
                                                     </td>
                                                     <td className="text-right" style={{ color: c.grossRevenue > 0 ? '#64748b' : '#dc2626' }}>${c.grossRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
@@ -726,7 +721,7 @@ const Accounting = ({ userProfile, exchangeRate, setExchangeRate }) => {
                                                                 e.stopPropagation();
                                                                 if (editingReceivable === c.id) { setEditingReceivable(null); return; }
                                                                 setEditingReceivable(c.id);
-                                                                setReceivableEditForm({ agreed_rate: c.rateSource === 'flat' ? c.agreedRate : '', amount_paid_partial: c.amountPaid, receivables_status: c.receivablesStatus });
+                                                                setReceivableEditForm({ amount_paid_partial: c.amountPaid, receivables_status: c.receivablesStatus });
                                                             }}
                                                             style={{ fontSize: '0.7rem', padding: '0.3rem 0.6rem' }}
                                                         >
@@ -770,20 +765,10 @@ const Accounting = ({ userProfile, exchangeRate, setExchangeRate }) => {
                                                     <tr>
                                                         <td colSpan="9" style={{ background: '#f0fdf4', padding: '1rem 1.5rem', borderBottom: '2px solid #10b981' }}>
                                                             <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                                                                {c.rateSource !== 'weekly_matrix' && (
-                                                                    <div>
-                                                                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, marginBottom: '4px' }}>Flat Rate Override (USD/box)</label>
-                                                                        <input type="number" step="0.01" className="input-field" value={receivableEditForm.agreed_rate}
-                                                                            onChange={e => setReceivableEditForm({ ...receivableEditForm, agreed_rate: e.target.value })}
-                                                                            style={{ width: '130px' }} />
-                                                                        <div style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', marginTop: '2px' }}>Leave 0 to use weekly matrix</div>
-                                                                    </div>
-                                                                )}
-                                                                {c.rateSource === 'weekly_matrix' && (
-                                                                    <div style={{ padding: '0.5rem 0.75rem', background: 'rgba(124, 58, 237, 0.08)', borderRadius: '8px', border: '1px solid rgba(124, 58, 237, 0.2)', fontSize: '0.8rem', color: '#7c3aed' }}>
-                                                                        📊 Rate auto-calculated from <strong>{c.rateWeek}</strong> weekly matrix = <strong>${c.agreedRate.toFixed(2)}/avg</strong>
-                                                                    </div>
-                                                                )}
+                                                                <div style={{ padding: '0.5rem 0.75rem', background: 'rgba(124, 58, 237, 0.08)', borderRadius: '8px', border: '1px solid rgba(124, 58, 237, 0.2)', fontSize: '0.8rem', color: '#7c3aed' }}>
+                                                                    📊 Rate from <strong>{c.rateWeek || 'weekly'}</strong> matrix{c.rateSource === 'weekly_matrix' && <> = <strong>${c.agreedRate.toFixed(2)}/avg</strong></>}
+                                                                    {c.rateSource === 'none' && <span style={{ color: '#dc2626' }}> — No matrix found. Set rates in Farms & Growers.</span>}
+                                                                </div>
                                                                 <div>
                                                                     <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, marginBottom: '4px' }}>Amount Paid (USD)</label>
                                                                     <input type="number" step="0.01" className="input-field" value={receivableEditForm.amount_paid_partial}
