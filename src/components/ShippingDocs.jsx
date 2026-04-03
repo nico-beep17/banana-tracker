@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { 
     CalendarClock, Clock, CheckCircle2, Circle, AlertCircle, FileText, 
     Ship, BookOpen, FileCheck, CheckSquare, Search, ChevronDown, ChevronUp, Anchor,
-    Mails, CheckCircle, Printer, Mail, Loader2, Sparkles, ExternalLink
+    Mails, CheckCircle, Printer, Mail, Loader2, Sparkles, ExternalLink, FileSearch
 } from 'lucide-react';
 import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
 import { useContainersQuery } from '../queries/hooks';
@@ -558,33 +558,55 @@ const ShippingDocs = () => {
                                                 </div>
                                             )}
 
-                                            <div className="sd-checklists-grid">
-                                                {/* Pre-departure */}
-                                                <div className="sd-checklist-column">
-                                                    <div className="sd-checklist-title">
-                                                        <FileCheck size={18} className="text-primary" />
-                                                        <h5>PREDEPARTURE Documents</h5>
-                                                    </div>
-                                                    <ul className="sd-checkbox-list">
-                                                        {PRE_DEPARTURE_LIST.map(item => 
-                                                            renderChecklistItem(item, 'preDeparture', docsState, container.id)
-                                                        )}
-                                                    </ul>
+                                            {scan && (
+                                                <div className="sd-ai-results-grid" style={{ marginTop: '1.5rem', background: '#f8fafc', padding: '1.5rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                                                    <h5 style={{ margin: '0 0 1rem 0', paddingBottom: '0.75rem', borderBottom: '1px solid #cbd5e1', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                        <FileSearch size={18} className="text-primary" />
+                                                        AI Detected Documents
+                                                    </h5>
+                                                    
+                                                    {!scan.matchedDocs || Object.keys(scan.matchedDocs).length === 0 ? (
+                                                        <div className="sd-empty-scan" style={{ padding: '2rem', textAlign: 'center', background: '#fff', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
+                                                            {scan.scanning ? (
+                                                                <Loader2 size={32} className="sd-spin" style={{ color: '#94a3b8', margin: '0 auto 1rem' }} />
+                                                            ) : (
+                                                                <FileSearch size={32} color="#94a3b8" style={{ margin: '0 auto 1rem' }} />
+                                                            )}
+                                                            <p style={{ color: '#64748b', margin: 0, fontWeight: 500 }}>
+                                                                {scan.scanning ? 'Analyzing emails...' : 'No relevant documents detected.'}
+                                                            </p>
+                                                            <p style={{ color: '#94a3b8', fontSize: '13px', margin: '4px 0 0 0' }}>
+                                                                {scan.scanning ? 'This may take a few moments' : 'The AI could not confidently identify standard shipping documents in the emails for this container.'}
+                                                            </p>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="sd-detected-docs-list" style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}>
+                                                            {Object.entries(scan.matchedDocs).map(([docKey, docValue]) => (
+                                                                <div key={docKey} className="sd-doc-card shadow-sm" style={{ background: '#fff', borderRadius: '8px', padding: '1rem', border: '1px solid #e2e8f0', borderLeft: docValue.confidence === 'high' ? '4px solid #10b981' : '4px solid #f59e0b' }}>
+                                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                                                                        <strong style={{ color: '#334155', fontSize: '14px' }}>{docKey}</strong>
+                                                                        <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '12px', background: docValue.confidence === 'high' ? '#dcfce7' : '#fef3c7', color: docValue.confidence === 'high' ? '#166534' : '#92400e', fontWeight: 600 }}>
+                                                                            {docValue.confidence} confidence
+                                                                        </span>
+                                                                    </div>
+                                                                    <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 12px 0', lineHeight: 1.4 }}>{docValue.reason}</p>
+                                                                    
+                                                                    {docValue.emails && docValue.emails.length > 0 && (
+                                                                        <div className="sd-doc-source" style={{ background: '#f8fafc', padding: '10px', borderRadius: '6px', border: '1px solid #f1f5f9' }}>
+                                                                            <div style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '4px', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                                                <ExternalLink size={10} /> Source Source Email
+                                                                            </div>
+                                                                            <div style={{ fontSize: '12px', color: '#3b82f6', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{docValue.emails[0].subject || 'No Subject'}</div>
+                                                                            <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>From: {docValue.emails[0].from}</div>
+                                                                            <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '4px' }}>{new Date(docValue.emails[0].date).toLocaleString()}</div>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                 </div>
-
-                                                {/* Cert of Origin */}
-                                                <div className="sd-checklist-column">
-                                                    <div className="sd-checklist-title" style={{ color: '#d97706' }}>
-                                                        <AlertCircle size={18} />
-                                                        <h5>Attachment for Certificate of Origin (BOC)</h5>
-                                                    </div>
-                                                    <ul className="sd-checkbox-list">
-                                                        {CERT_OF_ORIGIN_LIST.map(item => 
-                                                            renderChecklistItem(item, 'certOfOrigin', docsState, container.id)
-                                                        )}
-                                                    </ul>
-                                                </div>
-                                            </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>
