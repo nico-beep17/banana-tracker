@@ -12,15 +12,27 @@ const GMAIL_API_BASE = 'https://gmail.googleapis.com/gmail/v1/users/me';
  * @param {string} reeferNo - Container/reefer number to search for
  * @returns {Promise<{messages: Array, matchedDocs: Object, vesselInfo: Object}>}
  */
-export async function searchGmailForContainer(token, reeferNo) {
-  if (!token || !reeferNo) return { messages: [], error: 'Missing token or reefer number' };
+export async function searchGmailForContainer(token, container) {
+  if (!token || !container) return { messages: [], error: 'Missing token or container data' };
   
   try {
-    // Fetch the 30 most recent emails directly to broaden the search.
-    // The previous stringent search by exact reeferNo caused us to miss important docs
-    // when the reefer number was only present inside attached PDFs/images but not in text.
+    // Build a dynamic search flow using all available container identifiers.
+    // The user explicitly requested to include multiple keywords since the container ID is not always present in emails.
+    const terms = [];
+    if (container.reeferNo) terms.push(`"${container.reeferNo}"`);
+    if (container.bookingNo) terms.push(`"${container.bookingNo}"`);
+    // Add brand and destination as general text keywords
+    if (container.brand) terms.push(`"${container.brand}"`);
+    if (container.destination) terms.push(`"${container.destination}"`);
+    
+    // Combine terms with an OR operator so we match ANY of them.
+    const queryStr = terms.length > 0 ? `(${terms.join(' OR ')})` : '';
+    
+    // Search in everywhere (inbox, sent, etc.) up to 40 results to find the most relevant context.
+    const q = encodeURIComponent(`in:anywhere ${queryStr}`);
+    
     const res = await fetch(
-      `${GMAIL_API_BASE}/messages?maxResults=30`,
+      `${GMAIL_API_BASE}/messages?q=${q}&maxResults=40`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
     
@@ -157,7 +169,7 @@ export async function searchGmailForContainer(token, reeferNo) {
     }
     
     // Send to Gemini 3.1 Pro for AI analysis
-    const aiResult = await analyzeWithAI(processedMessages, reeferNo, imageAttachments);
+    const aiResult = await analyzeWithAI(processedMessages, container.reeferNo, imageAttachments);
     
     // Format results for the UI
     const matchedDocs = {};

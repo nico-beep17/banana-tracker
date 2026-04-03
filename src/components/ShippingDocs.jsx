@@ -114,13 +114,14 @@ const ShippingDocs = () => {
     }, [activeContainers, searchQuery]);
 
     // Scan Gmail for a specific container
-    const scanContainerEmails = useCallback(async (containerId, reeferNo) => {
-        if (!gmailToken || !reeferNo || scanningRef.current.has(containerId)) return;
+    const scanContainerEmails = useCallback(async (containerId) => {
+        const container = containers.find(c => c.id === containerId);
+        if (!gmailToken || !container || scanningRef.current.has(containerId)) return;
         
         scanningRef.current.add(containerId);
         setScanResults(prev => ({ ...prev, [containerId]: { ...prev[containerId], scanning: true, error: null } }));
         
-        const result = await searchGmailForContainer(gmailToken, reeferNo);
+        const result = await searchGmailForContainer(gmailToken, container);
         
         if (result.error === 'TOKEN_EXPIRED') {
             sessionStorage.removeItem('lavc_company_gmail_token');
@@ -215,7 +216,7 @@ const ShippingDocs = () => {
             // Auto-scan when expanding if we have a Gmail token and no cached result
             const container = containers.find(c => c.id === id);
             if (gmailToken && container?.reeferNo && !scanResults[id]) {
-                scanContainerEmails(id, container.reeferNo);
+                scanContainerEmails(id);
             }
         }
         setExpandedIds(newSet);
@@ -509,7 +510,7 @@ const ShippingDocs = () => {
 
                                             {gmailToken && !scan && container.reeferNo && (
                                                 <div className="sd-scan-banner" style={{ cursor: 'pointer' }}
-                                                    onClick={() => scanContainerEmails(container.id, container.reeferNo)}>
+                                                    onClick={() => scanContainerEmails(container.id)}>
                                                     <Sparkles size={16} />
                                                     <span>Click to AI-scan Gmail for <strong>{container.reeferNo}</strong> documents & images</span>
                                                 </div>
@@ -526,7 +527,7 @@ const ShippingDocs = () => {
                                                         className="sd-rescan-btn"
                                                         onClick={() => { 
                                                             setScanResults(prev => { const n = {...prev}; delete n[container.id]; return n; });
-                                                            scanContainerEmails(container.id, container.reeferNo);
+                                                            scanContainerEmails(container.id);
                                                         }}
                                                     >
                                                         ↻ Rescan
@@ -550,7 +551,7 @@ const ShippingDocs = () => {
                                                         className="sd-rescan-btn"
                                                         onClick={() => { 
                                                             setScanResults(prev => { const n = {...prev}; delete n[container.id]; return n; });
-                                                            scanContainerEmails(container.id, container.reeferNo);
+                                                            scanContainerEmails(container.id);
                                                         }}
                                                     >
                                                         ↻ Retry
