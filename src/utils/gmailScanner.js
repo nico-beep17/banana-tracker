@@ -30,7 +30,8 @@ export async function searchGmailForContainer(token, container, customQuery = nu
             const clean = container.reeferNo.replace(/[^A-Za-z0-9]/g, '');
             if (clean.length > 4) terms.push(`"${clean}"`);
         }
-        if (container.bookingNo) terms.push(`"${container.bookingNo}"`);
+        const bookingNo = container.bookingno || container.bookingNo;
+        if (bookingNo) terms.push(`"${bookingNo}"`);
         if (container.reeferName) terms.push(`"${container.reeferName}"`);
         if (container.voyageNo) terms.push(`"${container.voyageNo}"`);
         
