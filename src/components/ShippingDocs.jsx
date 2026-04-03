@@ -109,6 +109,35 @@ const ShippingDocs = () => {
     const [globalInboxSummary, setGlobalInboxSummary] = useState(null);
     const [generatingSummary, setGeneratingSummary] = useState(false);
     
+    // NEW: Database Sync State
+    const [syncingDB, setSyncingDB] = useState(false);
+    const [syncProgress, setSyncProgress] = useState('');
+
+    const handleSyncDatabase = async () => {
+        if (!gmailToken) {
+            toast.error('Connect Gmail first.');
+            return;
+        }
+        setSyncingDB(true);
+        setSyncProgress('Initializing secure tunnel...');
+        try {
+            const { syncLatestEmailsToDatabase } = await import('../utils/emailSyncEngine');
+            const syncedCount = await syncLatestEmailsToDatabase(gmailToken, setSyncProgress);
+            
+            if (syncedCount > 0) {
+                toast.success(`Successfully downloaded ${syncedCount} new emails and attachments to the database.`);
+            } else {
+                toast.info('Database is already up to date with Gmail.');
+            }
+        } catch (e) {
+            console.error(e);
+            toast.error(`Sync Failed: ${e.message}`);
+        } finally {
+            setSyncingDB(false);
+            setSyncProgress('');
+        }
+    };
+    
     const handleGenerateInboxSummary = async () => {
         if (!gmailToken) {
             toast.error('Connect Gmail first.');
@@ -406,14 +435,36 @@ const ShippingDocs = () => {
                 {/* Global Inbox Summary Panel */}
                 {gmailToken && (
                     <div style={{ padding: '0 1.5rem 1.5rem 1.5rem', borderTop: '1px solid #f1f5f9', marginTop: '0.5rem', paddingTop: '1rem' }}>
-                        <button 
-                            onClick={handleGenerateInboxSummary}
-                            disabled={generatingSummary}
-                            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0.75rem 1.5rem', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', fontSize: '0.95rem', fontWeight: 500, cursor: generatingSummary ? 'not-allowed' : 'pointer', opacity: generatingSummary ? 0.7 : 1 }}
-                        >
-                            {generatingSummary ? <Loader2 size={18} className="sd-spin" /> : <Sparkles size={18} />}
-                            {generatingSummary ? 'Scanning Entire Inbox...' : 'Generate Inbox Operations Report'}
-                        </button>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center' }}>
+                            <button 
+                                onClick={handleGenerateInboxSummary}
+                                disabled={generatingSummary}
+                                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0.75rem 1.5rem', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', fontSize: '0.95rem', fontWeight: 500, cursor: generatingSummary ? 'not-allowed' : 'pointer', opacity: generatingSummary ? 0.7 : 1 }}
+                            >
+                                {generatingSummary ? <Loader2 size={18} className="sd-spin" /> : <Sparkles size={18} />}
+                                {generatingSummary ? 'Scanning Entire Inbox...' : 'Generate Inbox Operations Report'}
+                            </button>
+                            
+                            <button 
+                                onClick={handleSyncDatabase}
+                                disabled={syncingDB}
+                                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0.75rem 1.5rem', background: syncingDB ? '#e2e8f0' : '#10b981', color: syncingDB ? '#94a3b8' : 'white', border: 'none', borderRadius: '8px', fontSize: '0.95rem', fontWeight: 500, cursor: syncingDB ? 'not-allowed' : 'pointer', transition: 'all 0.2s' }}
+                            >
+                                {syncingDB ? <Loader2 size={18} className="sd-spin" /> : <Database size={18} />}
+                                {syncingDB ? 'Syncing...' : 'Sync Latest Emails to DB'}
+                            </button>
+                        </div>
+                        
+                        {/* Progress Tracker for DB Sync */}
+                        {syncingDB && (
+                            <div className="animation-fade-in" style={{ marginTop: '1rem', padding: '12px 16px', background: '#ecfdf5', border: '1px solid #10b981', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <Database size={20} className="animate-pulse" style={{ color: '#059669' }} />
+                                <div>
+                                    <div style={{ fontWeight: 600, color: '#065f46', fontSize: '0.9rem' }}>Database Synchronization Active</div>
+                                    <div style={{ color: '#047857', fontSize: '0.85rem' }}>{syncProgress}</div>
+                                </div>
+                            </div>
+                        )}
                         
                         {globalInboxSummary && (
                             <div className="animation-fade-in" style={{ marginTop: '1rem', background: '#f8fafc', padding: '1.5rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>

@@ -590,3 +590,22 @@ Format neatly using markdown, headers, and bullet points. Do NOT output JSON. Ou
     return 'Error generating inbox summary: ' + err.message;
   }
 }
+
+
+export function getEmailBody(payload) {
+    let bodyText = '';
+    const extractParts = (part) => {
+        if (part.mimeType === 'text/plain' && part.body?.data) {
+            try { bodyText += atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/')); } catch(e) {}
+        }
+        if (part.mimeType === 'text/html' && !bodyText && part.body?.data) {
+            try {
+                let html = atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/'));
+                bodyText += html.replace(/<[^>]+>/g, ' ').replace(/s+/g, ' ');
+            } catch(e) {}
+        }
+        if (part.parts) part.parts.forEach(extractParts);
+    };
+    extractParts(payload || {});
+    return bodyText;
+}
