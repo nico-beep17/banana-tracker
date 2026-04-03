@@ -25,33 +25,47 @@ export async function searchGmailForContainer(token, container, customQuery = nu
         // The user explicitly requested to include multiple keywords since the container ID is not always present in emails.
         const terms = [];
         if (container.reeferNo) {
-            terms.push(`"${container.reeferNo}"`);
-            // Add stripped version for fuzzy format matching e.g. GMOU 903627 4 -> GMOU9036274
+            terms.push(container.reeferNo.replace(/[^A-Za-z0-9\s]/g, ''));
             const clean = container.reeferNo.replace(/[^A-Za-z0-9]/g, '');
-            if (clean.length > 4) terms.push(`"${clean}"`);
+            if (clean.length > 4) terms.push(clean);
         }
         const bookingNo = (container.bookingno || container.bookingNo || '').trim();
-        if (bookingNo) terms.push(`"${bookingNo}"`);
+        if (bookingNo) terms.push(bookingNo);
         
         // Sometimes users put just "COSCO" or "SITC" in reeferName, which is a poison pill that pulls 10,000 emails.
         const reeferName = (container.reeferName || '').trim();
         const poisonLines = ['cosco', 'sitc', 'oocl', 'evergreen', 'msc', 'cma', 'wanhai', 'maersk', 'yangming', 'hmm', 'zim', 'one'];
         if (reeferName && !poisonLines.includes(reeferName.toLowerCase())) {
-            terms.push(`"${reeferName}"`);
+            terms.push(reeferName);
+        }
+        // Strip trailing tabs, and strip trailing voyage numbers (e.g., "136N" or "V41N") 
+        // to leave just the pure Vessel Name (e.g., "SEASPAN EMERALD") which matches user expectations.
+        const voyageStr = (container.voyageNo || '').trim().replace(/\t/g, ' ');
+        if (voyageStr) {
+            // Split by space, keep words that don't have numbers in them (the pure vessel name)
+            const vesselOnly = voyageStr.split(' ').filter(w => !/\d/.test(w)).join(' ').trim();
+            if (vesselOnly && vesselOnly.length > 3) {
+                // E.g., "SEASPAN EMERALD 41N" -> "SEASPAN EMERALD"
+                terms.push(vesselOnly);
+            } else {
+                // Fallback to original string if for some reason it's mostly numbers
+                terms.push(voyageStr);
+            }
         }
         
-        const voyageNo = (container.voyageNo || '').trim().replace(/\t/g, ' ');
-        if (voyageNo) terms.push(`"${voyageNo}"`);
-        
-        // Combine terms with an OR operator so we match ANY of them.
-        queryStr = terms.length > 0 ? `(${terms.join(' OR ')})` : '';
+        // Combine terms with an OR operator. Don't wrap in quotes to allow Gmail's native fuzzy match.
+        // We wrap multi-word terms in parenthesis so OR applies correctly: (A B) OR C -> (A AND B) OR C
+        const formattedTerms = terms.filter(Boolean).map(t => `(${t})`);
+        queryStr = formattedTerms.length > 0 ? `(${formattedTerms.join(' OR ')})` : '';
     }
     
     // Search in everywhere (inbox, sent, etc.) up to 40 results to find the most relevant context.
     const q = encodeURIComponent(`in:anywhere ${queryStr}`);
     
+    // Using 100 results to ensure we cast a wide enough net to catch the original booking emails
+    // which may be buried behind 50+ back-and-forth threads with the forwarders.
     const res = await fetch(
-      `${GMAIL_API_BASE}/messages?q=${q}&maxResults=40`,
+      `${GMAIL_API_BASE}/messages?q=${q}&maxResults=100`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
     
@@ -160,10 +174,29 @@ export async function searchGmailForContainer(token, container, customQuery = nu
     // Sort newest first — corrections/delays take priority
     processedMessages.sort((a, b) => b.timestamp - a.timestamp);
     
-    // Fetch attachments for AI vision (limit to 10 to stay within API limits, prioritize PDFs)
-    const allAttachmentRefs = processedMessages.flatMap(m => 
+    // Fetch attachments for AI vision (limit to 10 to stay within API limits, prioritize PDFs and shipping keywords)
+    const rawRefs = processedMessages.flatMap(m => 
       m.attachmentRefs.filter(a => a.isImage || a.isPdf).map(a => ({ ...a, fromEmail: m.subject }))
-    ).slice(0, 10);
+    );
+    
+    // Prioritize PDFs over images, and prioritize files with shipping keywords over generic ones
+    rawRefs.sort((a, b) => {
+        const aName = (a.filename || '').toLowerCase();
+        const bName = (b.filename || '').toLowerCase();
+        
+        const aIsKey = aName.includes('bl') || aName.includes('bill') || aName.includes('invoice') || aName.includes('ci') || aName.includes('pl') || aName.includes('packing') || aName.includes('atw') || aName.includes('ed');
+        const bIsKey = bName.includes('bl') || bName.includes('bill') || bName.includes('invoice') || bName.includes('ci') || bName.includes('pl') || bName.includes('packing') || bName.includes('atw') || bName.includes('ed');
+        
+        if (aIsKey && !bIsKey) return -1;
+        if (!aIsKey && bIsKey) return 1;
+        
+        if (a.isPdf && !b.isPdf) return -1;
+        if (!a.isPdf && b.isPdf) return 1;
+        
+        return 0; // maintain original relative recent-first order
+    });
+    
+    const allAttachmentRefs = rawRefs.slice(0, 10);
     
     let totalBytes = 0;
     for (const ref of allAttachmentRefs) {
@@ -341,16 +374,26 @@ Return ONLY valid JSON in this exact format:
         })
       });
       
-      if (!gRes.ok) throw new Error('Gemini API Error');
-      const gData = await gRes.json();
-      const text = gData?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-      let aiResult = { matchedDocs: {}, vesselInfo: {} };
+      if (!gRes.ok) {
+          const errText = await gRes.text();
+          throw new Error('Gemini API HTTP Error: ' + errText);
+      }
       
-      try {
-        aiResult = JSON.parse(text);
-      } catch(e) {
-        const match = text.match(/\{[\s\S]*\}/);
-        if (match) aiResult = JSON.parse(match[0]);
+      const gData = await gRes.json();
+      const text = gData?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+      let aiResult = { matchedDocs: {}, vesselInfo: {}, summary: '' };
+      
+      if (text) {
+          try {
+            aiResult = JSON.parse(text);
+          } catch(e) {
+            const match = text.match(/\{[\s\S]*\}/);
+            if (match) {
+                try { aiResult = JSON.parse(match[0]); } catch(err) {}
+            }
+          }
+      } else {
+          console.warn('[GmailScan] Gemini returned empty response or hit a safety filter:', gData);
       }
       
       return aiResult;
