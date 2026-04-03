@@ -1,3 +1,5 @@
+import { createClient } from '@supabase/supabase-js';
+
 export const config = {
     maxDuration: 60, // Vercel Cron needs more time (Pro allows up to 300s, Hobby 10s. Default is 10s in Hobby but let's request 60s)
 };
@@ -13,7 +15,6 @@ export default async function handler(req, res) {
         return res.status(401).json({ error: 'Unauthorized CRON request' });
     }
 
-    const { createClient } = require('@supabase/supabase-js');
     const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
     const supabaseKey = process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
     
