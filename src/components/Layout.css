@@ -289,16 +289,7 @@
     position: relative;
 }
 
-.header-search::before {
-    content: '🔍';
-    position: absolute;
-    left: 1rem;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 1.1rem;
-    opacity: 0.5;
-    pointer-events: none;
-}
+/* Search icon is now rendered as a Lucide SVG in JSX — no CSS pseudo-element needed */
 
 .header-search .input-field {
     background-color: var(--bg-surface);
@@ -655,10 +646,6 @@
         padding-left: 2.5rem;
     }
 
-    .header-search::before {
-        left: 0.75rem;
-        font-size: 0.9rem;
-    }
 
     .header-actions {
         gap: var(--spacing-2);
