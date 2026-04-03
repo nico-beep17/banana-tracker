@@ -33,9 +33,6 @@ export async function searchGmailForContainer(token, container, customQuery = nu
         if (container.bookingNo) terms.push(`"${container.bookingNo}"`);
         if (container.reeferName) terms.push(`"${container.reeferName}"`);
         if (container.voyageNo) terms.push(`"${container.voyageNo}"`);
-        // Add brand and destination as general text keywords
-        if (container.brand) terms.push(`"${container.brand}"`);
-        if (container.destination) terms.push(`"${container.destination}"`);
         
         // Combine terms with an OR operator so we match ANY of them.
         queryStr = terms.length > 0 ? `(${terms.join(' OR ')})` : '';
@@ -66,7 +63,7 @@ export async function searchGmailForContainer(token, container, customQuery = nu
     
     // Fetch each message's full content
     const messageDetails = await Promise.all(
-      data.messages.slice(0, 20).map(async (msg) => {
+      data.messages.slice(0, 40).map(async (msg) => {
         try {
           const msgRes = await fetch(
             `${GMAIL_API_BASE}/messages/${msg.id}?format=full`,
@@ -154,10 +151,10 @@ export async function searchGmailForContainer(token, container, customQuery = nu
     // Sort newest first — corrections/delays take priority
     processedMessages.sort((a, b) => b.timestamp - a.timestamp);
     
-    // Fetch image attachments for AI vision (limit to 8 to stay within API limits)
+    // Fetch attachments for AI vision (limit to 10 to stay within API limits, prioritize PDFs)
     const allAttachmentRefs = processedMessages.flatMap(m => 
-      m.attachmentRefs.filter(a => a.isImage).map(a => ({ ...a, fromEmail: m.subject }))
-    ).slice(0, 8);
+      m.attachmentRefs.filter(a => a.isImage || a.isPdf).map(a => ({ ...a, fromEmail: m.subject }))
+    ).slice(0, 10);
     
     for (const ref of allAttachmentRefs) {
       try {
