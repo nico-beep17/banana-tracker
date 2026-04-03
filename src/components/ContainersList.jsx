@@ -201,150 +201,199 @@ const ContainersList = ({ onNavigate, onDepartContainer, onSealContainer, onEdit
                 </div>
             </header>
 
-            <div className="banana-table-container shadow-lg">
-                <table className="banana-table">
-                    <thead>
-                        <tr>
-                            <th>Date Created</th>
-                            <th>Brand / Reefer</th>
-                            <th>Container No.</th>
-                            <th>Seal No.</th>
-                            <th>Destination</th>
-                            <th className="text-right">Total Boxes</th>
-                            <th className="text-center">Status</th>
-                            <th className="text-center">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {containers.length === 0 ? (
-                            <tr>
-                                <td colSpan="8" className="text-center empty-state" style={{ padding: '6rem 0', color: 'var(--text-tertiary)' }}>
-                                    <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🚢</div>
-                                    No containers have been registered yet. <br />
-                                    <span style={{ fontSize: '0.9rem' }}>Start by creating a new Container Log.</span>
-                                </td>
-                            </tr>
-                        ) : (
-                            (() => {
-                                const totalPages = Math.ceil(containers.length / itemsPerPage);
-                                const startIndex = (currentPage - 1) * itemsPerPage;
-                                const paginatedContainers = containers.slice(startIndex, startIndex + itemsPerPage);
+            {/* Split containers into active vs departed */}
+            {(() => {
+                const activeContainers = containers.filter(c => !c.timeDeparted);
+                const departedContainers = containers.filter(c => !!c.timeDeparted);
 
-                                return paginatedContainers.map(container => {
-                                    const isFull = (container.totalBoxes >= 1540);
-                                const isEmpty = container.totalBoxes === 0;
-                                const isDeparted = !!container.timeDeparted;
-                                const isSealed = !!container.timeSealed;
+                const totalActivePages = Math.ceil(activeContainers.length / itemsPerPage);
+                const startIndex = (currentPage - 1) * itemsPerPage;
+                const paginatedActive = activeContainers.slice(startIndex, startIndex + itemsPerPage);
 
-                                let statusLabel = isDeparted ? 'DEPARTED' : (isSealed ? 'SEALED' : (isFull ? 'FULL' : (isEmpty ? 'EMPTY' : 'PACKING')));
-                                let statusClass = isDeparted ? 'departed' : (isSealed ? 'sealed' : (isFull ? 'full' : (isEmpty ? 'empty' : 'packing')));
+                const renderContainerRow = (container) => {
+                    const isFull = (container.totalBoxes >= 1540);
+                    const isEmpty = container.totalBoxes === 0;
+                    const isDeparted = !!container.timeDeparted;
+                    const isSealed = !!container.timeSealed;
 
-                                return (
-                                    <tr
-                                        key={container.id}
-                                        onClick={() => setBreakdownContainer(container)}
-                                        className="container-row-clickable"
-                                        title="Click to view class breakdown"
+                    let statusLabel = isDeparted ? 'DEPARTED' : (isSealed ? 'SEALED' : (isFull ? 'FULL' : (isEmpty ? 'EMPTY' : 'PACKING')));
+                    let statusClass = isDeparted ? 'departed' : (isSealed ? 'sealed' : (isFull ? 'full' : (isEmpty ? 'empty' : 'packing')));
+
+                    return (
+                        <tr
+                            key={container.id}
+                            onClick={() => setBreakdownContainer(container)}
+                            className="container-row-clickable"
+                            title="Click to view class breakdown"
+                        >
+                            <td data-label="Date" style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>
+                                {new Date(container.dateCreated).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </td>
+                            <td data-label="Brand / Reefer">
+                                <div className="brand-label" style={{ fontWeight: '800', color: 'var(--color-primary-dark)' }}>{container.reeferName || 'N/A'}</div>
+                                <div className="reefer-label" style={{ fontWeight: '600', color: 'var(--text-tertiary)' }}>{container.brand}</div>
+                            </td>
+                            <td data-label="Container No."><span className="spec-badge">{container.reeferNo || 'Pending'}</span></td>
+                            <td data-label="Seal No." style={{ fontWeight: '500' }}>{container.sealNo || 'Pending'}</td>
+                            <td data-label="Destination" style={{ color: 'var(--text-secondary)' }}>
+                                <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{container.destination || 'Pending'}</div>
+                                {container.destination && <div style={{ fontSize: '0.8rem' }}>{getCountry(container.destination)}</div>}
+                            </td>
+                            <td data-label="Total Boxes" className="text-right">
+                                <span style={{ fontSize: '1.2rem', fontWeight: '800', color: 'var(--color-primary-dark)' }}>{container.totalBoxes}</span>
+                                <span style={{ color: 'var(--text-tertiary)', fontSize: '0.8rem', marginLeft: '0.25rem' }}>/ 1540</span>
+                            </td>
+                            <td data-label="Status" className="text-center">
+                                <span className={`status-badge ${statusClass}`}>{statusLabel}</span>
+                            </td>
+                            <td data-label="" className="text-center" onClick={e => e.stopPropagation()}>
+                                <div className="action-cell">
+                                    {isDeparted ? (
+                                        <>
+                                            <span className="dispatched-label">✓ Dispatched</span>
+                                            <button className="btn-print" onClick={() => handlePrintClick(container)}>Print Manifest</button>
+                                        </>
+                                    ) : !isFull ? (
+                                        canPerformAction(userProfile, 'action:stuff-container') ? (
+                                        <button
+                                            className="btn-primary"
+                                            onClick={() => onNavigate({ name: 'container-stuffing-grid', state: { containerId: container.id } })}
+                                            style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
+                                        >
+                                            Stuff Container
+                                        </button>
+                                        ) : null
+                                    ) : !isSealed ? (
+                                        canPerformAction(userProfile, 'action:seal-container') ? (
+                                        <button className="btn-seal" onClick={() => onSealContainer(container.id)}>Seal Container</button>
+                                        ) : <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', fontWeight: '600' }}>FULL</span>
+                                    ) : (
+                                        <>
+                                            {canPerformAction(userProfile, 'action:depart-container') && (
+                                            <button className="btn-depart" onClick={() => onDepartContainer(container.id)}>Depart Hub</button>
+                                            )}
+                                            <button className="btn-print" onClick={() => handlePrintClick(container)}>Print Manifest</button>
+                                        </>
+                                    )}
+                                    <button
+                                        style={{ background: 'none', border: 'none', color: 'var(--color-primary-light)', textDecoration: 'underline', cursor: 'pointer', fontSize: '0.75rem', padding: '0.2rem', marginTop: '0.2rem', fontWeight: '500' }}
+                                        onClick={() => onNavigate({ name: 'edit-container', state: { containerId: container.id } })}
                                     >
-                                        <td data-label="Date" style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>
-                                            {new Date(container.dateCreated).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                                        </td>
-                                        <td data-label="Brand / Reefer">
-                                            <div className="brand-label" style={{ fontWeight: '800', color: 'var(--color-primary-dark)' }}>{container.reeferName || 'N/A'}</div>
-                                            <div className="reefer-label" style={{ fontWeight: '600', color: 'var(--text-tertiary)' }}>{container.brand}</div>
-                                        </td>
-                                        <td data-label="Container No."><span className="spec-badge">{container.reeferNo || 'Pending'}</span></td>
-                                        <td data-label="Seal No." style={{ fontWeight: '500' }}>{container.sealNo || 'Pending'}</td>
-                                        <td data-label="Destination" style={{ color: 'var(--text-secondary)' }}>
-                                            <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{container.destination || 'Pending'}</div>
-                                            {container.destination && <div style={{ fontSize: '0.8rem' }}>{getCountry(container.destination)}</div>}
-                                        </td>
-                                        <td data-label="Total Boxes" className="text-right">
-                                            <span style={{ fontSize: '1.2rem', fontWeight: '800', color: 'var(--color-primary-dark)' }}>{container.totalBoxes}</span>
-                                            <span style={{ color: 'var(--text-tertiary)', fontSize: '0.8rem', marginLeft: '0.25rem' }}>/ 1540</span>
-                                        </td>
-                                        <td data-label="Status" className="text-center">
-                                            <span className={`status-badge ${statusClass}`}>{statusLabel}</span>
-                                        </td>
-                                        <td data-label="" className="text-center" onClick={e => e.stopPropagation()}>
-                                            <div className="action-cell">
-                                                {isDeparted ? (
-                                                    <>
-                                                        <span className="dispatched-label">✓ Dispatched</span>
-                                                        <button className="btn-print" onClick={() => handlePrintClick(container)}>Print Manifest</button>
-                                                    </>
-                                                ) : !isFull ? (
-                                                    canPerformAction(userProfile, 'action:stuff-container') ? (
-                                                    <button
-                                                        className="btn-primary"
-                                                        onClick={() => onNavigate({ name: 'container-stuffing-grid', state: { containerId: container.id } })}
-                                                        style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
-                                                    >
-                                                        Stuff Container
-                                                    </button>
-                                                    ) : null
-                                                ) : !isSealed ? (
-                                                    canPerformAction(userProfile, 'action:seal-container') ? (
-                                                    <button className="btn-seal" onClick={() => onSealContainer(container.id)}>Seal Container</button>
-                                                    ) : <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', fontWeight: '600' }}>FULL</span>
-                                                ) : (
-                                                    <>
-                                                        {canPerformAction(userProfile, 'action:depart-container') && (
-                                                        <button className="btn-depart" onClick={() => onDepartContainer(container.id)}>Depart Hub</button>
-                                                        )}
-                                                        <button className="btn-print" onClick={() => handlePrintClick(container)}>Print Manifest</button>
-                                                    </>
-                                                )}
-                                                <button
-                                                    style={{ background: 'none', border: 'none', color: 'var(--color-primary-light)', textDecoration: 'underline', cursor: 'pointer', fontSize: '0.75rem', padding: '0.2rem', marginTop: '0.2rem', fontWeight: '500' }}
-                                                    onClick={() => onNavigate({ name: 'edit-container', state: { containerId: container.id } })}
-                                                >
-                                                    Edit Details
-                                                </button>
-                                                {(container.stuffedItems && container.stuffedItems.length > 0) && (canPerformAction(userProfile, 'action:edit-payload') || canPerformAction(userProfile, 'action:delete-payload')) && (
-                                                    <button
-                                                        style={{
-                                                            background: 'none', border: 'none', color: '#d97706', textDecoration: 'underline',
-                                                            cursor: 'pointer', fontSize: '0.75rem', padding: '0.2rem', fontWeight: '500'
-                                                        }}
-                                                        onClick={() => setManagingContainerId(container.id)}
-                                                    >
-                                                        🔒 Manage Payloads
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                );
-                            });
-                        })()
-                        )}
-                    </tbody>
-                </table>
-            </div>
+                                        Edit Details
+                                    </button>
+                                    {(container.stuffedItems && container.stuffedItems.length > 0) && (canPerformAction(userProfile, 'action:edit-payload') || canPerformAction(userProfile, 'action:delete-payload')) && (
+                                        <button
+                                            style={{
+                                                background: 'none', border: 'none', color: '#d97706', textDecoration: 'underline',
+                                                cursor: 'pointer', fontSize: '0.75rem', padding: '0.2rem', fontWeight: '500'
+                                            }}
+                                            onClick={() => setManagingContainerId(container.id)}
+                                        >
+                                            🔒 Manage Payloads
+                                        </button>
+                                    )}
+                                </div>
+                            </td>
+                        </tr>
+                    );
+                };
 
-            {/* Pagination Controls */}
-            {Math.ceil(containers.length / itemsPerPage) > 1 && (
-                <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '1rem', padding: '1rem' }}>
-                    <button 
-                        disabled={currentPage === 1} 
-                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                        className="btn-secondary btn-sm"
-                    >
-                        Previous
-                    </button>
-                    <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-secondary)' }}>
-                        Page {currentPage} of {Math.ceil(containers.length / itemsPerPage)}
-                    </span>
-                    <button 
-                        disabled={currentPage === Math.ceil(containers.length / itemsPerPage)} 
-                        onClick={() => setCurrentPage(prev => Math.min(Math.ceil(containers.length / itemsPerPage), prev + 1))}
-                        className="btn-secondary btn-sm"
-                    >
-                        Next
-                    </button>
-                </div>
-            )}
+                return (
+                    <>
+                        {/* ===== ACTIVE CONTAINERS ===== */}
+                        <div className="banana-table-container shadow-lg">
+                            <div style={{ padding: '0.75rem 1.25rem', borderBottom: '2px solid #10b981', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <h3 style={{ margin: 0, fontSize: '1rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    📦 Active Containers
+                                    <span style={{ background: '#dcfce7', color: '#166534', fontSize: '0.75rem', fontWeight: 700, padding: '2px 8px', borderRadius: '10px' }}>{activeContainers.length}</span>
+                                </h3>
+                            </div>
+                            <table className="banana-table">
+                                <thead>
+                                    <tr>
+                                        <th>Date Created</th>
+                                        <th>Brand / Reefer</th>
+                                        <th>Container No.</th>
+                                        <th>Seal No.</th>
+                                        <th>Destination</th>
+                                        <th className="text-right">Total Boxes</th>
+                                        <th className="text-center">Status</th>
+                                        <th className="text-center">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {activeContainers.length === 0 ? (
+                                        <tr>
+                                            <td colSpan="8" className="text-center" style={{ padding: '3rem 0', color: 'var(--text-tertiary)' }}>
+                                                <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📦</div>
+                                                All containers have been dispatched.<br />
+                                                <span style={{ fontSize: '0.9rem' }}>Register a new container to get started.</span>
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        paginatedActive.map(renderContainerRow)
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Active pagination */}
+                        {totalActivePages > 1 && (
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '1rem', padding: '1rem' }}>
+                                <button 
+                                    disabled={currentPage === 1} 
+                                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                    className="btn-secondary btn-sm"
+                                >
+                                    Previous
+                                </button>
+                                <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-secondary)' }}>
+                                    Page {currentPage} of {totalActivePages}
+                                </span>
+                                <button 
+                                    disabled={currentPage === totalActivePages} 
+                                    onClick={() => setCurrentPage(prev => Math.min(totalActivePages, prev + 1))}
+                                    className="btn-secondary btn-sm"
+                                >
+                                    Next
+                                </button>
+                            </div>
+                        )}
+
+                        {/* ===== DEPARTED CONTAINERS ===== */}
+                        {departedContainers.length > 0 && (
+                            <div className="banana-table-container shadow-lg" style={{ marginTop: '2rem', opacity: 0.92 }}>
+                                <div style={{ padding: '0.75rem 1.25rem', borderBottom: '2px solid #64748b', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc' }}>
+                                    <h3 style={{ margin: 0, fontSize: '1rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        🚢 Departed / Shipped
+                                        <span style={{ background: '#e2e8f0', color: '#475569', fontSize: '0.75rem', fontWeight: 700, padding: '2px 8px', borderRadius: '10px' }}>{departedContainers.length}</span>
+                                    </h3>
+                                </div>
+                                <table className="banana-table" style={{ fontSize: '0.9rem' }}>
+                                    <thead>
+                                        <tr>
+                                            <th>Departed</th>
+                                            <th>Brand / Reefer</th>
+                                            <th>Container No.</th>
+                                            <th>Seal No.</th>
+                                            <th>Destination</th>
+                                            <th className="text-right">Total Boxes</th>
+                                            <th className="text-center">Status</th>
+                                            <th className="text-center">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {departedContainers
+                                            .sort((a, b) => new Date(b.timeDeparted) - new Date(a.timeDeparted))
+                                            .map(renderContainerRow)
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </>
+                );
+            })()}
 
             {/* Hidden component solely for printing */}
             <div style={{ display: 'none' }}>
