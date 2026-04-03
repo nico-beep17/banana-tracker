@@ -664,6 +664,53 @@ const ShippingDocs = () => {
                                                 </div>
                                             )}
 
+                                            {/* Manual Checklists - Restored */}
+                                            <div className="sd-checklists-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem', marginTop: '1.5rem', paddingBottom: '1rem', borderBottom: '1px solid #e2e8f0' }}>
+                                                <div className="sd-checklist-section">
+                                                    <h5 style={{ color: '#334155', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem' }}>
+                                                        <CheckSquare size={16} /> Pre-Departure
+                                                    </h5>
+                                                    <div className="sd-docs-grid" style={{ display: 'grid', gap: '0.5rem' }}>
+                                                        {PRE_DEPARTURE_LIST.map(doc => {
+                                                            const isChecked = docsState.preDeparture?.[doc.id] || false;
+                                                            return (
+                                                            <label key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: isChecked ? '#f0fdf4' : '#f8fafc', border: isChecked ? '1px solid #bbf7d0' : '1px solid #e2e8f0', borderRadius: '6px', cursor: 'pointer', transition: 'all 0.2s ease' }}>
+                                                                <input 
+                                                                    type="checkbox" 
+                                                                    checked={isChecked}
+                                                                    onChange={() => handleToggleChecklist(container.id, 'preDeparture', doc.id, isChecked)}
+                                                                    disabled={updating}
+                                                                    style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                                                                />
+                                                                <span style={{ fontSize: '0.9rem', color: isChecked ? '#166534' : '#475569', fontWeight: isChecked ? 600 : 400 }}>{doc.label}</span>
+                                                            </label>
+                                                        )})}
+                                                    </div>
+                                                </div>
+                                                
+                                                <div className="sd-checklist-section">
+                                                    <h5 style={{ color: '#334155', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem' }}>
+                                                        <FileCheck size={16} /> Certificate of Origin
+                                                    </h5>
+                                                    <div className="sd-docs-grid" style={{ display: 'grid', gap: '0.5rem' }}>
+                                                        {CERT_OF_ORIGIN_LIST.map(doc => {
+                                                            const isChecked = docsState.certOfOrigin?.[doc.id] || false;
+                                                            return (
+                                                            <label key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: isChecked ? '#f0fdf4' : '#f8fafc', border: isChecked ? '1px solid #bbf7d0' : '1px solid #e2e8f0', borderRadius: '6px', cursor: 'pointer', transition: 'all 0.2s ease' }}>
+                                                                <input 
+                                                                    type="checkbox" 
+                                                                    checked={isChecked}
+                                                                    onChange={() => handleToggleChecklist(container.id, 'certOfOrigin', doc.id, isChecked)}
+                                                                    disabled={updating}
+                                                                    style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                                                                />
+                                                                <span style={{ fontSize: '0.9rem', color: isChecked ? '#166534' : '#475569', fontWeight: isChecked ? 600 : 400 }}>{doc.label}</span>
+                                                            </label>
+                                                        )})}
+                                                    </div>
+                                                </div>
+                                            </div>
+
                                             {scan && (
                                                 <div className="sd-ai-results-grid" style={{ marginTop: '1.5rem', background: '#f8fafc', padding: '1.5rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                                                     <h5 style={{ margin: '0 0 1rem 0', paddingBottom: '0.75rem', borderBottom: '1px solid #cbd5e1', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
