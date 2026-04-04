@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { RefreshCw, Bell, Settings, LayoutDashboard, ClipboardEdit, TestTubes, Leaf, Handshake, Ship, Package, Globe, LineChart, Calculator, Users, LogOut, UserCog, FileText, Search } from 'lucide-react';
+import { RefreshCw, Bell, Settings, LayoutDashboard, ClipboardEdit, TestTubes, Leaf, Handshake, Ship, Package, Globe, LineChart, Calculator, Users, LogOut, UserCog, FileText, Search, User } from 'lucide-react';
 import offlineSync from '../utils/offlineSync';
+import MyProfile from './MyProfile';
 import './Layout.css';
 
 const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notifications = [], onRefresh, arrivals = [], farms = [], samplings = [] }) => {
@@ -10,6 +11,7 @@ const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notif
     const [isSyncing, setIsSyncing] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [searchOpen, setSearchOpen] = useState(false);
+    const [isProfileOpen, setIsProfileOpen] = useState(false);
     const searchRef = useRef(null);
     const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -419,6 +421,27 @@ const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notif
                                         <h3>System Settings</h3>
                                     </div>
                                     <div className="notifications-list" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                                        {/* My Profile Button */}
+                                        <button
+                                            onClick={() => { setIsProfileOpen(true); setIsSettingsOpen(false); }}
+                                            style={{
+                                                display: 'flex', alignItems: 'center', gap: '0.75rem',
+                                                width: '100%', padding: '0.75rem 1rem', background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                                                border: '1px solid #bbf7d0', borderRadius: '12px', cursor: 'pointer',
+                                                transition: 'all 0.15s', textAlign: 'left'
+                                            }}
+                                            onMouseEnter={e => e.currentTarget.style.boxShadow = '0 4px 12px rgba(22,101,52,0.15)'}
+                                            onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
+                                        >
+                                            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'linear-gradient(135deg, #166534 0%, #14532d 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                <User size={18} color="white" />
+                                            </div>
+                                            <div>
+                                                <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#0f172a' }}>My Profile</div>
+                                                <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Employee CV &amp; personal details</div>
+                                            </div>
+                                        </button>
+                                        <hr style={{ border: 'none', borderTop: '1px solid #cbd5e1' }} />
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                             <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Skeuomorphic Mode</span>
                                             <div style={{ background: 'linear-gradient(180deg, #10b981 0%, #059669 100%)', boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.3)', width: '44px', height: '24px', borderRadius: '12px', position: 'relative', cursor: 'pointer' }}>
@@ -435,7 +458,7 @@ const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notif
                                         <hr style={{ border: 'none', borderTop: '1px solid #cbd5e1' }} />
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                             <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>App Version</span>
-                                            <span style={{ color: 'var(--color-primary-main)', fontWeight: 800, fontSize: '0.9rem', padding: '0.25rem 0.5rem', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px' }}>v1.4.0 (Live)</span>
+                                            <span style={{ color: 'var(--color-primary-main)', fontWeight: 800, fontSize: '0.9rem', padding: '0.25rem 0.5rem', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px' }}>v1.5.0 (Live)</span>
                                         </div>
                                     </div>
                                 </div>
@@ -504,6 +527,9 @@ const Layout = ({ children, activeTab, onTabChange, userProfile, onLogout, notif
                     <span className="mobile-nav-label">More</span>
                 </button>
             </nav>
+
+            {/* My Profile Modal */}
+            <MyProfile isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} userProfile={userProfile} />
         </div>
     );
 };
