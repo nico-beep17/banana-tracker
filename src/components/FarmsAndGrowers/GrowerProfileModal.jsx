@@ -476,10 +476,9 @@ function GrowerProfileModal({ farm, weeklyRates, arrivals, samplings = [], onClo
                                         <thead>
                                             <tr>
                                                 <th>Year</th><th>Week</th><th>Trend</th>
-                                                <th className="text-right">A-4H</th><th className="text-right">A-5H</th><th className="text-right">A-6H</th>
-                                                <th className="text-right">A-7H</th><th className="text-right">A-8H</th><th className="text-right">A-9H</th>
-                                                <th className="text-right">B-4H</th><th className="text-right">B-5H</th><th className="text-right">B-6H</th>
-                                                <th className="text-right">B-7H</th><th className="text-right">B-8H</th>
+                                                {FIELDS.map(f => (
+                                                    <th key={f.key} className="text-right">{f.label}</th>
+                                                ))}
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -496,9 +495,9 @@ function GrowerProfileModal({ farm, weeklyRates, arrivals, samplings = [], onClo
                                                         <td style={{ fontWeight: 600 }}>{rate.year}</td>
                                                         <td><span className="badge-neutral" style={{ background: isCur ? '#dcfce7' : undefined, color: isCur ? '#166534' : undefined }}>Wk {rate.week_number}{isCur ? ' ●' : ''}</span></td>
                                                         <td style={{ color: tc, fontWeight: 700, fontSize: '0.78rem', whiteSpace: 'nowrap' }}>{trend}</td>
-                                                        {['classA.rha4','classA.rha5','classA.rha6','classA.sha7','classA.sha8','classA.sha9','classB.rhb4','classB.rhb5','classB.rhb6','classB.shb7','classB.shb8'].map(k => (
-                                                            <td key={k} className="text-right" style={{ color: Number(rate.rates_matrix?.[k]) > 0 ? '#0f172a' : '#cbd5e1' }}>
-                                                                {Number(rate.rates_matrix?.[k] || 0) > 0 ? `₱${Number(rate.rates_matrix[k]).toFixed(2)}` : '—'}
+                                                        {FIELDS.map(f => (
+                                                            <td key={f.key} className="text-right" style={{ color: Number(rate.rates_matrix?.[f.key]) > 0 ? '#0f172a' : '#cbd5e1' }}>
+                                                                {Number(rate.rates_matrix?.[f.key] || 0) > 0 ? `₱${Number(rate.rates_matrix[f.key]).toFixed(2)}` : '—'}
                                                             </td>
                                                         ))}
                                                     </tr>
