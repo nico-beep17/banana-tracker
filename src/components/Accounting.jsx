@@ -122,7 +122,7 @@ const Accounting = ({ userProfile, exchangeRate, setExchangeRate }) => {
             }
 
             // Use the specific rate snapshot locked at the time of arrival
-            let rateApplied = arrival.locked_rate || 0;
+            let rateApplied = Number(arrival.locked_rate) || 0;
             const isClassA = arrival.typeId ? arrival.typeId.startsWith('classA') : (arrival.ccClass === 'A' || arrival.ccClass === 'Class A' || arrival.ccClass === 'SH' || arrival.ccClass === 'A (Cluster)');
 
             // Fallback to active weekly rates if locked_rate is 0 or missing
