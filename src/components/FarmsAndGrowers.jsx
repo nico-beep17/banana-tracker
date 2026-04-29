@@ -56,6 +56,17 @@ const FarmsAndGrowers = () => {
         }
     });
 
+    const FIELDS = [
+        { key: 'classA.rha4', label: 'A-4H' }, { key: 'classA.rha5', label: 'A-5H' },
+        { key: 'classA.rha6', label: 'A-6H' }, { key: 'classA.sha7', label: 'A-7H' },
+        { key: 'classA.sha8', label: 'A-8H' }, { key: 'classA.sha9', label: 'A-9H' },
+        { key: 'classA.cla', label: 'A-CL' },
+        { key: 'classB.rhb4', label: 'B-4H' }, { key: 'classB.rhb5', label: 'B-5H' },
+        { key: 'classB.rhb6', label: 'B-6H' }, { key: 'classB.shb7', label: 'B-7H' },
+        { key: 'classB.shb8', label: 'B-8H' }, { key: 'classB.shb9', label: 'B-9H' },
+        { key: 'classB.clb', label: 'B-CL' }, { key: 'classB.fp', label: 'B-FP' },
+    ];
+
     // New Grower Form State
     const [newGrower, setNewGrower] = useState({
         farmCode: '', name: '', prodHas: '', activeHas: '', location: '',
@@ -637,23 +648,17 @@ const FarmsAndGrowers = () => {
                                 </form>
                             </div>
 
-                            <div className="card" style={{ padding: '1.5rem' }}>
+                            <div className="card" style={{ padding: '1.5rem', width: '100%', overflow: 'hidden' }}>
                                 <h4 style={{ margin: '0 0 1rem 0' }}>📊 Price History — All Weeks</h4>
-                                <div className="table-responsive" style={{ marginTop: '0.5rem' }}>
+                                <div style={{ overflowX: 'auto', width: '100%', paddingBottom: '0.5rem' }}>
                                     <table className="banana-table" style={{ fontSize: '0.82rem' }}>
                                         <thead>
                                             <tr>
                                                 <th>Year</th>
                                                 <th>Week</th>
-                                                <th className="text-right">A-4H</th>
-                                                <th className="text-right">A-5H</th>
-                                                <th className="text-right">A-6H</th>
-                                                <th className="text-right">A-7H</th>
-                                                <th className="text-right">A-8H</th>
-                                                <th className="text-right">A-9H</th>
-                                                <th className="text-right">B-4H</th>
-                                                <th className="text-right">B-5H</th>
-                                                <th className="text-right">B-6H</th>
+                                                {FIELDS.map(f => (
+                                                    <th key={f.key} className="text-right">{f.label}</th>
+                                                ))}
                                                 <th className="text-center">Action</th>
                                             </tr>
                                         </thead>
@@ -680,15 +685,11 @@ const FarmsAndGrowers = () => {
                                                                         {trend === 'flat' && <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>→</span>}
                                                                     </span>
                                                                 </td>
-                                                                <td className="text-right">₱{Number(rate.rates_matrix?.['classA.rha4'] || 0).toFixed(2)}</td>
-                                                                <td className="text-right">₱{Number(rate.rates_matrix?.['classA.rha5'] || 0).toFixed(2)}</td>
-                                                                <td className="text-right">₱{Number(rate.rates_matrix?.['classA.rha6'] || 0).toFixed(2)}</td>
-                                                                <td className="text-right">₱{Number(rate.rates_matrix?.['classA.sha7'] || 0).toFixed(2)}</td>
-                                                                <td className="text-right">₱{Number(rate.rates_matrix?.['classA.sha8'] || 0).toFixed(2)}</td>
-                                                                <td className="text-right">₱{Number(rate.rates_matrix?.['classA.sha9'] || 0).toFixed(2)}</td>
-                                                                <td className="text-right">₱{Number(rate.rates_matrix?.['classB.rhb4'] || 0).toFixed(2)}</td>
-                                                                <td className="text-right">₱{Number(rate.rates_matrix?.['classB.rhb5'] || 0).toFixed(2)}</td>
-                                                                <td className="text-right">₱{Number(rate.rates_matrix?.['classB.rhb6'] || 0).toFixed(2)}</td>
+                                                                {FIELDS.map(f => (
+                                                                    <td key={f.key} className="text-right" style={{ color: Number(rate.rates_matrix?.[f.key]) > 0 ? '#0f172a' : '#cbd5e1' }}>
+                                                                        {Number(rate.rates_matrix?.[f.key] || 0) > 0 ? `₱${Number(rate.rates_matrix[f.key]).toFixed(2)}` : '—'}
+                                                                    </td>
+                                                                ))}
                                                                 <td className="text-center">
                                                                     <button
                                                                         className="btn-secondary"
