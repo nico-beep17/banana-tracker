@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { supabase } from '../../supabaseClient';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 
 const VouchersTab = ({ 
     exchangeRate, 
@@ -9,6 +10,7 @@ const VouchersTab = ({
     localChartOfAccounts, 
     farms 
 }) => {
+    const queryClient = useQueryClient();
     // Phase 12 Voucher Entry State
     const [voucherType, setVoucherType] = useState('PAYABLE');
     const [voucherForm, setVoucherForm] = useState({
@@ -157,6 +159,9 @@ const VouchersTab = ({
             }
 
             showToast("✅ Voucher posted to General Ledger!", "success");
+
+            queryClient.invalidateQueries({ queryKey: ['journal_entries'] });
+            queryClient.invalidateQueries({ queryKey: ['journal_lines'] });
 
             // Reset form
             setVoucherForm({ entityId: '', amount: '', referenceNo: '', description: '', currency: 'PHP' });

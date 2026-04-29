@@ -1,6 +1,11 @@
 import React, { useState, useMemo } from 'react';
+import { supabase } from '../../supabaseClient';
+import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 
 const LedgerTab = ({ journalLines, journalEntries, localChartOfAccounts }) => {
+    const queryClient = useQueryClient();
+
     // Computed Ledger Data
     const ledgerData = useMemo(() => {
         return journalLines.map(line => {
@@ -14,7 +19,8 @@ const LedgerTab = ({ journalLines, journalEntries, localChartOfAccounts }) => {
                 accountCode: account.code || '?',
                 accountName: account.name || 'Unknown Account',
                 debit: Number(line.debit_amount || 0),
-                credit: Number(line.credit_amount || 0)
+                credit: Number(line.credit_amount || 0),
+                entryId: entry.id
             };
         }).sort((a, b) => new Date(b.date) - new Date(a.date) || b.reference.localeCompare(a.reference));
     }, [journalLines, journalEntries, localChartOfAccounts]);
@@ -39,6 +45,31 @@ const LedgerTab = ({ journalLines, journalEntries, localChartOfAccounts }) => {
         return [...new Map(ledgerData.map(r => [r.accountCode, r])).values()]
             .sort((a, b) => a.accountCode.localeCompare(b.accountCode));
     }, [ledgerData]);
+
+    const handleDeleteEntry = async (entryId) => {
+        if (!entryId) {
+            toast.error("Invalid entry ID.");
+            return;
+        }
+        if (!window.confirm("Are you sure you want to delete this journal entry? This will permanently remove all associated lines and vouchers.")) return;
+
+        try {
+            // Delete child records first to avoid foreign key constraints
+            await supabase.from('vouchers').delete().eq('entry_id', entryId);
+            await supabase.from('journal_lines').delete().eq('entry_id', entryId);
+            const { error } = await supabase.from('journal_entries').delete().eq('id', entryId);
+            
+            if (error) throw error;
+            
+            toast.success("Journal entry deleted successfully.");
+            queryClient.invalidateQueries({ queryKey: ['journal_entries'] });
+            queryClient.invalidateQueries({ queryKey: ['journal_lines'] });
+            queryClient.invalidateQueries({ queryKey: ['vouchers'] });
+        } catch (error) {
+            console.error("Error deleting entry:", error);
+            toast.error("Failed to delete entry: " + error.message);
+        }
+    };
 
     return (
         <div className="erp-content-section slide-down text-left" style={{ padding: '2rem', background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' }}>
@@ -85,11 +116,12 @@ const LedgerTab = ({ journalLines, journalEntries, localChartOfAccounts }) => {
                                 <th>Account</th>
                                 <th className="text-right">Debit (PHP)</th>
                                 <th className="text-right">Credit (PHP)</th>
+                                <th className="text-center">Action</th>
                             </tr>
                         </thead>
                         <tbody>
                             {filtered.length === 0 ? (
-                                <tr><td colSpan="6" className="text-center" style={{ padding: '2rem', color: 'var(--text-tertiary)' }}>No journal lines match the current filters.</td></tr>
+                                <tr><td colSpan="7" className="text-center" style={{ padding: '2rem', color: 'var(--text-tertiary)' }}>No journal lines match the current filters.</td></tr>
                             ) : (
                                 filtered.map((row, idx) => (
                                     <tr key={row.id} style={{
@@ -109,6 +141,15 @@ const LedgerTab = ({ journalLines, journalEntries, localChartOfAccounts }) => {
                                         <td className="text-right" style={{ fontWeight: row.credit > 0 ? 700 : 400, color: row.credit > 0 ? '#b45309' : '#cbd5e1' }}>
                                             {row.credit > 0 ? row.credit.toLocaleString(undefined, { minimumFractionDigits: 2 }) : '–'}
                                         </td>
+                                        <td className="text-center">
+                                            <button 
+                                                className="btn-secondary" 
+                                                style={{ fontSize: '0.65rem', padding: '0.2rem 0.5rem', color: '#dc2626', borderColor: '#fca5a5' }}
+                                                onClick={() => handleDeleteEntry(row.entryId)}
+                                            >
+                                                Delete
+                                            </button>
+                                        </td>
                                     </tr>
                                 ))
                             )}
@@ -119,9 +160,10 @@ const LedgerTab = ({ journalLines, journalEntries, localChartOfAccounts }) => {
                                     <td colSpan="4" style={{ padding: '0.6rem 1rem', fontSize: '0.83rem', color: 'var(--text-secondary)' }}>TOTALS ({filtered.length} lines)</td>
                                     <td className="text-right" style={{ color: '#0f4c26', padding: '0.6rem 1rem' }}>{totalDebit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                                     <td className="text-right" style={{ color: '#b45309', padding: '0.6rem 1rem' }}>{totalCredit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                                    <td></td>
                                 </tr>
                                 <tr style={{ background: Math.abs(totalDebit - totalCredit) < 0.01 ? '#dcfce7' : '#fef2f2' }}>
-                                    <td colSpan="6" style={{ padding: '0.4rem 1rem', fontSize: '0.78rem', fontWeight: 600, color: Math.abs(totalDebit - totalCredit) < 0.01 ? '#166534' : '#dc2626', textAlign: 'right' }}>
+                                    <td colSpan="7" style={{ padding: '0.4rem 1rem', fontSize: '0.78rem', fontWeight: 600, color: Math.abs(totalDebit - totalCredit) < 0.01 ? '#166534' : '#dc2626', textAlign: 'right' }}>
                                         {Math.abs(totalDebit - totalCredit) < 0.01
                                             ? '✓ Balanced — Debits equal Credits'
                                             : `⚠ Out of Balance by ₱${Math.abs(totalDebit - totalCredit).toLocaleString(undefined, { minimumFractionDigits: 2 })}`}

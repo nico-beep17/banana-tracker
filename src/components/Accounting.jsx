@@ -127,11 +127,16 @@ const Accounting = ({ userProfile, exchangeRate, setExchangeRate }) => {
 
             // Fallback to active weekly rates if locked_rate is 0 or missing
             if (rateApplied === 0 && arrival.dateOfPacking) {
-                const getWeekNum = (dateStr) => {
-                    const d = new Date(dateStr); const s = new Date(d.getFullYear(), 0, 1);
-                    return { week: Math.ceil((d.getDay() + 1 + Math.floor((d - s) / 86400000)) / 7), year: d.getFullYear() };
+                const getISOWeekLookup = (dateStr) => {
+                    if (!dateStr) return { week: 0, year: 0 };
+                    const d = new Date(dateStr);
+                    const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+                    const dayNum = date.getUTCDay() || 7;
+                    date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+                    const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+                    return { week: Math.ceil((((date - yearStart) / 86400000) + 1) / 7), year: date.getUTCFullYear() };
                 };
-                const { week, year } = getWeekNum(arrival.dateOfPacking);
+                const { week, year } = getISOWeekLookup(arrival.dateOfPacking);
                 const farm = farms.find(f => f.farmCode === arrival.farmCode);
                 
                 if (farm && weeklyRates.length > 0) {

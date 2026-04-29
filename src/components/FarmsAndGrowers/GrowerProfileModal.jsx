@@ -232,8 +232,12 @@ function GrowerProfileModal({ farm, weeklyRates, arrivals, samplings = [], onClo
     ];
 
     const getCurrentWeekNum = () => {
-        const d = new Date(); const s = new Date(d.getFullYear(), 0, 1);
-        return Math.ceil((d.getDay() + 1 + Math.floor((d - s) / 86400000)) / 7);
+        const d = new Date();
+        const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+        const dayNum = date.getUTCDay() || 7;
+        date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+        const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+        return Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
     };
 
     const buildGrid = () => {
@@ -636,8 +640,12 @@ function GrowerProfileModal({ farm, weeklyRates, arrivals, samplings = [], onClo
                                                 const packDate = b.dateOfPacking || b.dateTimeArrive;
                                                 const wkNum = (() => {
                                                     if (!packDate) return '—';
-                                                    const d = new Date(packDate); const s = new Date(d.getFullYear(), 0, 1);
-                                                    return Math.ceil((d.getDay() + 1 + Math.floor((d - s) / 86400000)) / 7);
+                                                    const d = new Date(packDate);
+                                                    const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+                                                    const dayNum = date.getUTCDay() || 7;
+                                                    date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+                                                    const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+                                                    return Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
                                                 })();
                                                 return (
                                                     <tr key={b.batchId || b.id}>
