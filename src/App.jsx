@@ -390,7 +390,8 @@ function App() {
     handleEditStuffedPayload,
     handleDeleteStuffedPayload,
     handleApproveArrival,
-    handleDeleteArrival
+    handleDeleteArrival,
+    handleDeleteContainer
   } = useAppOperations();
 
   // --- Derived Analytics (computed from Zustand store data) ---
@@ -645,6 +646,7 @@ function App() {
             onSaveContainer={handleSaveContainer}
             initialData={containers.find(c => c.id === tabState.containerId)}
             onCancel={() => handleNavigate('containers-list')}
+            onDeleteContainer={handleDeleteContainer}
           />
         )}
 

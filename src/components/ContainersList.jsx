@@ -88,7 +88,7 @@ const ContainersList = ({ onNavigate, onDepartContainer, onSealContainer, onEdit
                 'B-CLB': handsBreakdown['classB.clb'] || 0,
                 'B-FP': handsBreakdown['classB.fp'] || 0,
                 'Class B Total': classBSubtotal,
-                'Status': c.timeDeparted ? 'DEPARTED' : (c.timeSealed ? 'SEALED' : (c.totalBoxes >= 1540 ? 'FULL' : (c.totalBoxes === 0 ? 'EMPTY' : 'PACKING'))),
+                'Status': (c.transit_status === 'DEPARTED' || c.timeDeparted) ? 'DEPARTED' : ((c.transit_status === 'SEALED' || c.timeSealed) ? 'SEALED' : (c.totalBoxes >= 1540 ? 'FULL' : (c.totalBoxes === 0 ? 'EMPTY' : 'PACKING'))),
                 'Time Started Loading': c.timeStarted ? new Date(c.timeStarted).toLocaleString() : '-',
                 'Time Ended Loading': c.timeEnded ? new Date(c.timeEnded).toLocaleString() : '-',
                 'Time Sealed': c.timeSealed ? new Date(c.timeSealed).toLocaleString() : '-',
@@ -203,8 +203,8 @@ const ContainersList = ({ onNavigate, onDepartContainer, onSealContainer, onEdit
 
             {/* Split containers into active vs departed */}
             {(() => {
-                const activeContainers = containers.filter(c => !c.timeDeparted);
-                const departedContainers = containers.filter(c => !!c.timeDeparted);
+                const activeContainers = containers.filter(c => c.transit_status !== 'DEPARTED' && !c.timeDeparted);
+                const departedContainers = containers.filter(c => c.transit_status === 'DEPARTED' || !!c.timeDeparted);
 
                 const totalActivePages = Math.ceil(activeContainers.length / itemsPerPage);
                 const startIndex = (currentPage - 1) * itemsPerPage;
@@ -213,8 +213,8 @@ const ContainersList = ({ onNavigate, onDepartContainer, onSealContainer, onEdit
                 const renderContainerRow = (container) => {
                     const isFull = (container.totalBoxes >= 1540);
                     const isEmpty = container.totalBoxes === 0;
-                    const isDeparted = !!container.timeDeparted;
-                    const isSealed = !!container.timeSealed;
+                    const isDeparted = container.transit_status === 'DEPARTED' || !!container.timeDeparted;
+                    const isSealed = container.transit_status === 'SEALED' || !!container.timeSealed;
 
                     let statusLabel = isDeparted ? 'DEPARTED' : (isSealed ? 'SEALED' : (isFull ? 'FULL' : (isEmpty ? 'EMPTY' : 'PACKING')));
                     let statusClass = isDeparted ? 'departed' : (isSealed ? 'sealed' : (isFull ? 'full' : (isEmpty ? 'empty' : 'packing')));
@@ -248,31 +248,45 @@ const ContainersList = ({ onNavigate, onDepartContainer, onSealContainer, onEdit
                             </td>
                             <td data-label="" className="text-center" onClick={e => e.stopPropagation()}>
                                 <div className="action-cell">
-                                    {isDeparted ? (
+                                    {isDeparted && (
                                         <>
                                             <span className="dispatched-label">✓ Dispatched</span>
                                             <button className="btn-print" onClick={() => handlePrintClick(container)}>Print Manifest</button>
                                         </>
-                                    ) : !isFull ? (
-                                        canPerformAction(userProfile, 'action:stuff-container') ? (
-                                        <button
-                                            className="btn-primary"
-                                            onClick={() => onNavigate({ name: 'container-stuffing-grid', state: { containerId: container.id } })}
-                                            style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
-                                        >
-                                            Stuff Container
-                                        </button>
-                                        ) : null
-                                    ) : !isSealed ? (
-                                        canPerformAction(userProfile, 'action:seal-container') ? (
-                                        <button className="btn-seal" onClick={() => onSealContainer(container.id)}>Seal Container</button>
-                                        ) : <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', fontWeight: '600' }}>FULL</span>
-                                    ) : (
+                                    )}
+
+                                    {!isDeparted && isSealed && (
                                         <>
                                             {canPerformAction(userProfile, 'action:depart-container') && (
-                                            <button className="btn-depart" onClick={() => onDepartContainer(container.id)}>Depart Hub</button>
+                                                <button className="btn-depart" onClick={() => onDepartContainer(container.id)}>Depart Hub</button>
                                             )}
                                             <button className="btn-print" onClick={() => handlePrintClick(container)}>Print Manifest</button>
+                                        </>
+                                    )}
+
+                                    {!isDeparted && !isSealed && (
+                                        <>
+                                            {canPerformAction(userProfile, 'action:stuff-container') && !isFull && (
+                                                <button
+                                                    className="btn-primary"
+                                                    onClick={() => onNavigate({ name: 'container-stuffing-grid', state: { containerId: container.id } })}
+                                                    style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
+                                                >
+                                                    Stuff Container
+                                                </button>
+                                            )}
+                                            {canPerformAction(userProfile, 'action:seal-container') && (
+                                                <button 
+                                                    className="btn-seal" 
+                                                    onClick={() => {
+                                                        if (!isFull && !window.confirm("This container is not full. Are you sure you want to OVERRIDE and seal it early?")) return;
+                                                        onSealContainer(container.id);
+                                                    }}
+                                                    style={!isFull ? { fontSize: '0.7rem', padding: '0.3rem 0.6rem', marginTop: '4px', opacity: 0.8 } : undefined}
+                                                >
+                                                    {isFull ? 'Seal Container' : 'Override: Seal Early'}
+                                                </button>
+                                            )}
                                         </>
                                     )}
                                     <button
@@ -384,7 +398,7 @@ const ContainersList = ({ onNavigate, onDepartContainer, onSealContainer, onEdit
                                     </thead>
                                     <tbody>
                                         {departedContainers
-                                            .sort((a, b) => new Date(b.timeDeparted) - new Date(a.timeDeparted))
+                                            .sort((a, b) => new Date(b.dateCreated) - new Date(a.dateCreated)) // fallback to dateCreated since timeDeparted is dropped
                                             .map(renderContainerRow)
                                         }
                                     </tbody>
@@ -428,8 +442,8 @@ const ContainersList = ({ onNavigate, onDepartContainer, onSealContainer, onEdit
                 const circumference = 2 * Math.PI * 42; // r=42
                 const dashOffset = circumference * (1 - fillPct / 100);
 
-                const isDeparted = !!c.timeDeparted;
-                const isSealed = !!c.timeSealed;
+                const isDeparted = c.transit_status === 'DEPARTED' || !!c.timeDeparted;
+                const isSealed = c.transit_status === 'SEALED' || !!c.timeSealed;
                 const isFull = c.totalBoxes >= capacity;
                 const isEmpty = c.totalBoxes === 0;
                 const statusLabel = isDeparted ? 'DEPARTED' : (isSealed ? 'SEALED' : (isFull ? 'FULL' : (isEmpty ? 'EMPTY' : 'PACKING')));

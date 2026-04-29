@@ -33,7 +33,7 @@ const AiSyncTag = ({ fieldName, syncedFields }) => {
     );
 };
 
-const NewContainerForm = ({ onSaveContainer, initialData = null, onCancel }) => {
+const NewContainerForm = ({ onSaveContainer, initialData = null, onCancel, onDeleteContainer }) => {
     const { data: consignees = [] } = useConsigneesQuery();
     const getLocalDate = () => {
         const d = new Date();
@@ -315,6 +315,16 @@ const NewContainerForm = ({ onSaveContainer, initialData = null, onCancel }) => 
                     )}
 
                     <div className="form-actions" style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                        {initialData && onDeleteContainer && (
+                            <button 
+                                type="button" 
+                                className="btn-secondary" 
+                                onClick={() => onDeleteContainer(initialData.id)} 
+                                style={{ padding: '0.75rem 1.5rem', fontWeight: 'bold', color: '#dc2626', borderColor: '#fca5a5', marginRight: 'auto' }}
+                            >
+                                🗑️ Delete Container
+                            </button>
+                        )}
                         <button type="button" className="btn-secondary" onClick={onCancel} style={{ padding: '0.75rem 1.5rem', fontWeight: 'bold' }}>
                             Cancel
                         </button>

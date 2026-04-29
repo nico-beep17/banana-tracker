@@ -37,11 +37,11 @@ export function useAppOperations() {
       if (success) {
         if (queued) {
           // Optimistic local state rendering for offline PWA
-          setArrivals(prev => [...newArrivalsBatch, ...prev]);
+          setArrivals([...newArrivalsBatch, ...arrivals]);
           toast.info('📱 Offline Mode: Arrival logged securely and queued for background syncing when internet returns.');
           return true;
         } else if (data) {
-          setArrivals(prev => [...data, ...prev]);
+          setArrivals([...data, ...arrivals]);
           return true;
         }
       }
@@ -55,21 +55,36 @@ export function useAppOperations() {
   const handleSaveContainer = async (containerData) => {
     const isUpdate = containerData.id && containers.some(c => c.id === containerData.id);
 
-    // Omit columns that are purely front-end display properties or remapped
+    // Strip front-end-only fields not mapped to DB columns
     const {
-      vesselVoyage,
-      driverName,
+      vesselVoyage,   // stored as voyageNo
+      driverName,     // stored as driver
       plugInTime: _plugInTime,
       plugOutTime: _plugOutTime,
       ...dbPayload
     } = containerData;
+
+    // Remap front-end names to DB column names
+    dbPayload.voyageNo = vesselVoyage;
+    dbPayload.driver = driverName;
+
+    // Coerce ALL empty or whitespace strings to null — Postgres rejects "" or " " for DATE, NUMERIC, TIME etc.
+    Object.keys(dbPayload).forEach(k => {
+      if (typeof dbPayload[k] === 'string' && dbPayload[k].trim() === '') dbPayload[k] = null;
+      else if (dbPayload[k] === undefined) delete dbPayload[k];
+    });
+
+    // Numeric columns: ensure proper number or null (not "0" string)
+    ['grossWeight', 'netWeight'].forEach(col => {
+      if (dbPayload[col] !== null) dbPayload[col] = Number(dbPayload[col]) || null;
+    });
 
     if (isUpdate) {
       try {
         const { success, data, queued } = await offlineSync.mutate('update', 'containers', dbPayload, { id: containerData.id });
         if (success) {
           const updatedContainer = { ...dbPayload, ...(data ? data[0] : {}), vesselVoyage, driverName };
-          setContainers(prev => prev.map(c => c.id === containerData.id ? { ...c, ...updatedContainer } : c));
+          setContainers(containers.map(c => c.id === containerData.id ? { ...c, ...updatedContainer } : c));
           if (queued) toast.info('📱 Offline Mode: Container modifications saved safely locally.');
           handleNavigate('containers-list');
         }
@@ -82,7 +97,7 @@ export function useAppOperations() {
         const { success, data, queued } = await offlineSync.mutate('insert', 'containers', dbPayload);
         if (success) {
           const newContainer = { ...dbPayload, ...(data ? data[0] : {}), vesselVoyage, driverName };
-          setContainers(prev => [newContainer, ...prev]);
+          setContainers([newContainer, ...containers]);
           if (queued) toast.info('📱 Offline Mode: New Container correctly registered locally.');
           handleNavigate('containers-list');
         }
@@ -90,6 +105,23 @@ export function useAppOperations() {
         console.error("Supabase error (Create Container):", error);
         toast.error(`Failed to create container registry in database. Error: ${error.message}`);
       }
+    }
+  };
+
+  const handleDeleteContainer = async (containerId) => {
+    if (!window.confirm("Are you sure you want to permanently delete this container registry? All associated data will be lost.")) return;
+
+    try {
+      const { success, queued } = await offlineSync.mutate('delete', 'containers', null, { id: containerId });
+      if (success) {
+        setContainers(containers.filter(c => c.id !== containerId));
+        if (queued) toast.info('📱 Offline Mode: Container deletion queued safely locally.');
+        else toast.success('Container permanently deleted.');
+        handleNavigate('containers-list');
+      }
+    } catch (error) {
+      console.error("Supabase error (Delete Container):", error);
+      toast.error(`Failed to delete container. Error: ${error.message}`);
     }
   };
 
@@ -124,7 +156,7 @@ export function useAppOperations() {
     }
 
     if (data && data[0]) {
-      setContainers(prev => prev.map(c => c.id === containerId ? data[0] : c));
+      setContainers(containers.map(c => c.id === containerId ? data[0] : c));
       handleNavigate('containers-list');
     }
   };
@@ -145,7 +177,7 @@ export function useAppOperations() {
     }
 
     if (data && data[0]) {
-      setContainers(prev => prev.map(c => c.id === containerId ? { ...data[0], timeSealed } : c));
+      setContainers(containers.map(c => c.id === containerId ? { ...data[0], timeSealed } : c));
       logAudit('SEAL_CONTAINER', 'container', containerId, { timeSealed });
     }
   };
@@ -154,7 +186,7 @@ export function useAppOperations() {
     const timeDeparted = new Date().toISOString();
     const { data, error } = await supabase
       .from('containers')
-      .update({ timeDeparted })
+      .update({ transit_status: 'DEPARTED', timeDeparted })
       .eq('id', containerId)
       .select();
 
@@ -165,7 +197,7 @@ export function useAppOperations() {
     }
 
     if (data && data[0]) {
-      setContainers(prev => prev.map(c => c.id === containerId ? data[0] : c));
+      setContainers(containers.map(c => c.id === containerId ? data[0] : c));
       logAudit('DEPART_CONTAINER', 'container', containerId, { timeDeparted });
     }
   };
@@ -185,7 +217,7 @@ export function useAppOperations() {
     }
 
     if (data && data[0]) {
-      setContainers(prev => prev.map(c => c.id === containerId ? data[0] : c));
+      setContainers(containers.map(c => c.id === containerId ? data[0] : c));
     }
   };
 
@@ -226,7 +258,7 @@ export function useAppOperations() {
       return;
     }
     if (data && data[0]) {
-      setContainers(prev => prev.map(c => c.id === containerId ? data[0] : c));
+      setContainers(containers.map(c => c.id === containerId ? data[0] : c));
     }
   };
 
@@ -265,7 +297,7 @@ export function useAppOperations() {
       return;
     }
     if (data && data[0]) {
-      setContainers(prev => prev.map(c => c.id === containerId ? data[0] : c));
+      setContainers(containers.map(c => c.id === containerId ? data[0] : c));
     }
   };
 
@@ -325,7 +357,7 @@ export function useAppOperations() {
 
     if (data && data.length > 0) {
       const updatedMap = new Map(data.map(item => [item.id, item]));
-      setArrivals(prev => prev.map(a => updatedMap.has(a.id) ? updatedMap.get(a.id) : a));
+      setArrivals(arrivals.map(a => updatedMap.has(a.id) ? updatedMap.get(a.id) : a));
       logAudit('APPROVE_ARRIVAL', 'arrival', batchId || arrivalId, { count: data.length });
 
       const totalGross = data.reduce((s, r) => s + (Number(r.quantity || 0) * Number(r.locked_rate || 0)), 0);
@@ -353,9 +385,9 @@ export function useAppOperations() {
     }
 
     if (batchId) {
-      setArrivals(prev => prev.filter(a => a.batchId !== batchId));
+      setArrivals(arrivals.filter(a => a.batchId !== batchId));
     } else {
-      setArrivals(prev => prev.filter(a => a.id !== arrivalId));
+      setArrivals(arrivals.filter(a => a.id !== arrivalId));
     }
     logAudit('DELETE_ARRIVAL', 'arrival', batchId || arrivalId);
   };
@@ -371,6 +403,7 @@ export function useAppOperations() {
     handleEditStuffedPayload,
     handleDeleteStuffedPayload,
     handleApproveArrival,
-    handleDeleteArrival
+    handleDeleteArrival,
+    handleDeleteContainer
   };
 }
