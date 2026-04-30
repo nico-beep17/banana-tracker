@@ -8,7 +8,8 @@ const VouchersTab = ({
     setExchangeRate, 
     accountingPeriods, 
     localChartOfAccounts, 
-    farms 
+    farms,
+    consignees = []
 }) => {
     const queryClient = useQueryClient();
     // Phase 12 Voucher Entry State
@@ -342,7 +343,12 @@ const VouchersTab = ({
                         <>
                             <div className="input-group">
                                 <label>Received From (Buyer)</label>
-                                <input type="text" className="input-field" placeholder="e.g. Kawasaki Trading" value={voucherForm.entityId} onChange={e => setVoucherForm({ ...voucherForm, entityId: e.target.value })} />
+                                <select className="input-field" value={voucherForm.entityId} onChange={e => setVoucherForm({ ...voucherForm, entityId: e.target.value })}>
+                                    <option value="">-- Select Buyer --</option>
+                                    {consignees.map(c => (
+                                        <option key={c.id} value={c.id}>{c.company_name}</option>
+                                    ))}
+                                </select>
                             </div>
                             <div className="input-group" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1rem' }}>
                                 <div>

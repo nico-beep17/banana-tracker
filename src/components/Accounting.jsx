@@ -819,6 +819,7 @@ const Accounting = ({ userProfile, exchangeRate, setExchangeRate }) => {
                     accountingPeriods={accountingPeriods}
                     localChartOfAccounts={localChartOfAccounts}
                     farms={farms}
+                    consignees={consignees}
                 />
             )}
 
