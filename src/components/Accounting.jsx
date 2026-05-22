@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { downloadCSV } from '../utils/exportUtils';
-import { LayoutDashboard, Receipt, BookOpen, Package, LineChart, Calendar, Save, Plus, BookMarked } from 'lucide-react';
+import { LayoutDashboard, Receipt, BookOpen, Package, LineChart, Calendar, Save, Plus, BookMarked, ShieldAlert } from 'lucide-react';
 import './Accounting.css';
 import { supabase } from '../supabaseClient';
 import { toast } from 'sonner';
@@ -11,6 +11,11 @@ import { useArrivalsQuery, useSamplingsQuery, useContainersQuery, useFarmsQuery,
 
 const Accounting = ({ userProfile, exchangeRate, setExchangeRate }) => {
     const queryClient = useQueryClient();
+    const isElevatedRole = useMemo(() => {
+        return userProfile?.role === 'Administrator' || 
+               userProfile?.role === 'Admin / Developer' || 
+               userProfile?.role === 'Accounting Manager';
+    }, [userProfile]);
     const { data: arrivals = [] } = useArrivalsQuery();
     const { data: samplings = [] } = useSamplingsQuery();
     const { data: containers = [] } = useContainersQuery();
@@ -410,6 +415,11 @@ const Accounting = ({ userProfile, exchangeRate, setExchangeRate }) => {
                 <button className={`chrome-tab ${subTab === 'periods' ? 'active' : ''}`} onClick={() => setSubTab('periods')}>
                     <Calendar size={16} /> Calendar Periods
                 </button>
+                {isElevatedRole && (
+                    <button className={`chrome-tab ${subTab === 'audit' ? 'active' : ''}`} onClick={() => setSubTab('audit')}>
+                        <ShieldAlert size={16} /> Audit Trail
+                    </button>
+                )}
             </div>
 
             {/* Dynamic Content Based on Sub-Tab */}
@@ -828,6 +838,7 @@ const Accounting = ({ userProfile, exchangeRate, setExchangeRate }) => {
                     journalLines={journalLines}
                     journalEntries={journalEntries}
                     localChartOfAccounts={localChartOfAccounts}
+                    accountingPeriods={accountingPeriods}
                 />
             )}
 
@@ -1408,6 +1419,620 @@ const Accounting = ({ userProfile, exchangeRate, setExchangeRate }) => {
                     </table>
                 </div>
             )}
+            {subTab === 'audit' && isElevatedRole && (
+                <AuditTrailTab />
+            )}
+        </div>
+    );
+};
+
+// ============================================================
+// AUDIT TRAIL TAB
+// ============================================================
+const AuditTrailTab = () => {
+    const [generalLogs, setGeneralLogs] = useState([]);
+    const [overrideLogs, setOverrideLogs] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [currentSubTab, setCurrentSubTab] = useState('general'); // 'general' or 'overrides'
+    
+    // Filters
+    const [actionFilter, setActionFilter] = useState('');
+    const [userFilter, setUserFilter] = useState('');
+    const [dateFrom, setDateFrom] = useState('');
+    const [dateTo, setDateTo] = useState('');
+    
+    // Pagination
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 15;
+    
+    // Detail Modal State
+    const [selectedLog, setSelectedLog] = useState(null);
+
+    const getLocalAuditLog = () => {
+        try {
+            return JSON.parse(localStorage.getItem('lavc_audit_log') || '[]');
+        } catch {
+            return [];
+        }
+    };
+
+    const fetchLogs = async () => {
+        setLoading(true);
+        try {
+            if (currentSubTab === 'general') {
+                const { data, error } = await supabase
+                    .from('audit_log')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+                if (error) {
+                    console.error("General logs fetch error, falling back to local storage:", error);
+                    setGeneralLogs(getLocalAuditLog());
+                } else {
+                    setGeneralLogs(data || []);
+                }
+            } else {
+                const { data, error } = await supabase
+                    .from('override_audit_logs')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+                if (error) {
+                    console.error("Override logs fetch error:", error);
+                    setOverrideLogs([]);
+                } else {
+                    setOverrideLogs(data || []);
+                }
+            }
+        } catch (err) {
+            console.error("Exception fetching logs:", err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchLogs();
+    }, [currentSubTab]);
+
+    // Reset pagination when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [actionFilter, userFilter, dateFrom, dateTo, currentSubTab]);
+
+    // Unique actions list for dropdown filter
+    const uniqueActions = useMemo(() => {
+        const logs = currentSubTab === 'general' ? generalLogs : overrideLogs;
+        return Array.from(new Set(logs.map(l => l.action))).sort();
+    }, [generalLogs, overrideLogs, currentSubTab]);
+
+    // Filter logic
+    const filteredLogs = useMemo(() => {
+        const logs = currentSubTab === 'general' ? generalLogs : overrideLogs;
+        return logs.filter(log => {
+            if (actionFilter && log.action !== actionFilter) return false;
+            
+            if (userFilter) {
+                const search = userFilter.toLowerCase();
+                if (currentSubTab === 'general') {
+                    const email = (log.user_email || '').toLowerCase();
+                    const userId = (log.user_id || '').toLowerCase();
+                    if (!email.includes(search) && !userId.includes(search)) return false;
+                } else {
+                    const opName = (log.operator_name || '').toLowerCase();
+                    if (!opName.includes(search)) return false;
+                }
+            }
+            
+            if (dateFrom || dateTo) {
+                const logDate = new Date(log.created_at || log.timestamp || Date.now());
+                if (dateFrom) {
+                    const from = new Date(dateFrom);
+                    from.setHours(0,0,0,0);
+                    if (logDate < from) return false;
+                }
+                if (dateTo) {
+                    const to = new Date(dateTo);
+                    to.setHours(23,59,59,999);
+                    if (logDate > to) return false;
+                }
+            }
+            return true;
+        });
+    }, [generalLogs, overrideLogs, currentSubTab, actionFilter, userFilter, dateFrom, dateTo]);
+
+    // Paginated logs
+    const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const paginatedLogs = filteredLogs.slice(startIndex, startIndex + itemsPerPage);
+
+    // Color-coding helper for action badges
+    const getActionBadgeStyle = (action) => {
+        const act = (action || '').toUpperCase();
+        if (act.includes('DELETE') || act.includes('REMOVE') || act === 'DELETE') {
+            return { background: 'linear-gradient(135deg, #fee2e2, #fee2e2)', color: '#991b1b', border: '1px solid #fca5a5', padding: '0.25rem 0.5rem', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700 };
+        }
+        if (act.includes('EDIT') || act.includes('UPDATE') || act === 'EDIT') {
+            return { background: 'linear-gradient(135deg, #fffbeb, #fef3c7)', color: '#92400e', border: '1px solid #fcd34d', padding: '0.25rem 0.5rem', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700 };
+        }
+        return { background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', color: '#15803d', border: '1px solid #86efac', padding: '0.25rem 0.5rem', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700 };
+    };
+
+    // Log summaries for tabular view
+    const getLogSummary = (log) => {
+        if (currentSubTab === 'general') {
+            if (log.action === 'EDIT_JOURNAL_ENTRY') {
+                return `Journal Entry Edit (Ref: ${log.details?.reference_no || log.target_id})`;
+            }
+            if (log.action === 'DELETE_JOURNAL_ENTRY') {
+                return `Journal Entry Deletion (Ref: ${log.details?.reference_no || log.target_id})`;
+            }
+            if (log.details && typeof log.details === 'object') {
+                if (log.details.reference_no) return `Reference: ${log.details.reference_no}`;
+                if (log.details.description) return log.details.description;
+                if (log.details.name) return log.details.name;
+            }
+            return `Target Type: ${log.target_type || '-'}, Target ID: ${log.target_id || '-'}`;
+        } else {
+            const type = log.entity_type;
+            if (type === 'ARRIVAL') {
+                const data = Array.isArray(log.old_data) ? log.old_data[0] : log.old_data;
+                return `Arrival DR: ${data?.deliveryReceipt || '-'} (${data?.farmName || '-'})`;
+            } else if (type === 'STUFFED_PAYLOAD') {
+                const oldData = log.old_data;
+                const newData = log.new_data;
+                return `Stuffed Payload Box count: ${oldData?.total || 0} -> ${newData?.total || 0}`;
+            }
+            return `Target Type: ${log.entity_type || '-'}, Entity ID: ${log.entity_id || '-'}`;
+        }
+    };
+
+    return (
+        <div className="erp-content-section slide-down text-left" style={{ padding: '2rem', background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem' }}>
+                <div>
+                    <h3 style={{ margin: '0 0 0.5rem 0', color: 'var(--color-primary-dark)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <ShieldAlert size={24} style={{ color: '#dc2626' }} /> System Audit Trail
+                    </h3>
+                    <p style={{ margin: 0, color: 'var(--text-tertiary)', fontSize: '0.9rem' }}>
+                        Track critical manual corrections, security overrides, and General Ledger adjustments.
+                    </p>
+                </div>
+                <button className="btn-secondary" onClick={fetchLogs} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}>
+                    ⟳ Refresh Logs
+                </button>
+            </div>
+
+            {/* Sub-Tabs for General vs Supervisor Overrides */}
+            <div className="tabs-container" style={{ marginBottom: '1.5rem' }}>
+                <button
+                    className={`tab-btn ${currentSubTab === 'general' ? 'active' : ''}`}
+                    onClick={() => setCurrentSubTab('general')}
+                    style={{ fontSize: '0.9rem', padding: '0.5rem 1rem' }}
+                >
+                    General Operations (audit_log)
+                </button>
+                <button
+                    className={`tab-btn ${currentSubTab === 'overrides' ? 'active' : ''}`}
+                    onClick={() => setCurrentSubTab('overrides')}
+                    style={{ fontSize: '0.9rem', padding: '0.5rem 1rem' }}
+                >
+                    Critical Supervisor Overrides (override_audit_logs)
+                </button>
+            </div>
+
+            {/* Filter Bar */}
+            <div style={{ background: '#f8fafc', padding: '1.25rem', border: '1px solid #e2e8f0', borderRadius: '10px', marginBottom: '1.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '1rem', alignItems: 'end' }}>
+                <div>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.3rem' }}>Action Type</label>
+                    <select className="input-field" value={actionFilter} onChange={e => setActionFilter(e.target.value)}>
+                        <option value="">-- All Actions --</option>
+                        {uniqueActions.map(action => (
+                            <option key={action} value={action}>{action}</option>
+                        ))}
+                    </select>
+                </div>
+                <div>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.3rem' }}>
+                        {currentSubTab === 'general' ? 'User ID / Email' : 'Supervisor Operator'}
+                    </label>
+                    <input
+                        className="input-field"
+                        placeholder="Search operator..."
+                        value={userFilter}
+                        onChange={e => setUserFilter(e.target.value)}
+                    />
+                </div>
+                <div>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.3rem' }}>From Date</label>
+                    <input type="date" className="input-field" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+                </div>
+                <div>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.3rem' }}>To Date</label>
+                    <input type="date" className="input-field" value={dateTo} onChange={e => setDateTo(e.target.value)} />
+                </div>
+                <button
+                    className="btn-secondary"
+                    style={{ padding: '0.55rem 1rem', height: '38px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#475569', fontWeight: 700, cursor: 'pointer' }}
+                    onClick={() => {
+                        setActionFilter('');
+                        setUserFilter('');
+                        setDateFrom('');
+                        setDateTo('');
+                    }}
+                >
+                    Reset Filters
+                </button>
+            </div>
+
+            {/* Logs List Table */}
+            {loading ? (
+                <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-tertiary)' }}>
+                    <div style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>⟳</div>
+                    <p>Loading audit trail logs...</p>
+                </div>
+            ) : (
+                <div className="card" style={{ padding: '0', overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '12px' }}>
+                    <table className="banana-table">
+                        <thead>
+                            <tr>
+                                <th style={{ width: '170px' }}>Timestamp</th>
+                                <th style={{ width: '130px' }}>Action</th>
+                                <th style={{ width: '220px' }}>{currentSubTab === 'general' ? 'User / Email' : 'Authorized Operator'}</th>
+                                <th>Summary / Description</th>
+                                <th style={{ width: '120px', textAlign: 'center' }}>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {paginatedLogs.length === 0 ? (
+                                <tr>
+                                    <td colSpan="5" className="text-center" style={{ padding: '3rem', color: 'var(--text-tertiary)' }}>
+                                        No audit entries match the current filters.
+                                    </td>
+                                </tr>
+                            ) : (
+                                paginatedLogs.map((log) => (
+                                    <tr key={log.id}>
+                                        <td style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                                            {new Date(log.created_at || log.timestamp).toLocaleString()}
+                                        </td>
+                                        <td>
+                                            <span style={getActionBadgeStyle(log.action)}>
+                                                {log.action}
+                                            </span>
+                                        </td>
+                                        <td style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                                            {currentSubTab === 'general' ? (log.user_email || log.user_id || 'System') : log.operator_name}
+                                        </td>
+                                        <td style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                                            {getLogSummary(log)}
+                                        </td>
+                                        <td className="text-center">
+                                            <button
+                                                className="btn-secondary"
+                                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', cursor: 'pointer' }}
+                                                onClick={() => setSelectedLog(log)}
+                                            >
+                                                View
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+
+                    {/* Pagination Controls */}
+                    {totalPages > 1 && (
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '1rem', padding: '1rem', borderTop: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                            <button
+                                disabled={currentPage === 1}
+                                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                className="btn-secondary btn-sm"
+                            >
+                                Previous
+                            </button>
+                            <span style={{ fontSize: '0.82rem', fontWeight: '600', color: 'var(--text-secondary)' }}>
+                                Page {currentPage} of {totalPages}
+                            </span>
+                            <button
+                                disabled={currentPage === totalPages}
+                                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                className="btn-secondary btn-sm"
+                            >
+                                Next
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Modal Detail Viewer */}
+            {selectedLog && (
+                <AuditDetailModal log={selectedLog} onClose={() => setSelectedLog(null)} currentSubTab={currentSubTab} />
+            )}
+        </div>
+    );
+};
+
+// ============================================================
+// AUDIT LOG DETAIL MODAL
+// ============================================================
+const AuditDetailModal = ({ log, onClose, currentSubTab }) => {
+    const isLedgerAction = log.action === 'EDIT_JOURNAL_ENTRY' || log.action === 'DELETE_JOURNAL_ENTRY';
+
+    // Renders the Ledger comparative tables
+    const renderJournalLinesTable = (lines = [], title = '') => {
+        const totalDr = lines.reduce((s, l) => s + (Number(l.debit || l.debit_amount) || 0), 0);
+        const totalCr = lines.reduce((s, l) => s + (Number(l.credit || l.credit_amount) || 0), 0);
+
+        return (
+            <div style={{ flex: 1, minWidth: '300px', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '1rem', alignSelf: 'stretch' }}>
+                <h4 style={{ margin: '0 0 1rem 0', color: '#1e293b', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', fontSize: '0.9rem' }}>{title}</h4>
+                <table style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse' }}>
+                    <thead>
+                        <tr style={{ textAlign: 'left', borderBottom: '1px solid #cbd5e1' }}>
+                            <th style={{ padding: '0.35rem' }}>Account</th>
+                            <th style={{ padding: '0.35rem', textAlign: 'right' }}>Debit</th>
+                            <th style={{ padding: '0.35rem', textAlign: 'right' }}>Credit</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {lines.map((line, idx) => (
+                            <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                <td style={{ padding: '0.35rem' }}>
+                                    <div style={{ fontWeight: 600 }}>{line.accountCode}</div>
+                                    <div style={{ color: '#64748b', fontSize: '0.75rem' }}>{line.accountName}</div>
+                                </td>
+                                <td style={{ padding: '0.35rem', textAlign: 'right', color: '#0f172a' }}>
+                                    {line.debit > 0 ? `₱${Number(line.debit).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '-'}
+                                </td>
+                                <td style={{ padding: '0.35rem', textAlign: 'right', color: '#0f172a' }}>
+                                    {line.credit > 0 ? `₱${Number(line.credit).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '-'}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                    <tfoot>
+                        <tr style={{ fontWeight: 800, borderTop: '1px solid #cbd5e1' }}>
+                            <td style={{ padding: '0.5rem 0.35rem' }}>Total</td>
+                            <td style={{ padding: '0.5rem 0.35rem', textAlign: 'right' }}>₱{totalDr.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                            <td style={{ padding: '0.5rem 0.35rem', textAlign: 'right' }}>₱{totalCr.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        );
+    };
+
+    // Format headers side-by-side
+    const renderJournalHeaderDiff = (before, after) => {
+        const fields = [
+            { key: 'date_posted', label: 'Date Posted' },
+            { key: 'reference_no', label: 'Reference' },
+            { key: 'description', label: 'Description' },
+            { key: 'currency', label: 'Currency' },
+            { key: 'exchange_rate', label: 'Exchange Rate' },
+        ];
+
+        return (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', background: '#f8fafc', padding: '1rem', borderRadius: '8px', border: '1px solid #cbd5e1', marginBottom: '1rem' }}>
+                <div>
+                    <h5 style={{ margin: '0 0 0.5rem 0', color: '#475569', fontSize: '0.8rem', textTransform: 'uppercase' }}>Before (Original)</h5>
+                    {fields.map(f => (
+                        <div key={f.key} style={{ fontSize: '0.85rem', marginBottom: '0.3rem' }}>
+                            <span style={{ color: '#64748b' }}>{f.label}: </span>
+                            <strong>{String(before[f.key] || '-')}</strong>
+                        </div>
+                    ))}
+                </div>
+                <div>
+                    <h5 style={{ margin: '0 0 0.5rem 0', color: '#475569', fontSize: '0.8rem', textTransform: 'uppercase' }}>After (Modified)</h5>
+                    {fields.map(f => {
+                        const isChanged = String(before[f.key] || '') !== String(after[f.key] || '');
+                        return (
+                            <div key={f.key} style={{ fontSize: '0.85rem', marginBottom: '0.3rem', background: isChanged ? '#fef3c7' : 'transparent', padding: isChanged ? '1px 4px' : '0', borderRadius: '3px' }}>
+                                <span style={{ color: '#64748b' }}>{f.label}: </span>
+                                <strong style={{ color: isChanged ? '#b45309' : '#0f172a' }}>{String(after[f.key] || '-')}</strong>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        );
+    };
+
+    // Custom view for supervisor override payload (e.g. Arrival or Stuffed Payload)
+    const renderOverrideDiff = () => {
+        const type = log.entity_type;
+        const oldData = log.old_data;
+        const newData = log.new_data;
+
+        if (type === 'ARRIVAL') {
+            const renderArrivalGrid = (dataRows = [], title = '') => {
+                if (!dataRows || dataRows.length === 0) return <p style={{ color: '#64748b', fontSize: '0.85rem' }}>No data</p>;
+                const header = dataRows[0] || {};
+                
+                const qtys = {};
+                dataRows.forEach(r => {
+                    if (r.typeId) qtys[r.typeId] = r.quantity;
+                });
+
+                return (
+                    <div style={{ flex: 1, minWidth: '280px', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '1rem' }}>
+                        <h4 style={{ margin: '0 0 0.75rem 0', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.3rem', fontSize: '0.85rem' }}>{title}</h4>
+                        <div style={{ fontSize: '0.8rem', color: '#475569', marginBottom: '0.5rem' }}>
+                            <div>DR: <strong>{header.deliveryReceipt || '-'}</strong></div>
+                            <div>Farm: <strong>{header.farmName || '-'} ({header.farmCode || '-'})</strong></div>
+                            <div>Driver: <strong>{header.driverName || '-'} ({header.plateNumber || '-'})</strong></div>
+                        </div>
+                        <strong style={{ fontSize: '0.78rem', display: 'block', margin: '0.5rem 0 0.25rem 0' }}>Class Breakdown:</strong>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.75rem' }}>
+                            {Object.entries(qtys).map(([typeId, val]) => (
+                                <div key={typeId} style={{ display: 'flex', justifycontent: 'space-between', borderBottom: '1px solid #f1f5f9' }}>
+                                    <span>{typeId.replace('classA.', 'A-').replace('classB.', 'B-').toUpperCase()}:</span>
+                                    <strong>{val} bxs</strong>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                );
+            };
+
+            const isEdit = log.action === 'EDIT';
+            const beforeRows = Array.isArray(oldData) ? oldData : [oldData];
+            
+            let afterRows = [];
+            if (newData) {
+                const qtys = newData.quantities || {};
+                afterRows = Object.entries(qtys).map(([typeId, quantity]) => ({
+                    ...newData,
+                    typeId,
+                    quantity
+                }));
+            }
+
+            return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                        {renderArrivalGrid(beforeRows, "Before (Original State)")}
+                        {isEdit && renderArrivalGrid(afterRows, "After (Modified State)")}
+                    </div>
+                </div>
+            );
+        }
+
+        if (type === 'STUFFED_PAYLOAD') {
+            const renderPayloadGrid = (payload, title) => {
+                if (!payload) return <p style={{ color: '#64748b', fontSize: '0.85rem' }}>No data (Deleted)</p>;
+                return (
+                    <div style={{ flex: 1, minWidth: '280px', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '1rem' }}>
+                        <h4 style={{ margin: '0 0 0.75rem 0', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.3rem', fontSize: '0.85rem' }}>{title}</h4>
+                        <div style={{ fontSize: '0.8rem', color: '#475569', marginBottom: '0.5rem' }}>
+                            <div>Payload ID: <strong>{payload.id || '-'}</strong></div>
+                            <div>Total Boxes: <strong>{payload.total || 0}</strong></div>
+                        </div>
+                        <strong style={{ fontSize: '0.78rem', display: 'block', margin: '0.5rem 0 0.25rem 0' }}>Hands breakdown:</strong>
+                        <pre style={{ fontSize: '0.75rem', background: '#ffffff', border: '1px solid #e2e8f0', padding: '0.5rem', borderRadius: '4px', overflowX: 'auto', margin: 0 }}>
+                            {JSON.stringify(payload.data || {}, null, 2)}
+                        </pre>
+                    </div>
+                );
+            };
+
+            return (
+                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                    {renderPayloadGrid(oldData, "Before (Original State)")}
+                    {log.action === 'EDIT' && renderPayloadGrid(newData, "After (Modified State)")}
+                </div>
+            );
+        }
+
+        return (
+            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: '280px' }}>
+                    <h4 style={{ fontSize: '0.85rem', color: '#475569', margin: '0 0 0.5rem 0' }}>Before (Original)</h4>
+                    <pre style={{ margin: 0, padding: '1rem', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px', overflowX: 'auto', fontSize: '0.75rem', maxHeight: '300px' }}>
+                        {JSON.stringify(oldData, null, 2)}
+                    </pre>
+                </div>
+                <div style={{ flex: 1, minWidth: '280px' }}>
+                    <h4 style={{ fontSize: '0.85rem', color: '#475569', margin: '0 0 0.5rem 0' }}>After (Modified)</h4>
+                    <pre style={{ margin: 0, padding: '1rem', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px', overflowX: 'auto', fontSize: '0.75rem', maxHeight: '300px' }}>
+                        {newData ? JSON.stringify(newData, null, 2) : '(Deleted)'}
+                    </pre>
+                </div>
+            </div>
+        );
+    };
+
+    return (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15, 23, 42, 0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, backdropFilter: 'blur(8px)', padding: '1rem' }}>
+            <div className="card animation-fade-in" style={{ padding: '2rem', maxWidth: '850px', width: '100%', maxHeight: '90vh', overflowY: 'auto', position: 'relative', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', background: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', textAlign: 'left' }}>
+                <button
+                    onClick={onClose}
+                    style={{ position: 'absolute', top: '20px', right: '20px', cursor: 'pointer', fontSize: '1.5rem', color: '#64748b', background: 'none', border: 'none', padding: '0.2rem' }}
+                >
+                    ×
+                </button>
+                
+                <h3 style={{ margin: '0 0 0.5rem 0', color: 'var(--color-primary-dark)', fontSize: '1.25rem', fontWeight: 800 }}>
+                    Audit Log Details
+                </h3>
+                <p style={{ margin: '0 0 1.5rem 0', color: '#64748b', fontSize: '0.85rem' }}>
+                    Entry ID: <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', fontSize: '0.75rem' }}>{log.id}</code>
+                </p>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', background: '#f1f5f9', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', border: '1px solid #cbd5e1' }}>
+                    <div>
+                        <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block', textTransform: 'uppercase', fontWeight: 600 }}>Timestamp</span>
+                        <strong style={{ fontSize: '0.85rem', color: '#0f172a' }}>{new Date(log.created_at || log.timestamp).toLocaleString()}</strong>
+                    </div>
+                    <div>
+                        <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block', textTransform: 'uppercase', fontWeight: 600 }}>Action</span>
+                        <strong style={{ fontSize: '0.85rem', color: '#0f172a' }}>{log.action}</strong>
+                    </div>
+                    <div>
+                        <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block', textTransform: 'uppercase', fontWeight: 600 }}>
+                            {currentSubTab === 'general' ? 'User / Email' : 'PIN Authorized Operator'}
+                        </span>
+                        <strong style={{ fontSize: '0.85rem', color: '#0f172a' }}>
+                            {currentSubTab === 'general' ? (log.user_email || log.user_id || 'System') : log.operator_name}
+                        </strong>
+                    </div>
+                    <div>
+                        <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block', textTransform: 'uppercase', fontWeight: 600 }}>Target / Entity Type</span>
+                        <strong style={{ fontSize: '0.85rem', color: '#0f172a' }}>
+                            {currentSubTab === 'general' ? (log.target_type || '-') : log.entity_type}
+                        </strong>
+                    </div>
+                </div>
+
+                <div style={{ marginBottom: '1.5rem' }}>
+                    <h4 style={{ margin: '0 0 1rem 0', color: '#0f172a', fontSize: '1rem', fontWeight: 700 }}>Comparison snapshot</h4>
+                    
+                    {log.action === 'EDIT_JOURNAL_ENTRY' && (
+                        <div>
+                            {renderJournalHeaderDiff(log.details?.before || {}, log.details?.after || {})}
+                            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginTop: '1rem' }}>
+                                {renderJournalLinesTable(log.details?.before?.lines || [], "Before (Original Journal Lines)")}
+                                {renderJournalLinesTable(log.details?.after?.lines || [], "After (Modified Journal Lines)")}
+                            </div>
+                        </div>
+                    )}
+
+                    {log.action === 'DELETE_JOURNAL_ENTRY' && (
+                        <div>
+                            <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', padding: '1rem', borderRadius: '8px', marginBottom: '1rem', color: '#991b1b', fontSize: '0.88rem' }}>
+                                🚨 <strong>This journal entry was permanently deleted.</strong> Below is the final logged snapshot of the entry and its lines before deletion.
+                            </div>
+                            <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '8px', border: '1px solid #cbd5e1', marginBottom: '1rem', fontSize: '0.85rem' }}>
+                                <div>Reference: <strong>{log.details?.reference_no || '-'}</strong></div>
+                                <div>Date Posted: <strong>{log.details?.date_posted || '-'}</strong></div>
+                                <div>Description: <strong>{log.details?.description || '-'}</strong></div>
+                                <div>Currency: <strong>{log.details?.currency || '-'}</strong> (Exchange rate: <strong>{log.details?.exchange_rate || '1.00'}</strong>)</div>
+                            </div>
+                            {renderJournalLinesTable(log.details?.lines || [], "Deleted Journal Lines Snapshot")}
+                        </div>
+                    )}
+
+                    {currentSubTab === 'overrides' && renderOverrideDiff()}
+
+                    {!isLedgerAction && currentSubTab === 'general' && (
+                        <pre style={{ margin: 0, padding: '1rem', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px', overflowX: 'auto', fontSize: '0.8rem', maxHeight: '300px' }}>
+                            {JSON.stringify(log.details || {}, null, 2)}
+                        </pre>
+                    )}
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
+                    <button
+                        className="btn-primary"
+                        onClick={onClose}
+                        style={{ padding: '0.5rem 2rem', cursor: 'pointer' }}
+                    >
+                        Close Details
+                    </button>
+                </div>
+            </div>
         </div>
     );
 };
