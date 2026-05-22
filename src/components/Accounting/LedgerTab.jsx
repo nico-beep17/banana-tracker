@@ -417,33 +417,8 @@ const LedgerTab = ({ journalLines, journalEntries, localChartOfAccounts, account
 
             {/* Premium Glassmorphic Edit Entry Modal */}
             {editingEntry && (
-                <div style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    backgroundColor: 'rgba(15, 23, 42, 0.65)',
-                    backdropFilter: 'blur(8px)',
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    zIndex: 10000,
-                    padding: '1.5rem',
-                }}>
-                    <div style={{
-                        backgroundColor: '#ffffff',
-                        borderRadius: '16px',
-                        width: '100%',
-                        maxWidth: '750px',
-                        maxHeight: '90vh',
-                        overflowY: 'auto',
-                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-                        border: '1px solid #e2e8f0',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        padding: '2rem'
-                    }}>
+                <div className="audit-modal-overlay" style={{ zIndex: 10000 }}>
+                    <div className="ledger-modal-content">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '1rem' }}>
                             <h3 style={{ margin: 0, color: 'var(--color-primary-dark)' }}>Edit Journal Entry</h3>
                             <button
@@ -455,7 +430,7 @@ const LedgerTab = ({ journalLines, journalEntries, localChartOfAccounts, account
                             </button>
                         </div>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                        <div className="ledger-modal-grid-2col">
                             <div className="input-group">
                                 <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Date Posted</label>
                                 <input
@@ -486,7 +461,7 @@ const LedgerTab = ({ journalLines, journalEntries, localChartOfAccounts, account
                             />
                         </div>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+                        <div className="ledger-modal-grid-2col" style={{ marginBottom: '1.5rem' }}>
                             <div className="input-group">
                                 <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Currency</label>
                                 <select
@@ -618,16 +593,9 @@ const LedgerTab = ({ journalLines, journalEntries, localChartOfAccounts, account
                         </div>
 
                         {/* Totals & Live Balance Validation */}
-                        <div style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            padding: '0.75rem 1rem',
+                        <div className="ledger-modal-validation-bar" style={{
                             background: validation.balanced ? '#f0fdf4' : '#fef2f2',
-                            borderRadius: '8px',
-                            marginTop: '1rem',
-                            border: `1px solid ${validation.balanced ? '#bbf7d0' : '#fecaca'}`,
-                            fontSize: '0.85rem'
+                            border: `1px solid ${validation.balanced ? '#bbf7d0' : '#fecaca'}`
                         }}>
                             <div>
                                 <span style={{ marginRight: '1.5rem', color: '#334155' }}>Total Debits: <strong>₱{validation.totalDebit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong></span>

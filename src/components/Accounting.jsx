@@ -1587,7 +1587,7 @@ const AuditTrailTab = () => {
 
     return (
         <div className="erp-content-section slide-down text-left" style={{ padding: '2rem', background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem' }}>
+            <div className="audit-header-container">
                 <div>
                     <h3 style={{ margin: '0 0 0.5rem 0', color: 'var(--color-primary-dark)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <ShieldAlert size={24} style={{ color: '#dc2626' }} /> System Audit Trail
@@ -1620,7 +1620,7 @@ const AuditTrailTab = () => {
             </div>
 
             {/* Filter Bar */}
-            <div style={{ background: '#f8fafc', padding: '1.25rem', border: '1px solid #e2e8f0', borderRadius: '10px', marginBottom: '1.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '1rem', alignItems: 'end' }}>
+            <div className="audit-filter-bar">
                 <div>
                     <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.3rem' }}>Action Type</label>
                     <select className="input-field" value={actionFilter} onChange={e => setActionFilter(e.target.value)}>
@@ -1670,7 +1670,7 @@ const AuditTrailTab = () => {
                     <p>Loading audit trail logs...</p>
                 </div>
             ) : (
-                <div className="card" style={{ padding: '0', overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '12px' }}>
+                <div className="audit-table-card">
                     <table className="banana-table">
                         <thead>
                             <tr>
@@ -1814,7 +1814,7 @@ const AuditDetailModal = ({ log, onClose, currentSubTab }) => {
         ];
 
         return (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', background: '#f8fafc', padding: '1rem', borderRadius: '8px', border: '1px solid #cbd5e1', marginBottom: '1rem' }}>
+            <div className="audit-modal-diff-header-grid">
                 <div>
                     <h5 style={{ margin: '0 0 0.5rem 0', color: '#475569', fontSize: '0.8rem', textTransform: 'uppercase' }}>Before (Original)</h5>
                     {fields.map(f => (
@@ -1892,7 +1892,7 @@ const AuditDetailModal = ({ log, onClose, currentSubTab }) => {
 
             return (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                    <div className="audit-modal-side-by-side-wrap">
                         {renderArrivalGrid(beforeRows, "Before (Original State)")}
                         {isEdit && renderArrivalGrid(afterRows, "After (Modified State)")}
                     </div>
@@ -1919,7 +1919,7 @@ const AuditDetailModal = ({ log, onClose, currentSubTab }) => {
             };
 
             return (
-                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                <div className="audit-modal-side-by-side-wrap">
                     {renderPayloadGrid(oldData, "Before (Original State)")}
                     {log.action === 'EDIT' && renderPayloadGrid(newData, "After (Modified State)")}
                 </div>
@@ -1927,7 +1927,7 @@ const AuditDetailModal = ({ log, onClose, currentSubTab }) => {
         }
 
         return (
-            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+            <div className="audit-modal-side-by-side-wrap">
                 <div style={{ flex: 1, minWidth: '280px' }}>
                     <h4 style={{ fontSize: '0.85rem', color: '#475569', margin: '0 0 0.5rem 0' }}>Before (Original)</h4>
                     <pre style={{ margin: 0, padding: '1rem', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px', overflowX: 'auto', fontSize: '0.75rem', maxHeight: '300px' }}>
@@ -1945,8 +1945,8 @@ const AuditDetailModal = ({ log, onClose, currentSubTab }) => {
     };
 
     return (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15, 23, 42, 0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, backdropFilter: 'blur(8px)', padding: '1rem' }}>
-            <div className="card animation-fade-in" style={{ padding: '2rem', maxWidth: '850px', width: '100%', maxHeight: '90vh', overflowY: 'auto', position: 'relative', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', background: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', textAlign: 'left' }}>
+        <div className="audit-modal-overlay">
+            <div className="audit-modal-content animation-fade-in">
                 <button
                     onClick={onClose}
                     style={{ position: 'absolute', top: '20px', right: '20px', cursor: 'pointer', fontSize: '1.5rem', color: '#64748b', background: 'none', border: 'none', padding: '0.2rem' }}
@@ -1961,7 +1961,7 @@ const AuditDetailModal = ({ log, onClose, currentSubTab }) => {
                     Entry ID: <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', fontSize: '0.75rem' }}>{log.id}</code>
                 </p>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', background: '#f1f5f9', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', border: '1px solid #cbd5e1' }}>
+                <div className="audit-modal-metadata-grid">
                     <div>
                         <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block', textTransform: 'uppercase', fontWeight: 600 }}>Timestamp</span>
                         <strong style={{ fontSize: '0.85rem', color: '#0f172a' }}>{new Date(log.created_at || log.timestamp).toLocaleString()}</strong>
@@ -1992,7 +1992,7 @@ const AuditDetailModal = ({ log, onClose, currentSubTab }) => {
                     {log.action === 'EDIT_JOURNAL_ENTRY' && (
                         <div>
                             {renderJournalHeaderDiff(log.details?.before || {}, log.details?.after || {})}
-                            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginTop: '1rem' }}>
+                            <div className="audit-modal-side-by-side-wrap" style={{ marginTop: '1rem' }}>
                                 {renderJournalLinesTable(log.details?.before?.lines || [], "Before (Original Journal Lines)")}
                                 {renderJournalLinesTable(log.details?.after?.lines || [], "After (Modified Journal Lines)")}
                             </div>

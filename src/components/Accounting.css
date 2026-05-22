@@ -114,4 +114,158 @@
         grid-template-columns: 1fr 1fr !important;
         gap: 0.75rem !important;
     }
+
+    /* Responsiveness upgrades */
+    .audit-header-container {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 1rem;
+    }
+
+    .audit-modal-content, .ledger-modal-content {
+        padding: 1rem !important;
+    }
+
+    .audit-modal-diff-header-grid, .ledger-modal-grid-2col {
+        grid-template-columns: 1fr !important;
+        gap: 0.75rem !important;
+    }
+
+    .ledger-modal-validation-bar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
 }
+
+/* ==========================================
+   AUDIT TRAIL & LEDGER EDIT MODAL PREMIUM RESPONSIVE CLASSES
+   ========================================== */
+
+/* Audit Trail Header */
+.audit-header-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 2rem;
+}
+
+/* Audit Filter Bar */
+.audit-filter-bar {
+    background: #f8fafc;
+    padding: 1.25rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    margin-bottom: 1.5rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 1rem;
+    align-items: end;
+}
+
+/* Audit Table Card wrapper */
+.audit-table-card {
+    background: #ffffff;
+    padding: 0;
+    overflow-x: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+}
+
+/* Audit Modal Overlay */
+.audit-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(15, 23, 42, 0.75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    backdrop-filter: blur(8px);
+    padding: 1rem;
+}
+
+/* Audit Modal Content Card */
+.audit-modal-content {
+    padding: 2rem;
+    max-width: 850px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+    box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    text-align: left;
+}
+
+/* Audit Modal Metadata Grid */
+.audit-modal-metadata-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    background: #f1f5f9;
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    border: 1px solid #cbd5e1;
+}
+
+/* Audit Modal Diff Header Grid */
+.audit-modal-diff-header-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    background: #f8fafc;
+    padding: 1rem;
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    margin-bottom: 1rem;
+}
+
+/* Audit Modal Side-by-Side wrap */
+.audit-modal-side-by-side-wrap {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    align-items: stretch;
+}
+
+/* General Ledger Edit Modal Content Card */
+.ledger-modal-content {
+    background-color: #ffffff;
+    border-radius: 16px;
+    width: 100%;
+    max-width: 750px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    border: 1px solid #e2e8f0;
+    display: flex;
+    flex-direction: column;
+    padding: 2rem;
+}
+
+/* General Ledger Edit Modal Form 2-Column Grid */
+.ledger-modal-grid-2col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+/* General Ledger Edit Modal Validation Bar */
+.ledger-modal-validation-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    margin-top: 1rem;
+    font-size: 0.85rem;
+}
+
